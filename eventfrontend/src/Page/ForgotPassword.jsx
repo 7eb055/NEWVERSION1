@@ -1,38 +1,132 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './css/ForgotPassword.css';
+import axios from 'axios';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isEmailSent, setIsEmailSent] = useState(false);
   const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const validateForm = () => {
+    // Clear previous error
+    setError('');
+
+    // Check required fields
+    if (!email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate form
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
     setMessage('');
+    setError('');
 
     try {
-      // Simulate API call
-      setTimeout(() => {
+      // Prepare data for backend
+      const forgotPasswordData = {
+        email: email.trim()
+      };
+
+      // Make API request
+      const response = await axios.post('http://localhost:5000/api/forgot-password', forgotPasswordData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Handle success - backend always returns success for security
+      if (response.data.message) {
         setIsEmailSent(true);
-        setMessage('Password reset instructions have been sent to your email.');
-        setIsLoading(false);
-      }, 1500);
-      
-      // Handle forgot password logic here
-      console.log('Password reset requested for:', email);
+        setMessage(response.data.message);
+        console.log('Password reset requested for:', email);
+      }
+
     } catch (error) {
-      setMessage('Something went wrong. Please try again.');
+      console.error('Forgot password error:', error);
+      
+      if (error.response) {
+        // Server responded with error status
+        setError(error.response.data.message || 'Failed to send reset instructions. Please try again.');
+      } else if (error.request) {
+        // Request was made but no response received
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        // Something else happened
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
       setIsLoading(false);
     }
   };
 
-  const handleResendEmail = () => {
+  const handleResendEmail = async () => {
+    // Validate form before resending
+    if (!validateForm()) {
+      return;
+    }
+
     setIsEmailSent(false);
     setMessage('');
-    handleSubmit({ preventDefault: () => {} });
+    setError('');
+    setIsLoading(true);
+
+    try {
+      // Prepare data for backend
+      const forgotPasswordData = {
+        email: email.trim()
+      };
+
+      // Make API request
+      const response = await axios.post('http://localhost:5000/api/forgot-password', forgotPasswordData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Handle success
+      if (response.data.message) {
+        setIsEmailSent(true);
+        setMessage('Reset instructions have been sent again to your email.');
+        console.log('Password reset resent for:', email);
+      }
+
+    } catch (error) {
+      console.error('Resend email error:', error);
+      
+      if (error.response) {
+        // Server responded with error status
+        setError(error.response.data.message || 'Failed to resend instructions. Please try again.');
+      } else if (error.request) {
+        // Request was made but no response received
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        // Something else happened
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -73,13 +167,23 @@ const ForgotPassword = () => {
                       className="fp-form-input"
                       placeholder="Enter your email address"
                       value={email}
-                      onChange={(e) => setEmail(e.target.value)}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) setError('');
+                      }}
                       required
                       disabled={isLoading}
                     />
                   </div>
 
-                  {message && (
+                  {error && (
+                    <div className="fp-message error">
+                      <i className="fas fa-exclamation-circle"></i>
+                      {error}
+                    </div>
+                  )}
+
+                  {message && !error && (
                     <div className={`fp-message ${isEmailSent ? 'success' : 'error'}`}>
                       <i className={`fas ${isEmailSent ? 'fa-check-circle' : 'fa-exclamation-circle'}`}></i>
                       {message}
@@ -126,13 +230,34 @@ const ForgotPassword = () => {
                     </p>
                   </div>
 
+                  {error && (
+                    <div className="fp-message error">
+                      <i className="fas fa-exclamation-circle"></i>
+                      {error}
+                    </div>
+                  )}
+
                   <button 
                     type="button" 
                     className="fp-resend-btn"
                     onClick={handleResendEmail}
+                    disabled={isLoading}
+                    style={{
+                      opacity: isLoading ? 0.7 : 1,
+                      cursor: isLoading ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    <i className="fas fa-redo"></i>
-                    Resend Email
+                    {isLoading ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin"></i>
+                        Sending...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-redo"></i>
+                        Resend Email
+                      </>
+                    )}
                   </button>
                 </div>
               </>

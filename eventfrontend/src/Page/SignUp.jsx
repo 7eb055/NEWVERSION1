@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import './css/SignUp.css';
+import axios from 'axios';
 
 const SignUp = () => {
   const [formData, setFormData] = useState({
@@ -16,6 +17,8 @@ const SignUp = () => {
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -23,19 +26,141 @@ const SignUp = () => {
       ...prev,
       [name]: value
     }));
+    // Clear error when user starts typing
+    if (error) setError('');
   };
 
-  const handleSubmit = (e) => {
+  const validateForm = () => {
+    // Clear previous error
+    setError('');
+
+    // Check required fields
+    if (!formData.fullName.trim()) {
+      setError('Full name is required');
+      return false;
+    }
+
+    if (!formData.email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    if (!formData.password) {
+      setError('Password is required');
+      return false;
+    }
+
+    // Password strength validation
+    if (formData.password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+
+    // Organizer-specific validations
+    if (formData.role === 'organizer') {
+      if (!formData.companyName.trim()) {
+        setError('Company name is required for organizers');
+        return false;
+      }
+      if (!formData.contactPerson.trim()) {
+        setError('Contact person is required for organizers');
+        return false;
+      }
+      if (!formData.location.trim()) {
+        setError('Location is required for organizers');
+        return false;
+      }
+    }
+
+    return true;
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Basic validation
-    if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
-    console.log('Sign up data:', formData);
-    // Handle sign up logic here
+    setIsLoading(true);
+    setError('');
+
+    try {
+      // Prepare data for backend
+      const submitData = {
+        username: formData.fullName,
+        email: formData.email,
+        password: formData.password,
+        role: formData.role,
+        companyName: formData.role === 'organizer' ? formData.companyName : undefined,
+        location: formData.role === 'organizer' ? formData.location : undefined,
+        phoneNumber: formData.role === 'organizer' ? formData.contactPerson : undefined
+      };
+
+      // Make API request
+      const response = await axios.post('http://localhost:5000/api/register', submitData, {
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      // Handle success
+      if (response.data.token) {
+        // Store token in localStorage
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        
+        alert('Account created successfully! Welcome to our platform.');
+        
+        // Reset form
+        setFormData({
+          fullName: '',
+          email: '',
+          password: '',
+          confirmPassword: '',
+          role: 'attendee',
+          companyName: '',
+          contactPerson: '',
+          location: ''
+        });
+
+        // Redirect to login
+        window.location.href = '/login'; // or use history.push('/login') if using react-router
+
+        // You can add navigation here if using react-router
+        console.log('Registration successful:', response.data);
+
+      }
+
+    } catch (error) {
+      console.error('Registration error:', error);
+      
+      if (error.response) {
+        // Server responded with error status
+        setError(error.response.data.message || 'Registration failed. Please try again.');
+      } else if (error.request) {
+        // Request was made but no response received
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        // Something else happened
+        setError('An unexpected error occurred. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -55,7 +180,21 @@ const SignUp = () => {
             </p>
           </div>
 
-          <form className="signup-form" onSubmit={handleSubmit}>
+          <form className="signup-form" >
+            {/* Error Message */}
+            {error && (
+              <div className="error-message" style={{
+                backgroundColor: '#fee',
+                color: '#c33',
+                padding: '12px',
+                borderRadius: '6px',
+                marginBottom: '20px',
+                border: '1px solid #fcc'
+              }}>
+                <i className="fas fa-exclamation-triangle"></i> {error}
+              </div>
+            )}
+
             {/* Full Name */}
             <div className="form-group">
               <label htmlFor="fullName" className="form-label">
@@ -246,9 +385,27 @@ const SignUp = () => {
             )}
 
             {/* Submit Button */}
-            <button type="submit" className="signup-btn">
-              <i className="fas fa-user-plus"></i>
-              Create Account
+            <button 
+              type="submit" 
+              className="signup-btn"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              style={{
+                opacity: isLoading ? 0.7 : 1,
+                cursor: isLoading ? 'not-allowed' : 'pointer'
+              }}
+            >
+              {isLoading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin"></i>
+                  Creating Account...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-user-plus"></i>
+                  Create Account
+                </>
+              )}
             </button>
 
             {/* Social Sign Up */}
