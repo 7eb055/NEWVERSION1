@@ -2,12 +2,18 @@ import React, { useState } from "react";
 import { Link } from 'react-router-dom';
 import './css/header.css'
 
+import { useLocation } from 'react-router-dom';
+
 const Header = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+
+  // Hide auth buttons on eventdetails page
+  const hideAuth = location.pathname === '/eventdetails';
 
   return (
     <header className="header">
@@ -36,24 +42,26 @@ const Header = () => {
           Schedule
         </a>
         <a href="#" className="nav-link">
-          <i className="fas fa-blog"></i>
-          Blogs
+          <i className="fas fa-calendar"></i>
+          Events
         </a>
         <a href="#" className="nav-link">
           <i className="fas fa-file-alt"></i>
           Pages
         </a>
       </nav>
-      <div className="auth-buttons">
-        <Link to="/login" className="login-btn-header">
-          <i className="fas fa-sign-in-alt"></i>
-          Login
-        </Link>
-        <Link to="/signup" className="signup-btn-header">
-          <i className="fas fa-user-plus"></i>
-          Sign Up
-        </Link>
-      </div>
+      {!hideAuth && (
+        <div className="auth-buttons">
+          <Link to="/login" className="login-btn-header">
+            <i className="fas fa-sign-in-alt"></i>
+            Login
+          </Link>
+          <Link to="/signup" className="signup-btn-header">
+            <i className="fas fa-user-plus"></i>
+            Sign Up
+          </Link>
+        </div>
+      )}
     </header>
   );
 }
