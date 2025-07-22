@@ -99,31 +99,27 @@ const SignUp = () => {
     setError('');
 
     try {
-      // Prepare data for backend
+      // Prepare data for backend - matching the server's expected fields
       const submitData = {
         username: formData.fullName,
         email: formData.email,
         password: formData.password,
+        phone: formData.role === 'organizer' ? formData.contactPerson : undefined,
         role: formData.role,
-        companyName: formData.role === 'organizer' ? formData.companyName : undefined,
-        location: formData.role === 'organizer' ? formData.location : undefined,
-        phoneNumber: formData.role === 'organizer' ? formData.contactPerson : undefined
+        // Note: company_id will be null for now, could be enhanced to create company first
+        company_id: null
       };
 
-      // Make API request
-      const response = await axios.post('http://localhost:5000/api/register', submitData, {
+      // Make API request to the correct endpoint
+      const response = await axios.post('http://localhost:5000/api/auth/register', submitData, {
         headers: {
           'Content-Type': 'application/json'
         }
       });
 
-      // Handle success
-      if (response.data.token) {
-        // Store token in localStorage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        
-        alert('Account created successfully! Welcome to our platform.');
+      // Handle success - the backend sends a different response structure
+      if (response.data.user) {
+        alert(`Account created successfully! Please check your email (${response.data.user.email}) to verify your account before logging in.`);
         
         // Reset form
         setFormData({
@@ -137,12 +133,10 @@ const SignUp = () => {
           location: ''
         });
 
-        // Redirect to login
-        window.location.href = '/login'; // or use history.push('/login') if using react-router
+        // Redirect to login page
+        window.location.href = '/login';
 
-        // You can add navigation here if using react-router
         console.log('Registration successful:', response.data);
-
       }
 
     } catch (error) {
@@ -183,15 +177,8 @@ const SignUp = () => {
           <form className="signup-form" >
             {/* Error Message */}
             {error && (
-              <div className="error-message" style={{
-                backgroundColor: '#fee',
-                color: '#c33',
-                padding: '12px',
-                borderRadius: '6px',
-                marginBottom: '20px',
-                border: '1px solid #fcc'
-              }}>
-                <i className="fas fa-exclamation-triangle"></i> {error}
+              <div className="error-message">
+                {error}
               </div>
             )}
 

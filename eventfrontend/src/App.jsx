@@ -1,25 +1,16 @@
-// <<<<<<< HEAD
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './Page/Home';
 import Login from './Page/Login';
 import SignUp from './Page/SignUp';
 import ForgotPassword from './Page/ForgotPassword';
+import EmailVerification from './Page/EmailVerification';
 import './App.css';
 import Attendee from './Page/Eventdetails';
 import EventListPage from './Page/Eventslist';
 import OrganizerDashboard from './Page/OrganizerDashboard';
 
-// =======
-// import { useState } from 'react'
-// import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-// import Home from './Page/Home'
-// import Login from './Page/Login'
-// import SignUp from './Page/SignUp'
-// import ForgotPassword from './Page/ForgotPassword'
-// import OrganizerDashboard from './Page/OrganizerDashboard'
-// import './App.css'
-// >>>>>>> 39408b67ab6a7276806367ee3073096815db5aa2
+
 
 function App() {
   return (
@@ -32,6 +23,7 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/verify-email" element={<EmailVerification />} />
         <Route path="/Attendee" element={<Attendee />} />
         <Route path="/eventslist" element={<EventListPage />} />
 
