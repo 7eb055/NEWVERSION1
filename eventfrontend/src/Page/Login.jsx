@@ -60,7 +60,7 @@ const Login = () => {
       };
 
       // Make API request
-      const response = await axios.post('http://localhost:5000/api/login', loginData, {
+      const response = await axios.post('http://localhost:5000/api/auth/login', loginData, {
         headers: {
           'Content-Type': 'application/json'
         }
@@ -101,7 +101,12 @@ const Login = () => {
       if (error.response) {
         // Server responded with error status
         if (error.response.status === 401) {
-          setError('Invalid email or password. Please try again.');
+          // Check if it's an email verification issue
+          if (error.response.data.message?.includes('verify') || error.response.data.requiresVerification) {
+            setError('Please verify your email before logging in. Check your inbox for the verification link.');
+          } else {
+            setError('Invalid email or password. Please try again.');
+          }
         } else {
           setError(error.response.data.message || 'Login failed. Please try again.');
         }
@@ -137,15 +142,8 @@ const Login = () => {
           <form className="login-form" onSubmit={handleSubmit}>
             {/* Error Message */}
             {error && (
-              <div className="error-message" style={{
-                backgroundColor: '#fee',
-                color: '#c33',
-                padding: '12px',
-                borderRadius: '6px',
-                marginBottom: '20px',
-                border: '1px solid #fcc'
-              }}>
-                <i className="fas fa-exclamation-triangle"></i> {error}
+              <div className="error-message">
+                {error}
               </div>
             )}
 

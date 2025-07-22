@@ -473,7 +473,7 @@ const OrganizerDashboard = () => {
     // Filter by date range
     if (feedbackFilter.dateRange !== 'all') {
       const now = new Date();
-      const filterDate = new Date();
+      let filterDate = new Date();
       
       switch (feedbackFilter.dateRange) {
         case 'week':
