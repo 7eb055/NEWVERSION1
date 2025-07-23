@@ -9,6 +9,7 @@ const SignUp = () => {
     email: '',
     password: '',
     confirmPassword: '',
+    phone: '',
     role: 'attendee',
     companyName: '',
     contactPerson: '',
@@ -99,16 +100,21 @@ const SignUp = () => {
     setError('');
 
     try {
-      // Prepare data for backend - matching the server's expected fields
+      // Prepare data for backend - matching the new server's expected fields
       const submitData = {
         username: formData.fullName,
         email: formData.email,
         password: formData.password,
-        phone: formData.role === 'organizer' ? formData.contactPerson : undefined,
-        role: formData.role,
-        // Note: company_id will be null for now, could be enhanced to create company first
-        company_id: null
+        phone: formData.phone,
+        role: formData.role
       };
+
+      // Add organizer-specific fields if role is organizer
+      if (formData.role === 'organizer') {
+        submitData.companyName = formData.companyName;
+        submitData.contactPerson = formData.contactPerson;
+        submitData.location = formData.location;
+      }
 
       // Make API request to the correct endpoint
       const response = await axios.post('http://localhost:5000/api/auth/register', submitData, {
@@ -127,6 +133,7 @@ const SignUp = () => {
           email: '',
           password: '',
           confirmPassword: '',
+          phone: '',
           role: 'attendee',
           companyName: '',
           contactPerson: '',
@@ -215,6 +222,23 @@ const SignUp = () => {
                 value={formData.email}
                 onChange={handleInputChange}
                 required
+              />
+            </div>
+
+            {/* Phone */}
+            <div className="form-group">
+              <label htmlFor="phone" className="form-label">
+                <i className="fas fa-phone"></i>
+                Phone Number
+              </label>
+              <input
+                type="tel"
+                id="phone"
+                name="phone"
+                className="form-input"
+                placeholder="Enter your phone number"
+                value={formData.phone}
+                onChange={handleInputChange}
               />
             </div>
 

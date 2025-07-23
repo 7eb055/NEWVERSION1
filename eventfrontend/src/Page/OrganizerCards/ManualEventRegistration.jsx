@@ -76,7 +76,14 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="event-form">
+    <div className="create-event-section">
+      <div className="form-container">
+        <div className="form-title">
+          <i className="fas fa-user-plus"></i>
+          Manual Event Registration
+        </div>
+        
+        <form onSubmit={handleSubmit} className="event-form">
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="eventId">Select Event *</label>
@@ -276,6 +283,8 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
   );
 };
 

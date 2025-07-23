@@ -4,9 +4,11 @@ import Home from './Page/Home';
 import Login from './Page/Login';
 import SignUp from './Page/SignUp';
 import ForgotPassword from './Page/ForgotPassword';
+import ResetPassword from './Page/ResetPassword';
 import EmailVerification from './Page/EmailVerification';
+// import TestVerification from './component/TestVerification';
 import './App.css';
-import Attendee from './Page/Eventdetails';
+import Attendee from './Page/AttendeeDashboard';
 import EventListPage from './Page/Eventslist';
 import OrganizerDashboard from './Page/OrganizerDashboard';
 
@@ -23,7 +25,9 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<SignUp />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<EmailVerification />} />
+        {/* <Route path="/test-verification" element={<TestVerification />} /> */}
         <Route path="/Attendee" element={<Attendee />} />
         <Route path="/eventslist" element={<EventListPage />} />
 

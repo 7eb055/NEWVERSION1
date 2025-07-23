@@ -8,7 +8,14 @@ const CreateEventForm = ({
   isLoading
 }) => {
   return (
-    <form className="create-event-form" onSubmit={handleSubmit}>
+    <div className="create-event-section">
+      <div className="form-container">
+        <h2 className="form-title">
+          <i className="fas fa-calendar-plus"></i>
+          Create New Event
+        </h2>
+        
+        <form className="create-event-form" onSubmit={handleSubmit}>
           <div className="form-row">
             <div className="form-group">
               <label htmlFor="name" className="form-label">
@@ -171,6 +178,8 @@ const CreateEventForm = ({
             </button>
           </div>
         </form>
+      </div>
+    </div>
   );
 };
 

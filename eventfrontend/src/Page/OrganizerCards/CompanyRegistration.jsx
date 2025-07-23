@@ -68,7 +68,14 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="event-form">
+    <div className="create-event-section">
+      <div className="form-container">
+        <div className="form-title">
+          <i className="fas fa-building"></i>
+          Register Event Company
+        </div>
+        
+        <form onSubmit={handleSubmit} className="event-form">
           <div className="form-grid">
             <div className="form-group">
               <label htmlFor="name">Company Name *</label>
@@ -232,6 +239,8 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
             </button>
           </div>
         </form>
+      </div>
+    </div>
   );
 };
 
