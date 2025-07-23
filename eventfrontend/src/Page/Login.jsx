@@ -215,7 +215,7 @@ const Login = () => {
             </div>
 
             <div className="form-options">
-              <Link to='/forget-password' className="forgot-password">
+              <Link to='/forgot-password' className="forgot-password">
                 <i className="fas fa-question-circle"></i>
                 Forgot Password?
               </Link>

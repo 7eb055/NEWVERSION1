@@ -28,14 +28,20 @@ const EmailVerification = () => {
           setMessage(response.data.message || 'Email verified successfully!');
         } else {
           setVerificationStatus('error');
-          setMessage('Email verification failed. Please try again.');
+          setMessage(response.data.message || 'Email verification failed. Please try again.');
         }
       } catch (error) {
         console.error('Email verification error:', error);
         setVerificationStatus('error');
         
         if (error.response) {
-          setMessage(error.response.data.message || 'Email verification failed.');
+          // Check if this is an "already verified" case
+          if (error.response.data.alreadyVerified) {
+            setVerificationStatus('success');
+            setMessage(error.response.data.message || 'Email is already verified! You can proceed to login.');
+          } else {
+            setMessage(error.response.data.message || 'Email verification failed.');
+          }
         } else if (error.request) {
           setMessage('Unable to connect to server. Please check your internet connection.');
         } else {
