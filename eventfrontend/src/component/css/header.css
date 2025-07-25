@@ -101,6 +101,12 @@ nav {
 }
 
 /* Auth Buttons */
+.auth-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .auth-buttons {
   display: flex;
   gap: 12px;
@@ -121,6 +127,195 @@ nav {
   transition: all 0.3s ease;
   cursor: pointer;
   border: 2px solid transparent;
+}
+
+/* User Menu Styles */
+.user-menu {
+  position: relative;
+}
+
+.user-profile-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  background: rgba(102, 126, 234, 0.1);
+  border: 2px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #333;
+  font-family: inherit;
+}
+
+.user-profile-btn:hover {
+  background: rgba(102, 126, 234, 0.15);
+  border-color: rgba(102, 126, 234, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.user-avatar {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 14px;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.user-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: #333;
+  line-height: 1.2;
+}
+
+.user-role {
+  font-size: 0.75rem;
+  color: #667eea;
+  text-transform: capitalize;
+  line-height: 1.2;
+}
+
+.dropdown-arrow {
+  font-size: 0.7rem;
+  color: #667eea;
+  transition: transform 0.3s ease;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* Profile Dropdown */
+.profile-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  background: white;
+  border: 1px solid rgba(102, 126, 234, 0.2);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+  min-width: 280px;
+  z-index: 1001;
+  overflow: hidden;
+  animation: dropdownFadeIn 0.3s ease;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.dropdown-header {
+  padding: 20px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar-large {
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 20px;
+}
+
+.user-details h4 {
+  margin: 0 0 4px 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.user-details p {
+  margin: 0 0 8px 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.role-badge {
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  text-transform: capitalize;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: rgba(102, 126, 234, 0.1);
+  margin: 0;
+}
+
+.dropdown-menu {
+  padding: 8px 0;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: #333;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  background: none;
+  border: none;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.dropdown-item:hover {
+  background: rgba(102, 126, 234, 0.1);
+  color: #667eea;
+}
+
+.dropdown-item i {
+  width: 16px;
+  color: #667eea;
+  font-size: 0.9rem;
+}
+
+.logout-btn {
+  color: #e53e3e !important;
+  border-top: 1px solid rgba(102, 126, 234, 0.1);
+  margin-top: 4px;
+}
+
+.logout-btn:hover {
+  background: rgba(229, 62, 62, 0.1) !important;
+  color: #c53030 !important;
+}
+
+.logout-btn i {
+  color: #e53e3e !important;
 }
 
 .login-btn-header {
@@ -179,9 +374,21 @@ nav {
     gap: 0.75rem;
   }
   
-  .login-btn, .signup-btn {
+  .login-btn-header, .signup-btn-header {
     padding: 0.6rem 1.2rem;
     font-size: 0.85rem;
+  }
+
+  .user-profile-btn {
+    padding: 6px 12px;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .profile-dropdown {
+    min-width: 240px;
   }
 }
 

@@ -1,15 +1,25 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import './css/Login.css';
-import axios from 'axios';
+import AuthTokenService from '../services/AuthTokenService';
+import apiService from '../services/ApiService';
 
 const Login = () => {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Check if user is already authenticated
+  useEffect(() => {
+    if (AuthTokenService.isAuthenticated()) {
+      console.log('User already authenticated, redirecting to dashboard...');
+      const dashboardRoute = AuthTokenService.getDashboardRoute();
+      navigate(dashboardRoute, { replace: true });
+    }
+  }, [navigate]);
 
   const validateForm = () => {
     // Clear previous error
@@ -53,68 +63,60 @@ const Login = () => {
     setError('');
 
     try {
-      // Prepare data for backend
-      const loginData = {
-        email: email.trim(),
-        password: password
-      };
+      // Use ApiService for login
+      const result = await apiService.login(email.trim(), password);
 
-      // Make API request
-      const response = await axios.post('http://localhost:5000/api/auth/login', loginData, {
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      });
-
-      // Handle success
-      if (response.data.token) {
-        // Store token and user data in localStorage
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
+      if (result.success && result.data.token) {
+        console.log('Login successful:', result.data);
         
-        alert('Login successful! Welcome back.');
+        // Store authentication data using AuthTokenService
+        const authStored = AuthTokenService.setAuthData(result.data.token, result.data.user);
+        
+        if (!authStored) {
+          setError('Failed to store authentication data. Please try again.');
+          return;
+        }
+        
+        // Get the appropriate dashboard route based on user role
+        const dashboardRoute = AuthTokenService.getDashboardRoute();
+        
+        console.log('User role:', AuthTokenService.getUserRole());
+        console.log('Redirecting to:', dashboardRoute);
         
         // Reset form
         setEmail('');
         setPassword('');
-        setRole('');
-
-        // Redirect based on user role or to dashboard
-       
-          
-
-
-        // You can add navigation here if using react-router
-        console.log('Login successful:', response.data);
         
-        // Example: Redirect to different pages based on role
-        // if (response.data.user.role === 'organizer') {
-        //   navigate('/organizer-dashboard');
-        // } else {
-        //   navigate('/dashboard');
-        // }
+        // Clear any existing errors
+        setError('');
+        
+        // Redirect to the appropriate dashboard
+        navigate(dashboardRoute, { replace: true });
+      } else {
+        setError(result.error || 'Login failed. Please check your credentials and try again.');
       }
 
     } catch (error) {
       console.error('Login error:', error);
       
+      // ApiService already handles the error formatting
       if (error.response) {
-        // Server responded with error status
+        const errorData = error.response.data;
+        
         if (error.response.status === 401) {
-          // Check if it's an email verification issue
-          if (error.response.data.message?.includes('verify') || error.response.data.requiresVerification) {
+          if (errorData.message?.includes('verify') || errorData.requiresVerification) {
             setError('Please verify your email before logging in. Check your inbox for the verification link.');
           } else {
             setError('Invalid email or password. Please try again.');
           }
+        } else if (error.response.status === 400) {
+          setError(errorData.message || 'Please check your input and try again.');
         } else {
-          setError(error.response.data.message || 'Login failed. Please try again.');
+          setError(errorData.message || 'Login failed. Please try again.');
         }
       } else if (error.request) {
-        // Request was made but no response received
-        setError('Unable to connect to server. Please check your internet connection.');
+        setError('Unable to connect to server. Please check your internet connection and try again.');
       } else {
-        // Something else happened
         setError('An unexpected error occurred. Please try again.');
       }
     } finally {
@@ -192,26 +194,6 @@ const Login = () => {
                   <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'}></i>
                 </button>
               </div>
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="role" className="form-label">
-                <i className="fas fa-user-tag"></i>
-                Role
-              </label>
-              <select
-                id="role"
-                className="form-select"
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                required
-              >
-                <option value="">Select your role</option>
-                <option value="organizer">Event Organizer</option>
-                <option value="attendee">Attendee</option>
-                <option value="vendor">Vendor</option>
-                <option value="admin">Administrator</option>
-              </select>
             </div>
 
             <div className="form-options">
