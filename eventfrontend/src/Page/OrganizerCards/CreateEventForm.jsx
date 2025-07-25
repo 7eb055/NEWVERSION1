@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useRef } from 'react';
+import './CreateEventForm.css';
 
 const CreateEventForm = ({
   formData,
@@ -7,6 +8,45 @@ const CreateEventForm = ({
   setShowCreateForm,
   isLoading
 }) => {
+  const [imageSource, setImageSource] = useState('url'); // 'url' or 'upload'
+  const [imagePreview, setImagePreview] = useState(formData.imageUrl || '');
+  const fileInputRef = useRef(null);
+  
+  const handleImageSourceChange = (source) => {
+    setImageSource(source);
+    // Clear the preview and form data when changing source
+    if (source === 'url' && fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    if (!formData.imageUrl) {
+      setImagePreview('');
+    }
+  };
+  
+  const handleImageChange = (e) => {
+    const { name, value, files } = e.target;
+    
+    if (name === 'imageUrl' && imageSource === 'url') {
+      handleInputChange(e);
+      setImagePreview(value);
+    } else if (name === 'imageFile' && files && files[0]) {
+      const file = files[0];
+      // Handle file upload - store in formData and create preview
+      handleInputChange({
+        target: {
+          name: 'imageFile',
+          value: file
+        }
+      });
+      
+      // Create image preview
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImagePreview(reader.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
   return (
     <div className="create-event-section">
       <div className="form-container">
@@ -148,6 +188,74 @@ const CreateEventForm = ({
               rows="4"
               required
             ></textarea>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              <i className="fas fa-image"></i>
+              Event Image
+            </label>
+            
+            <div className="image-source-toggle">
+              <button 
+                type="button" 
+                className={`image-source-btn ${imageSource === 'url' ? 'active' : ''}`}
+                onClick={() => handleImageSourceChange('url')}
+              >
+                <i className="fas fa-link"></i>
+                Image URL
+              </button>
+              <button 
+                type="button" 
+                className={`image-source-btn ${imageSource === 'upload' ? 'active' : ''}`}
+                onClick={() => handleImageSourceChange('upload')}
+              >
+                <i className="fas fa-upload"></i>
+                Upload Image
+              </button>
+            </div>
+            
+            {imageSource === 'url' ? (
+              <input
+                type="url"
+                id="imageUrl"
+                name="imageUrl"
+                className="form-input"
+                placeholder="Enter image URL"
+                value={formData.imageUrl || ''}
+                onChange={handleImageChange}
+              />
+            ) : (
+              <div className="file-upload-container">
+                <input
+                  type="file"
+                  id="imageFile"
+                  name="imageFile"
+                  ref={fileInputRef}
+                  className="file-input"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                />
+                <label htmlFor="imageFile" className="file-upload-label">
+                  <i className="fas fa-cloud-upload-alt"></i>
+                  {formData.imageFile ? formData.imageFile.name : 'Choose Image File'}
+                </label>
+              </div>
+            )}
+            
+            {imagePreview && (
+              <div className="image-preview-container">
+                <img 
+                  src={imagePreview} 
+                  alt="Event Preview" 
+                  className="image-preview" 
+                  onError={(e) => {
+                    e.target.onerror = null;
+                    e.target.src = 'https://via.placeholder.com/400x200?text=Image+Preview+Unavailable';
+                  }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="form-actions">
