@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import QRCodeGenerator from './QRCodeGenerator';
+import './TicketingManagement.css';
 
 const TicketingManagement = ({ events, onCancel, isLoading }) => {
   const [activeTab, setActiveTab] = useState('tiers');
