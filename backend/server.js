@@ -1063,18 +1063,206 @@ app.get('/api/companies', authenticateToken, async (req, res) => {
   }
 });
 
-// Create new company
-app.post('/api/companies', authenticateToken, async (req, res) => {
+// Get company by ID
+app.get('/api/companies/:id', authenticateToken, async (req, res) => {
   try {
-    const { company_name, address, contact_info } = req.body;
+    const companyId = req.params.id;
+    
+    const companyQuery = await pool.query(
+      'SELECT * FROM EventCompanies WHERE company_id = $1',
+      [companyId]
+    );
+    
+    if (companyQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+    
+    res.json({ company: companyQuery.rows[0] });
+  } catch (error) {
+    console.error('Get company by ID error:', error);
+    res.status(500).json({ message: 'Server error while fetching company details' });
+  }
+});
+
+// Update company
+app.put('/api/companies/:id', authenticateToken, async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    const { 
+      company_name, 
+      company_type, 
+      category, 
+      address, 
+      contact_info, 
+      description, 
+      services 
+    } = req.body;
 
     if (!company_name) {
       return res.status(400).json({ message: 'Company name is required' });
     }
+    
+    // Check if the company exists
+    const companyCheck = await pool.query(
+      'SELECT * FROM EventCompanies WHERE company_id = $1',
+      [companyId]
+    );
+    
+    if (companyCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+    
+    // Update the company
+    const updateQuery = `
+      UPDATE EventCompanies
+      SET 
+        company_name = $1,
+        company_type = $2,
+        category = $3,
+        address = $4,
+        contact_info = $5,
+        description = $6,
+        services = $7,
+        updated_at = NOW()
+      WHERE company_id = $8
+      RETURNING *
+    `;
+    
+    const updatedCompany = await pool.query(
+      updateQuery,
+      [
+        company_name, 
+        company_type || 'vendor', 
+        category, 
+        address, 
+        contact_info, 
+        description, 
+        services,
+        companyId
+      ]
+    );
+    
+    res.json({
+      message: 'Company updated successfully',
+      company: updatedCompany.rows[0]
+    });
+  } catch (error) {
+    console.error('Update company error:', error);
+    res.status(500).json({ message: 'Server error while updating company' });
+  }
+});
+
+// Delete company
+app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
+  try {
+    const companyId = req.params.id;
+    
+    // Check if company exists
+    const companyCheck = await pool.query(
+      'SELECT * FROM EventCompanies WHERE company_id = $1',
+      [companyId]
+    );
+    
+    if (companyCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+    
+    // Check if company has associated organizers
+    const organizersCheck = await pool.query(
+      'SELECT COUNT(*) FROM Organizers WHERE company_id = $1',
+      [companyId]
+    );
+    
+    const organizerCount = parseInt(organizersCheck.rows[0].count);
+    if (organizerCount > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete company because it has associated organizers',
+        organizerCount
+      });
+    }
+    
+    // Delete the company
+    await pool.query(
+      'DELETE FROM EventCompanies WHERE company_id = $1',
+      [companyId]
+    );
+    
+    res.json({ message: 'Company deleted successfully' });
+  } catch (error) {
+    console.error('Delete company error:', error);
+    res.status(500).json({ message: 'Server error while deleting company' });
+  }
+});
+
+// Create new company
+app.post('/api/companies', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      company_name, 
+      company_type, 
+      category, 
+      address, 
+      contact_info, 
+      description, 
+      services 
+    } = req.body;
+
+    if (!company_name) {
+      return res.status(400).json({ message: 'Company name is required' });
+    }
+    
+    // Check if a table schema update is needed
+    try {
+      // Check if columns exist in the table
+      const checkColumnsQuery = `
+        SELECT column_name 
+        FROM information_schema.columns 
+        WHERE table_name = 'eventcompanies' 
+        AND column_name = 'company_type'`;
+      
+      const columnCheck = await pool.query(checkColumnsQuery);
+      
+      // If company_type column doesn't exist, alter table to add new columns
+      if (columnCheck.rows.length === 0) {
+        await pool.query(`
+          ALTER TABLE EventCompanies 
+          ADD COLUMN company_type VARCHAR(50) DEFAULT 'vendor',
+          ADD COLUMN category VARCHAR(100),
+          ADD COLUMN description TEXT,
+          ADD COLUMN services TEXT
+        `);
+        console.log('EventCompanies table schema updated with new columns');
+      }
+    } catch (schemaError) {
+      console.error('Error checking/updating schema:', schemaError);
+      // Continue with the insert anyway
+    }
+    
+    // Additional columns needed for the enhanced company schema
+    const query = `
+      INSERT INTO EventCompanies (
+        company_name, 
+        address, 
+        contact_info, 
+        company_type, 
+        category, 
+        description, 
+        services
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7) 
+      RETURNING *`;
 
     const newCompany = await pool.query(
-      'INSERT INTO EventCompanies (company_name, address, contact_info) VALUES ($1, $2, $3) RETURNING *',
-      [company_name, address, contact_info]
+      query,
+      [
+        company_name, 
+        address, 
+        contact_info, 
+        company_type || 'vendor', 
+        category, 
+        description, 
+        services
+      ]
     );
 
     res.status(201).json({ 
