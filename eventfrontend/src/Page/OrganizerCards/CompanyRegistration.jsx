@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import AuthTokenService from '../../services/AuthTokenService';
+import './css/CompanyRegistration.css';
 
-const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
+const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, initialData = null }) => {
   const [formData, setFormData] = useState({
-    name: '',
-    type: 'vendor',
+    company_name: '',
+    company_type: 'vendor',
     category: '',
     email: '',
     phone: '',
     address: '',
     website: '',
     description: '',
-    contactPerson: '',
+    contact_person: '',
     services: ''
   });
 
@@ -31,11 +34,29 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
     }
   };
 
+  // Initialize form with data if in edit mode
+  useEffect(() => {
+    if (editMode && initialData) {
+      setFormData({
+        company_name: initialData.company_name || '',
+        company_type: initialData.company_type || 'vendor',
+        category: initialData.category || '',
+        email: initialData.email || '',
+        phone: initialData.phone || '',
+        address: initialData.address || '',
+        website: initialData.website || '',
+        description: initialData.description || '',
+        contact_person: initialData.contact_person || '',
+        services: initialData.services || ''
+      });
+    }
+  }, [editMode, initialData]);
+
   const validateForm = () => {
     const newErrors = {};
 
-    if (!formData.name.trim()) {
-      newErrors.name = 'Company name is required';
+    if (!formData.company_name.trim()) {
+      newErrors.company_name = 'Company name is required';
     }
 
     if (!formData.email.trim()) {
@@ -52,18 +73,84 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
       newErrors.category = 'Category is required';
     }
 
-    if (!formData.contactPerson.trim()) {
-      newErrors.contactPerson = 'Contact person is required';
+    if (!formData.contact_person.trim()) {
+      newErrors.contact_person = 'Contact person is required';
     }
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      try {
+        const token = AuthTokenService.getToken();
+        
+        if (!token) {
+          setErrors({ general: 'You must be logged in to register a company' });
+          return;
+        }
+        
+        // Create a contact_info object that contains email, phone, contact_person, and website
+        const contactInfo = JSON.stringify({
+          email: formData.email,
+          phone: formData.phone,
+          contact_person: formData.contact_person,
+          website: formData.website
+        });
+        
+        // Prepare data for backend API
+        const companyData = {
+          company_name: formData.company_name,
+          company_type: formData.company_type,
+          category: formData.category,
+          address: formData.address,
+          contact_info: contactInfo,
+          description: formData.description,
+          services: formData.services
+        };
+        
+        let response;
+        
+        if (editMode && initialData?.company_id) {
+          // Update existing company
+          response = await axios.put(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies/${initialData.company_id}`,
+            companyData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+        } else {
+          // Create new company
+          response = await axios.post(
+            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`,
+            companyData,
+            {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              }
+            }
+          );
+        }
+        
+        // Call the parent component's onSubmit with the API response
+        onSubmit(response.data);
+      } catch (error) {
+        console.error('Company registration error:', error);
+        let errorMessage = 'Failed to register company. Please try again.';
+        
+        if (error.response && error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        }
+        
+        setErrors({ general: errorMessage });
+      }
     }
   };
 
@@ -78,25 +165,25 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
         <form onSubmit={handleSubmit} className="event-form">
           <div className="form-grid">
             <div className="form-group">
-              <label htmlFor="name">Company Name *</label>
+              <label htmlFor="company_name">Company Name *</label>
               <input
                 type="text"
-                id="name"
-                name="name"
-                value={formData.name}
+                id="company_name"
+                name="company_name"
+                value={formData.company_name}
                 onChange={handleInputChange}
                 placeholder="Enter company name"
-                className={errors.name ? 'error' : ''}
+                className={errors.company_name ? 'error' : ''}
               />
-              {errors.name && <span className="error-text">{errors.name}</span>}
+              {errors.company_name && <span className="error-text">{errors.company_name}</span>}
             </div>
 
             <div className="form-group">
-              <label htmlFor="type">Company Type *</label>
+              <label htmlFor="company_type">Company Type *</label>
               <select
-                id="type"
-                name="type"
-                value={formData.type}
+                id="company_type"
+                name="company_type"
+                value={formData.company_type}
                 onChange={handleInputChange}
               >
                 <option value="vendor">Vendor</option>
@@ -161,17 +248,17 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="contactPerson">Contact Person *</label>
+              <label htmlFor="contact_person">Contact Person *</label>
               <input
                 type="text"
-                id="contactPerson"
-                name="contactPerson"
-                value={formData.contactPerson}
+                id="contact_person"
+                name="contact_person"
+                value={formData.contact_person}
                 onChange={handleInputChange}
                 placeholder="Contact person name"
-                className={errors.contactPerson ? 'error' : ''}
+                className={errors.contact_person ? 'error' : ''}
               />
-              {errors.contactPerson && <span className="error-text">{errors.contactPerson}</span>}
+              {errors.contact_person && <span className="error-text">{errors.contact_person}</span>}
             </div>
 
             <div className="form-group full-width">

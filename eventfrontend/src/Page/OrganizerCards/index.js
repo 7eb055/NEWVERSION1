@@ -7,6 +7,7 @@ export { default as FeedbackSection } from './FeedbackSection';
 
 // Registration & User Management Components
 export { default as CompanyRegistration } from './CompanyRegistration';
+export { default as CompanyManagement } from './CompanyManagement';
 export { default as PeopleRegistration } from './PeopleRegistration';
 export { default as ManualEventRegistration } from './ManualEventRegistration';
 

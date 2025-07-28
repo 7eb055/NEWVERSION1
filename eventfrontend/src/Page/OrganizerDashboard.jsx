@@ -10,6 +10,7 @@ import {
   SalesSummary,
   FeedbackSection,
   CompanyRegistration,
+  CompanyManagement,
   PeopleRegistration,
   ManualEventRegistration,
   TicketingManagement,
@@ -34,6 +35,7 @@ const OrganizerDashboard = () => {
   const [people, setPeople] = useState([]);
   const [eventRegistrations, setEventRegistrations] = useState([]);
   const [showCompanyForm, setShowCompanyForm] = useState(false);
+  const [showCompanyManagement, setShowCompanyManagement] = useState(false);
   const [showPeopleForm, setShowPeopleForm] = useState(false);
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   
@@ -609,17 +611,71 @@ const OrganizerDashboard = () => {
   };
 
   // Registration & User Management Functions (UI Demo Mode)
-  const handleCompanyRegistration = (companyData) => {
-    const newCompany = {
-      id: companies.length + 1,
-      ...companyData,
-      registeredAt: new Date().toISOString(),
-      status: 'active'
-    };
-    setCompanies(prev => [...prev, newCompany]);
-    setSuccess('Company registered successfully! (UI Demo Mode)');
-    setShowCompanyForm(false);
-    setTimeout(() => setSuccess(''), 3000);
+  const handleCompanyRegistration = async (companyData) => {
+    try {
+      setIsLoading(true);
+      setError('');
+      
+      // Get token from AuthTokenService
+      const token = AuthTokenService.getToken();
+      
+      if (!token) {
+        setError('You must be logged in to register a company');
+        return;
+      }
+
+      // Create API request based on whether this is a new company or an update
+      let response;
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`;
+      
+      if (companyData.company && companyData.company.company_id) {
+        // Update existing company
+        response = await axios.put(
+          `${apiUrl}/${companyData.company.company_id}`,
+          companyData.company,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        setSuccess('Company updated successfully!');
+      } else {
+        // Create new company
+        response = await axios.post(
+          apiUrl,
+          companyData.company || companyData,
+          {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        setSuccess('Company registered successfully!');
+      }
+      
+      // If we're showing the company management section, refresh it
+      if (showCompanyManagement) {
+        // Trigger a refresh in the CompanyManagement component
+        // This will happen automatically when the component mounts or we could
+        // implement a more sophisticated state management approach
+      }
+      
+      setShowCompanyForm(false);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Company registration error:', error);
+      
+      if (error.response) {
+        setError(error.response.data.message || 'Failed to register company');
+      } else {
+        setError('Failed to register company. Please check your connection.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePeopleRegistration = (personData) => {
@@ -804,6 +860,13 @@ const OrganizerDashboard = () => {
                   {showCompanyForm ? 'Cancel' : 'Register Company'}
                 </button>
                 <button 
+                  className="action-button register-company-btn"
+                  onClick={() => setShowCompanyManagement(true)}
+                >
+                  <i className="fas fa-th-list"></i>
+                  Manage Companies
+                </button>
+                <button 
                   className="action-button register-people-btn"
                   onClick={() => setShowPeopleForm(!showPeopleForm)}
                 >
@@ -976,6 +1039,23 @@ const OrganizerDashboard = () => {
         renderStarRating={renderStarRating}
         formatDate={formatDate}
       />
+      
+      {/* Company Management Modal */}
+      <Modal 
+        isOpen={showCompanyManagement} 
+        onClose={() => setShowCompanyManagement(false)}
+        title={
+          <>
+            <i className="fas fa-building"></i>
+            Company Management
+          </>
+        }
+        maxWidth="80%"
+      >
+        <CompanyManagement 
+          onRegister={(companyData) => handleCompanyRegistration(companyData)}
+        />
+      </Modal>
 
       {/* Events List */}
       <div className="events-section">

@@ -535,7 +535,8 @@
 .events-section,
 .sales-overview-section,
 .vendor-management-section,
-.feedback-section {
+.feedback-section,
+.company-management-section {
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -552,7 +553,8 @@
 .events-section::before,
 .sales-overview-section::before,
 .vendor-management-section::before,
-.feedback-section::before {
+.feedback-section::before,
+.company-management-section::before {
   content: '';
   position: absolute;
   top: -50%;
@@ -2327,7 +2329,8 @@ html {
 
   .create-event-section,
   .events-section,
-  .feedback-section {
+  .feedback-section,
+  .company-management-section {
     padding: 15px;
     margin: 10px 15px 15px 15px;
   }
