@@ -1093,15 +1093,88 @@ app.post('/api/companies', authenticateToken, async (req, res) => {
 // Get all events
 app.get('/api/events', async (req, res) => {
   try {
-    const events = await pool.query(
-      `SELECT e.*, ec.company_name, u.username as created_by_name
-       FROM Events e
-       LEFT JOIN EventCompanies ec ON e.company_id = ec.company_id
-       LEFT JOIN Users u ON e.created_by = u.user_id
-       ORDER BY e.event_date DESC`
-    );
+    // Query parameters for filtering
+    const { 
+      category,
+      status,
+      organizer_id,
+      upcoming = 'true',
+      limit = 50,
+      offset = 0
+    } = req.query;
 
-    res.json({ events: events.rows });
+    // Build the query dynamically based on filters
+    let query = `
+      SELECT e.*, 
+             u.email as organizer_email,
+             CASE WHEN o.full_name IS NOT NULL THEN o.full_name ELSE u.email END as organizer_name,
+             (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id) as registration_count,
+             COALESCE((SELECT ROUND(AVG(ef.rating), 1) FROM eventfeedback ef WHERE ef.event_id = e.event_id), 0) as average_rating
+      FROM events e
+      LEFT JOIN users u ON e.organizer_id = u.user_id
+      LEFT JOIN organizers o ON e.organizer_id = o.user_id
+      WHERE 1=1
+    `;
+    
+    const queryParams = [];
+    let paramCounter = 1;
+
+    // Add filters if provided
+    if (category) {
+      query += ` AND e.category = $${paramCounter++}`;
+      queryParams.push(category);
+    }
+
+    if (status) {
+      query += ` AND e.status = $${paramCounter++}`;
+      queryParams.push(status);
+    }
+
+    if (organizer_id) {
+      query += ` AND e.organizer_id = $${paramCounter++}`;
+      queryParams.push(organizer_id);
+    }
+
+    if (upcoming === 'true') {
+      query += ` AND e.event_date >= NOW()`;
+    } else if (upcoming === 'false') {
+      query += ` AND e.event_date < NOW()`;
+    }
+
+    // Add sorting and pagination
+    query += ` ORDER BY e.event_date DESC LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
+    queryParams.push(parseInt(limit), parseInt(offset));
+
+    const events = await pool.query(query, queryParams);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM events e 
+      WHERE 1=1 
+      ${category ? ' AND e.category = $1' : ''}
+      ${status ? (category ? ' AND e.status = $2' : ' AND e.status = $1') : ''}
+      ${organizer_id ? (category || status ? ' AND e.organizer_id = $3' : ' AND e.organizer_id = $1') : ''}
+      ${upcoming === 'true' ? ' AND e.event_date >= NOW()' : ''}
+      ${upcoming === 'false' ? ' AND e.event_date < NOW()' : ''}
+    `;
+    
+    const countParams = [];
+    if (category) countParams.push(category);
+    if (status) countParams.push(status);
+    if (organizer_id) countParams.push(organizer_id);
+
+    const totalCount = await pool.query(countQuery, countParams);
+    
+    res.json({ 
+      events: events.rows,
+      pagination: {
+        total: parseInt(totalCount.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
+      }
+    });
 
   } catch (error) {
     console.error('Get events error:', error);
@@ -1112,16 +1185,69 @@ app.get('/api/events', async (req, res) => {
 // Get events by user
 app.get('/api/events/my-events', authenticateToken, async (req, res) => {
   try {
-    const events = await pool.query(
-      `SELECT e.*, ec.company_name
-       FROM Events e
-       LEFT JOIN EventCompanies ec ON e.company_id = ec.company_id
-       WHERE e.created_by = $1
-       ORDER BY e.event_date DESC`,
-      [req.user.user_id]
-    );
+    // Query parameters for filtering
+    const { 
+      status,
+      upcoming = 'true',
+      limit = 10,
+      offset = 0
+    } = req.query;
 
-    res.json({ events: events.rows });
+    // Build the query dynamically based on filters
+    let query = `
+      SELECT e.*, 
+             (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id) as registration_count,
+             COALESCE((SELECT ROUND(AVG(ef.rating), 1) FROM eventfeedback ef WHERE ef.event_id = e.event_id), 0) as average_rating,
+             (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id AND er.check_in_status = true) as check_in_count
+      FROM events e
+      WHERE e.organizer_id = $1
+    `;
+    
+    const queryParams = [req.user.user_id];
+    let paramCounter = 2;
+
+    // Add filters if provided
+    if (status) {
+      query += ` AND e.status = $${paramCounter++}`;
+      queryParams.push(status);
+    }
+
+    if (upcoming === 'true') {
+      query += ` AND e.event_date >= NOW()`;
+    } else if (upcoming === 'false') {
+      query += ` AND e.event_date < NOW()`;
+    }
+
+    // Add sorting and pagination
+    query += ` ORDER BY e.event_date DESC LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
+    queryParams.push(parseInt(limit), parseInt(offset));
+
+    const events = await pool.query(query, queryParams);
+
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM events e
+      WHERE e.organizer_id = $1
+      ${status ? ' AND e.status = $2' : ''}
+      ${upcoming === 'true' ? ' AND e.event_date >= NOW()' : ''}
+      ${upcoming === 'false' ? ' AND e.event_date < NOW()' : ''}
+    `;
+    
+    const countParams = [req.user.user_id];
+    if (status) countParams.push(status);
+
+    const totalCount = await pool.query(countQuery, countParams);
+    
+    res.json({ 
+      events: events.rows,
+      pagination: {
+        total: parseInt(totalCount.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
+      }
+    });
 
   } catch (error) {
     console.error('Get user events error:', error);
@@ -1132,29 +1258,122 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
 // Create new event
 app.post('/api/events', authenticateToken, async (req, res) => {
   try {
-    const { event_name, event_date, event_location, description, capacity, company_id } = req.body;
+    const { 
+      event_name, 
+      event_date, 
+      venue_name, 
+      venue_address, 
+      description, 
+      ticket_price = 0,
+      event_type = 'Conference', 
+      category,
+      tags,
+      image_url,
+      registration_deadline,
+      refund_policy,
+      terms_and_conditions,
+      status = 'draft',
+      is_public = true,
+      requires_approval = false,
+      max_tickets_per_person = 5,
+      max_attendees
+    } = req.body;
 
     if (!event_name || !event_date) {
       return res.status(400).json({ message: 'Event name and date are required' });
     }
 
-    // Use user's company_id if not provided and user has one
-    const finalCompanyId = company_id || req.user.company_id;
+    // Check if user is an organizer
+    const organizerCheck = await pool.query(
+      'SELECT user_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    // If the user is not an organizer, automatically make them one
+    if (organizerCheck.rows.length === 0) {
+      try {
+        console.log('User is not an organizer, creating organizer record...');
+        
+        // First, get the user's information for the full_name field
+        const userQuery = await pool.query(
+          'SELECT username, email FROM users WHERE user_id = $1',
+          [req.user.user_id]
+        );
+        
+        if (userQuery.rows.length === 0) {
+          return res.status(404).json({ 
+            message: 'User not found',
+            error: 'user_not_found'
+          });
+        }
+        
+        const user = userQuery.rows[0];
+        const fullName = user.username || user.email.split('@')[0];
+        
+        // Insert user as an organizer with required fields
+        await pool.query(
+          'INSERT INTO organizers (user_id, full_name) VALUES ($1, $2)',
+          [req.user.user_id, fullName]
+        );
+        console.log('Organizer record created successfully');
+      } catch (err) {
+        console.error('Error creating organizer record:', err);
+        return res.status(403).json({ 
+          message: 'Unable to create organizer record. Please contact support.',
+          error: 'organizer_creation_failed',
+          details: err.message
+        });
+      }
+    }
+
+    // Validate event date
+    const eventDateTime = new Date(event_date);
+    if (isNaN(eventDateTime.getTime())) {
+      return res.status(400).json({ message: 'Invalid event date format' });
+    }
+    
+    // Get the organizer_id from the organizers table
+    const organizerIdQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    
+    if (organizerIdQuery.rows.length === 0) {
+      return res.status(500).json({ 
+        message: 'Organizer record not found even after creation attempt',
+        error: 'organizer_not_found'
+      });
+    }
+    
+    const organizerId = organizerIdQuery.rows[0].organizer_id;
+    console.log(`Using organizer_id: ${organizerId} for event creation`);
 
     const newEvent = await pool.query(
-      `INSERT INTO Events (event_name, event_date, event_location, description, capacity, company_id, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
-      [event_name, event_date, event_location, description, capacity, finalCompanyId, req.user.user_id]
+      `INSERT INTO Events (
+        organizer_id, event_name, event_date, venue_name, venue_address, 
+        description, ticket_price, event_type, category, tags,
+        image_url, registration_deadline, refund_policy, terms_and_conditions,
+        status, is_public, requires_approval, max_tickets_per_person, max_attendees
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19) 
+      RETURNING *`,
+      [
+        organizerId, event_name, eventDateTime, venue_name, venue_address, 
+        description, ticket_price, event_type, category, tags,
+        image_url, registration_deadline, refund_policy, terms_and_conditions,
+        status, is_public, requires_approval, max_tickets_per_person, max_attendees
+      ]
     );
 
     res.status(201).json({
       message: 'Event created successfully',
       event: newEvent.rows[0]
     });
-
   } catch (error) {
     console.error('Create event error:', error);
-    res.status(500).json({ message: 'Server error while creating event' });
+    res.status(500).json({ 
+      message: 'Server error while creating event',
+      details: error.message
+    });
   }
 });
 
@@ -1163,11 +1382,18 @@ app.get('/api/events/:id', async (req, res) => {
   try {
     const eventId = req.params.id;
 
+    // Get main event details
     const event = await pool.query(
-      `SELECT e.*, ec.company_name, u.username as created_by_name
-       FROM Events e
-       LEFT JOIN EventCompanies ec ON e.company_id = ec.company_id
-       LEFT JOIN Users u ON e.created_by = u.user_id
+      `SELECT e.*,
+             u.email as organizer_email,
+             CASE WHEN o.full_name IS NOT NULL THEN o.full_name ELSE u.email END as organizer_name,
+             o.phone as organizer_phone,
+             (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id) as registration_count,
+             COALESCE((SELECT ROUND(AVG(ef.rating), 1) FROM eventfeedback ef WHERE ef.event_id = e.event_id), 0) as average_rating,
+             (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id AND er.check_in_status = true) as checked_in_count
+       FROM events e
+       LEFT JOIN users u ON e.organizer_id = u.user_id
+       LEFT JOIN organizers o ON e.organizer_id = o.user_id
        WHERE e.event_id = $1`,
       [eventId]
     );
@@ -1176,7 +1402,46 @@ app.get('/api/events/:id', async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    res.json({ event: event.rows[0] });
+    const eventData = event.rows[0];
+
+    // Get event speakers
+    const speakers = await pool.query(
+      `SELECT * FROM eventspeakers WHERE event_id = $1 ORDER BY speaker_role DESC`,
+      [eventId]
+    );
+    eventData.speakers = speakers.rows;
+
+    // Get feedback summary
+    const feedbackSummary = await pool.query(
+      `SELECT 
+         COUNT(*) as total_feedback,
+         ROUND(AVG(rating), 1) as average_rating,
+         COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+         COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+         COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+         COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+         COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+       FROM eventfeedback
+       WHERE event_id = $1`,
+      [eventId]
+    );
+    eventData.feedback_summary = feedbackSummary.rows[0];
+
+    // Get recent feedback (limited to 5)
+    const feedback = await pool.query(
+      `SELECT ef.*,
+             a.full_name,
+             CASE WHEN ef.is_anonymous THEN 'Anonymous' ELSE a.full_name END as display_name
+       FROM eventfeedback ef
+       LEFT JOIN attendees a ON ef.attendee_id = a.attendee_id
+       WHERE ef.event_id = $1
+       ORDER BY ef.created_at DESC
+       LIMIT 5`,
+      [eventId]
+    );
+    eventData.recent_feedback = feedback.rows;
+
+    res.json({ event: eventData });
 
   } catch (error) {
     console.error('Get event error:', error);
@@ -1188,11 +1453,30 @@ app.get('/api/events/:id', async (req, res) => {
 app.put('/api/events/:id', authenticateToken, async (req, res) => {
   try {
     const eventId = req.params.id;
-    const { event_name, event_date, event_location, description, capacity } = req.body;
+    const { 
+      event_name, 
+      event_date, 
+      venue_name, 
+      venue_address, 
+      description, 
+      ticket_price,
+      event_type, 
+      category,
+      tags,
+      image_url,
+      registration_deadline,
+      refund_policy,
+      terms_and_conditions,
+      status,
+      is_public,
+      requires_approval,
+      max_tickets_per_person,
+      max_attendees
+    } = req.body;
 
     // Check if user owns this event or is admin
     const eventCheck = await pool.query(
-      'SELECT created_by FROM Events WHERE event_id = $1',
+      'SELECT organizer_id FROM events WHERE event_id = $1',
       [eventId]
     );
 
@@ -1200,16 +1484,66 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    if (eventCheck.rows[0].created_by !== req.user.user_id && req.user.role !== 'admin') {
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to update this event' });
     }
 
-    const updatedEvent = await pool.query(
-      `UPDATE Events 
-       SET event_name = $1, event_date = $2, event_location = $3, description = $4, capacity = $5
-       WHERE event_id = $6 RETURNING *`,
-      [event_name, event_date, event_location, description, capacity, eventId]
-    );
+    // Validate event date if provided
+    let eventDateTime = null;
+    if (event_date) {
+      eventDateTime = new Date(event_date);
+      if (isNaN(eventDateTime.getTime())) {
+        return res.status(400).json({ message: 'Invalid event date format' });
+      }
+    }
+
+    // Build the update query dynamically based on provided fields
+    const updateFields = [];
+    const queryParams = [];
+    let paramCounter = 1;
+
+    // Helper to add fields only if they were provided in the request
+    const addFieldIfProvided = (fieldName, value) => {
+      if (value !== undefined) {
+        updateFields.push(`${fieldName} = $${paramCounter++}`);
+        queryParams.push(value);
+      }
+    };
+
+    addFieldIfProvided('event_name', event_name);
+    addFieldIfProvided('event_date', eventDateTime);
+    addFieldIfProvided('venue_name', venue_name);
+    addFieldIfProvided('venue_address', venue_address);
+    addFieldIfProvided('description', description);
+    addFieldIfProvided('ticket_price', ticket_price);
+    addFieldIfProvided('event_type', event_type);
+    addFieldIfProvided('category', category);
+    addFieldIfProvided('tags', tags);
+    addFieldIfProvided('image_url', image_url);
+    addFieldIfProvided('registration_deadline', registration_deadline);
+    addFieldIfProvided('refund_policy', refund_policy);
+    addFieldIfProvided('terms_and_conditions', terms_and_conditions);
+    addFieldIfProvided('status', status);
+    addFieldIfProvided('is_public', is_public);
+    addFieldIfProvided('requires_approval', requires_approval);
+    addFieldIfProvided('max_tickets_per_person', max_tickets_per_person);
+    addFieldIfProvided('max_attendees', max_attendees);
+    addFieldIfProvided('updated_at', new Date());
+
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: 'No fields to update provided' });
+    }
+
+    // Always update the updated_at timestamp
+    const query = `
+      UPDATE events 
+      SET ${updateFields.join(', ')}
+      WHERE event_id = $${paramCounter} 
+      RETURNING *
+    `;
+    queryParams.push(eventId);
+
+    const updatedEvent = await pool.query(query, queryParams);
 
     res.json({
       message: 'Event updated successfully',
@@ -1226,10 +1560,11 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
 app.delete('/api/events/:id', authenticateToken, async (req, res) => {
   try {
     const eventId = req.params.id;
+    const { force = false } = req.query;
 
     // Check if user owns this event or is admin
     const eventCheck = await pool.query(
-      'SELECT created_by FROM Events WHERE event_id = $1',
+      'SELECT organizer_id FROM events WHERE event_id = $1',
       [eventId]
     );
 
@@ -1237,17 +1572,1508 @@ app.delete('/api/events/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    if (eventCheck.rows[0].created_by !== req.user.user_id && req.user.role !== 'admin') {
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to delete this event' });
     }
 
-    await pool.query('DELETE FROM Events WHERE event_id = $1', [eventId]);
+    // Check if event has registrations
+    const registrationsCheck = await pool.query(
+      'SELECT COUNT(*) FROM eventregistrations WHERE event_id = $1',
+      [eventId]
+    );
 
-    res.json({ message: 'Event deleted successfully' });
+    const hasRegistrations = parseInt(registrationsCheck.rows[0].count) > 0;
+
+    if (hasRegistrations && !force) {
+      return res.status(409).json({ 
+        message: 'Cannot delete event with registrations. Use force=true to delete anyway.',
+        has_registrations: true,
+        registration_count: parseInt(registrationsCheck.rows[0].count)
+      });
+    }
+
+    // Start a transaction since we need to delete from multiple tables
+    const client = await pool.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      // Delete related data if force=true
+      if (force) {
+        await client.query('DELETE FROM eventregistrations WHERE event_id = $1', [eventId]);
+        await client.query('DELETE FROM eventfeedback WHERE event_id = $1', [eventId]);
+        await client.query('DELETE FROM eventspeakers WHERE event_id = $1', [eventId]);
+        await client.query('DELETE FROM attendancelogs WHERE event_id = $1', [eventId]);
+      }
+      
+      // Finally delete the event
+      await client.query('DELETE FROM events WHERE event_id = $1', [eventId]);
+      
+      await client.query('COMMIT');
+      
+      res.json({ 
+        message: 'Event deleted successfully',
+        force_applied: force && hasRegistrations
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
 
   } catch (error) {
     console.error('Delete event error:', error);
     res.status(500).json({ message: 'Server error while deleting event' });
+  }
+});
+
+// ===== EVENT REGISTRATIONS ROUTES =====
+
+// Register for an event
+app.post('/api/events/:id/register', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { ticket_quantity = 1, special_requirements } = req.body;
+    
+    // Check if the event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id, event_name, max_attendees, ticket_price, registration_deadline, requires_approval, max_tickets_per_person FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    const event = eventCheck.rows[0];
+    
+    // Check if registration deadline has passed
+    if (event.registration_deadline && new Date(event.registration_deadline) < new Date()) {
+      return res.status(400).json({ message: 'Registration deadline has passed' });
+    }
+    
+    // Check if user is an attendee
+    const attendeeCheck = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    
+    if (attendeeCheck.rows.length === 0) {
+      return res.status(403).json({ 
+        message: 'Only attendees can register for events',
+        error: 'permission_denied',
+        roles_required: ['attendee']
+      });
+    }
+    
+    const attendeeId = attendeeCheck.rows[0].attendee_id;
+    
+    // Check if already registered
+    const alreadyRegistered = await pool.query(
+      'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
+      [eventId, attendeeId]
+    );
+    
+    if (alreadyRegistered.rows.length > 0) {
+      return res.status(409).json({ message: 'You are already registered for this event' });
+    }
+    
+    // Check ticket quantity limit
+    if (ticket_quantity > event.max_tickets_per_person) {
+      return res.status(400).json({ 
+        message: `Maximum ${event.max_tickets_per_person} tickets allowed per person` 
+      });
+    }
+    
+    // Check if event is full
+    if (event.max_attendees) {
+      const registrationsCount = await pool.query(
+        'SELECT SUM(ticket_quantity) as total FROM eventregistrations WHERE event_id = $1',
+        [eventId]
+      );
+      
+      const totalRegistered = parseInt(registrationsCount.rows[0].total || 0);
+      if (totalRegistered + ticket_quantity > event.max_attendees) {
+        return res.status(400).json({ message: 'Event is full or has insufficient tickets remaining' });
+      }
+    }
+    
+    // Calculate total amount
+    const totalAmount = ticket_quantity * event.ticket_price;
+    
+    // Create registration
+    const registration = await pool.query(
+      `INSERT INTO eventregistrations 
+       (event_id, attendee_id, ticket_quantity, total_amount, payment_status, special_requirements, status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`,
+      [
+        eventId, 
+        attendeeId, 
+        ticket_quantity, 
+        totalAmount, 
+        event.ticket_price > 0 ? 'pending' : 'completed', 
+        special_requirements,
+        event.requires_approval ? 'pending' : 'confirmed'
+      ]
+    );
+    
+    // Generate QR code for the registration
+    const qrCode = `EVENT-${eventId}-REG-${registration.rows[0].registration_id}-USER-${req.user.user_id}`;
+    
+    await pool.query(
+      'UPDATE eventregistrations SET qr_code = $1 WHERE registration_id = $2',
+      [qrCode, registration.rows[0].registration_id]
+    );
+    
+    res.status(201).json({
+      message: 'Registration successful',
+      registration: {
+        ...registration.rows[0],
+        qr_code: qrCode
+      },
+      event: {
+        id: event.event_id,
+        name: event.event_name
+      },
+      payment_required: event.ticket_price > 0,
+      approval_required: event.requires_approval
+    });
+    
+  } catch (error) {
+    console.error('Event registration error:', error);
+    res.status(500).json({ message: 'Server error during event registration' });
+  }
+});
+
+// Get my event registrations
+app.get('/api/registrations', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is an attendee
+    const attendeeCheck = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    
+    if (attendeeCheck.rows.length === 0) {
+      return res.status(403).json({ 
+        message: 'Only attendees can view registrations',
+        error: 'permission_denied',
+        roles_required: ['attendee']
+      });
+    }
+    
+    const attendeeId = attendeeCheck.rows[0].attendee_id;
+    
+    const registrations = await pool.query(
+      `SELECT r.*, 
+              e.event_name, e.event_date, e.venue_name, e.status as event_status, 
+              e.image_url, e.category
+       FROM eventregistrations r
+       JOIN events e ON r.event_id = e.event_id
+       WHERE r.attendee_id = $1
+       ORDER BY e.event_date DESC`,
+      [attendeeId]
+    );
+    
+    res.json({ registrations: registrations.rows });
+    
+  } catch (error) {
+    console.error('Get registrations error:', error);
+    res.status(500).json({ message: 'Server error while fetching registrations' });
+  }
+});
+
+// Organizer: Get registrations for a specific event
+app.get('/api/events/:id/registrations', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { status, sort = 'registration_date', order = 'desc', limit = 50, offset = 0 } = req.query;
+    
+    // Check if user is an organizer and owns this event
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view registrations for this event' });
+    }
+    
+    // Build the query with optional filters
+    let query = `
+      SELECT r.*, 
+             a.full_name, a.email, a.phone_number,
+             u.username, u.profile_picture
+      FROM eventregistrations r
+      JOIN attendees a ON r.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE r.event_id = $1
+    `;
+    
+    const queryParams = [eventId];
+    let paramIndex = 2;
+    
+    if (status) {
+      query += ` AND r.status = $${paramIndex}`;
+      queryParams.push(status);
+      paramIndex++;
+    }
+    
+    // Validate sort field (prevent SQL injection)
+    const allowedSortFields = ['registration_date', 'full_name', 'status', 'ticket_quantity', 'total_amount'];
+    const sortField = allowedSortFields.includes(sort) ? sort : 'registration_date';
+    
+    // Validate order direction
+    const orderDir = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    
+    query += ` ORDER BY ${sortField} ${orderDir} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryParams.push(limit, offset);
+    
+    const registrations = await pool.query(query, queryParams);
+    
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM eventregistrations r
+      WHERE r.event_id = $1
+      ${status ? ' AND r.status = $2' : ''}
+    `;
+    
+    const countParams = [eventId];
+    if (status) countParams.push(status);
+    
+    const totalCount = await pool.query(countQuery, countParams);
+    
+    // Get registration summary
+    const summaryQuery = `
+      SELECT 
+        COUNT(*) as total_registrations,
+        SUM(ticket_quantity) as total_tickets,
+        SUM(total_amount) as total_revenue,
+        COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed_count,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_count,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_count,
+        COUNT(CASE WHEN payment_status = 'completed' THEN 1 END) as paid_count,
+        COUNT(CASE WHEN payment_status = 'pending' THEN 1 END) as unpaid_count
+      FROM eventregistrations
+      WHERE event_id = $1
+    `;
+    
+    const summary = await pool.query(summaryQuery, [eventId]);
+    
+    res.json({
+      registrations: registrations.rows,
+      summary: summary.rows[0],
+      pagination: {
+        total: parseInt(totalCount.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get event registrations error:', error);
+    res.status(500).json({ message: 'Server error while fetching event registrations' });
+  }
+});
+
+// Update registration status (confirm, reject, cancel)
+app.put('/api/events/:eventId/registrations/:regId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, regId } = req.params;
+    const { status, rejection_reason } = req.body;
+    
+    if (!['confirmed', 'rejected', 'cancelled'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    
+    // Check if user is an organizer and owns this event
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if registration exists for this event
+    const registrationCheck = await pool.query(
+      'SELECT * FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+      [regId, eventId]
+    );
+    
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+    
+    // Check authorization - organizer or admin can update any registration, attendee can only cancel their own
+    const isOrganizer = eventCheck.rows[0].organizer_id === req.user.user_id;
+    const isAdmin = req.user.role === 'admin';
+    const isAttendee = req.user.user_id === registrationCheck.rows[0].attendee_id;
+    
+    if ((!isOrganizer && !isAdmin) && !(isAttendee && status === 'cancelled')) {
+      return res.status(403).json({ message: 'Not authorized to update this registration' });
+    }
+    
+    // Update registration status
+    const updatedRegistration = await pool.query(
+      `UPDATE eventregistrations 
+       SET status = $1, 
+           ${status === 'rejected' ? 'rejection_reason = $3,' : ''}
+           updated_at = NOW()
+       WHERE registration_id = $2
+       RETURNING *`,
+      status === 'rejected' 
+        ? [status, regId, rejection_reason || 'Registration rejected by organizer'] 
+        : [status, regId]
+    );
+    
+    res.json({
+      message: `Registration ${status} successfully`,
+      registration: updatedRegistration.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Update registration status error:', error);
+    res.status(500).json({ message: 'Server error while updating registration status' });
+  }
+});
+
+// ===== EVENT FEEDBACK ROUTES =====
+
+// Submit feedback for an event
+app.post('/api/events/:id/feedback', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { rating, feedback_text, is_anonymous = false } = req.body;
+    
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ message: 'Rating must be between 1 and 5' });
+    }
+    
+    // Check if the event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Check if user is an attendee
+    const attendeeCheck = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+    
+    if (attendeeCheck.rows.length === 0) {
+      return res.status(403).json({ 
+        message: 'Only attendees can submit feedback',
+        error: 'permission_denied',
+        roles_required: ['attendee']
+      });
+    }
+    
+    const attendeeId = attendeeCheck.rows[0].attendee_id;
+    
+    // Check if the attendee registered for the event
+    const registrationCheck = await pool.query(
+      'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
+      [eventId, attendeeId]
+    );
+    
+    if (registrationCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'You must be registered for this event to submit feedback' });
+    }
+    
+    // Check if already submitted feedback
+    const existingFeedback = await pool.query(
+      'SELECT feedback_id FROM eventfeedback WHERE event_id = $1 AND attendee_id = $2',
+      [eventId, attendeeId]
+    );
+    
+    let feedbackId;
+    
+    if (existingFeedback.rows.length > 0) {
+      // Update existing feedback
+      const updatedFeedback = await pool.query(
+        `UPDATE eventfeedback 
+         SET rating = $1, feedback_text = $2, is_anonymous = $3, updated_at = NOW()
+         WHERE event_id = $4 AND attendee_id = $5
+         RETURNING *`,
+        [rating, feedback_text, is_anonymous, eventId, attendeeId]
+      );
+      
+      feedbackId = updatedFeedback.rows[0].feedback_id;
+      
+      res.json({
+        message: 'Feedback updated successfully',
+        feedback: updatedFeedback.rows[0]
+      });
+    } else {
+      // Create new feedback
+      const newFeedback = await pool.query(
+        `INSERT INTO eventfeedback 
+         (event_id, attendee_id, rating, feedback_text, is_anonymous)
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING *`,
+        [eventId, attendeeId, rating, feedback_text, is_anonymous]
+      );
+      
+      feedbackId = newFeedback.rows[0].feedback_id;
+      
+      res.status(201).json({
+        message: 'Feedback submitted successfully',
+        feedback: newFeedback.rows[0]
+      });
+    }
+    
+  } catch (error) {
+    console.error('Submit feedback error:', error);
+    res.status(500).json({ message: 'Server error while submitting feedback' });
+  }
+});
+
+// Get feedback for an event
+app.get('/api/events/:id/feedback', async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { limit = 10, offset = 0 } = req.query;
+    
+    // Check if the event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Get feedback summary
+    const feedbackSummary = await pool.query(
+      `SELECT 
+         COUNT(*) as total_feedback,
+         ROUND(AVG(rating), 1) as average_rating,
+         COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+         COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+         COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+         COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+         COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+       FROM eventfeedback
+       WHERE event_id = $1`,
+      [eventId]
+    );
+    
+    // Get feedback list with attendee names
+    const feedback = await pool.query(
+      `SELECT ef.*,
+             CASE WHEN ef.is_anonymous THEN 'Anonymous' 
+                  ELSE a.full_name 
+             END as attendee_name
+       FROM eventfeedback ef
+       LEFT JOIN attendees a ON ef.attendee_id = a.attendee_id
+       WHERE ef.event_id = $1
+       ORDER BY ef.created_at DESC
+       LIMIT $2 OFFSET $3`,
+      [eventId, limit, offset]
+    );
+    
+    // Get total count for pagination
+    const totalCount = await pool.query(
+      'SELECT COUNT(*) as total FROM eventfeedback WHERE event_id = $1',
+      [eventId]
+    );
+    
+    res.json({
+      summary: feedbackSummary.rows[0],
+      feedback: feedback.rows,
+      pagination: {
+        total: parseInt(totalCount.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get feedback error:', error);
+    res.status(500).json({ message: 'Server error while fetching feedback' });
+  }
+});
+
+// ===== EVENT CATEGORIES ROUTES =====
+
+// Get all event categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const categories = await pool.query(
+      'SELECT * FROM eventcategories ORDER BY category_name'
+    );
+    
+    res.json({ categories: categories.rows });
+    
+  } catch (error) {
+    console.error('Get categories error:', error);
+    res.status(500).json({ message: 'Server error while fetching categories' });
+  }
+});
+
+// ===== EVENT SPEAKERS ROUTES =====
+
+// Add speaker to event
+app.post('/api/events/:id/speakers', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { 
+      speaker_name, 
+      bio, 
+      profile_image_url, 
+      organization, 
+      job_title, 
+      presentation_title,
+      presentation_description,
+      presentation_start_time,
+      presentation_end_time,
+      speaker_order = 0
+    } = req.body;
+    
+    // Validate required fields
+    if (!speaker_name) {
+      return res.status(400).json({ message: 'Speaker name is required' });
+    }
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to add speakers to this event' });
+    }
+    
+    // Add speaker
+    const newSpeaker = await pool.query(
+      `INSERT INTO eventspeakers 
+       (event_id, speaker_name, bio, profile_image_url, organization, job_title, 
+        presentation_title, presentation_description, presentation_start_time, 
+        presentation_end_time, speaker_order)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING *`,
+      [
+        eventId, speaker_name, bio, profile_image_url, organization, job_title,
+        presentation_title, presentation_description, presentation_start_time,
+        presentation_end_time, speaker_order
+      ]
+    );
+    
+    res.status(201).json({
+      message: 'Speaker added successfully',
+      speaker: newSpeaker.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Add speaker error:', error);
+    res.status(500).json({ message: 'Server error while adding speaker' });
+  }
+});
+
+// Update speaker
+app.put('/api/events/:eventId/speakers/:speakerId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, speakerId } = req.params;
+    const { 
+      speaker_name, 
+      bio, 
+      profile_image_url, 
+      organization, 
+      job_title, 
+      presentation_title,
+      presentation_description,
+      presentation_start_time,
+      presentation_end_time,
+      speaker_order
+    } = req.body;
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update speakers for this event' });
+    }
+    
+    // Check if speaker exists for this event
+    const speakerCheck = await pool.query(
+      'SELECT speaker_id FROM eventspeakers WHERE speaker_id = $1 AND event_id = $2',
+      [speakerId, eventId]
+    );
+    
+    if (speakerCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Speaker not found for this event' });
+    }
+    
+    // Build dynamic update query with only provided fields
+    let updateFields = [];
+    let queryParams = [speakerId];
+    let paramIndex = 2;
+    
+    if (speaker_name !== undefined) {
+      updateFields.push(`speaker_name = $${paramIndex++}`);
+      queryParams.push(speaker_name);
+    }
+    
+    if (bio !== undefined) {
+      updateFields.push(`bio = $${paramIndex++}`);
+      queryParams.push(bio);
+    }
+    
+    if (profile_image_url !== undefined) {
+      updateFields.push(`profile_image_url = $${paramIndex++}`);
+      queryParams.push(profile_image_url);
+    }
+    
+    if (organization !== undefined) {
+      updateFields.push(`organization = $${paramIndex++}`);
+      queryParams.push(organization);
+    }
+    
+    if (job_title !== undefined) {
+      updateFields.push(`job_title = $${paramIndex++}`);
+      queryParams.push(job_title);
+    }
+    
+    if (presentation_title !== undefined) {
+      updateFields.push(`presentation_title = $${paramIndex++}`);
+      queryParams.push(presentation_title);
+    }
+    
+    if (presentation_description !== undefined) {
+      updateFields.push(`presentation_description = $${paramIndex++}`);
+      queryParams.push(presentation_description);
+    }
+    
+    if (presentation_start_time !== undefined) {
+      updateFields.push(`presentation_start_time = $${paramIndex++}`);
+      queryParams.push(presentation_start_time);
+    }
+    
+    if (presentation_end_time !== undefined) {
+      updateFields.push(`presentation_end_time = $${paramIndex++}`);
+      queryParams.push(presentation_end_time);
+    }
+    
+    if (speaker_order !== undefined) {
+      updateFields.push(`speaker_order = $${paramIndex++}`);
+      queryParams.push(speaker_order);
+    }
+    
+    // Update speaker
+    updateFields.push(`updated_at = NOW()`);
+    
+    const query = `
+      UPDATE eventspeakers
+      SET ${updateFields.join(', ')}
+      WHERE speaker_id = $1
+      RETURNING *
+    `;
+    
+    const updatedSpeaker = await pool.query(query, queryParams);
+    
+    res.json({
+      message: 'Speaker updated successfully',
+      speaker: updatedSpeaker.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Update speaker error:', error);
+    res.status(500).json({ message: 'Server error while updating speaker' });
+  }
+});
+
+// Get all speakers for an event
+app.get('/api/events/:id/speakers', async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    
+    // Check if the event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Get speakers for this event
+    const speakers = await pool.query(
+      `SELECT * FROM eventspeakers 
+       WHERE event_id = $1
+       ORDER BY speaker_order, speaker_name`,
+      [eventId]
+    );
+    
+    res.json({ speakers: speakers.rows });
+    
+  } catch (error) {
+    console.error('Get speakers error:', error);
+    res.status(500).json({ message: 'Server error while fetching speakers' });
+  }
+});
+
+// Delete a speaker
+app.delete('/api/events/:eventId/speakers/:speakerId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, speakerId } = req.params;
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete speakers for this event' });
+    }
+    
+    // Check if speaker exists for this event
+    const speakerCheck = await pool.query(
+      'SELECT speaker_id FROM eventspeakers WHERE speaker_id = $1 AND event_id = $2',
+      [speakerId, eventId]
+    );
+    
+    if (speakerCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Speaker not found for this event' });
+    }
+    
+    // Delete speaker
+    await pool.query(
+      'DELETE FROM eventspeakers WHERE speaker_id = $1',
+      [speakerId]
+    );
+    
+    res.json({ message: 'Speaker deleted successfully' });
+    
+  } catch (error) {
+    console.error('Delete speaker error:', error);
+    res.status(500).json({ message: 'Server error while deleting speaker' });
+  }
+});
+
+// ===== VENDOR ROUTES =====
+
+// Add vendor to event
+app.post('/api/events/:id/vendors', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { 
+      vendor_name, 
+      contact_name,
+      contact_email,
+      contact_phone,
+      booth_number,
+      booth_size,
+      products_services,
+      logo_url,
+      website_url,
+      special_requirements,
+      sponsor_level
+    } = req.body;
+    
+    // Validate required fields
+    if (!vendor_name) {
+      return res.status(400).json({ message: 'Vendor name is required' });
+    }
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to add vendors to this event' });
+    }
+    
+    // Add vendor
+    const newVendor = await pool.query(
+      `INSERT INTO eventvendors 
+       (event_id, vendor_name, contact_name, contact_email, contact_phone, 
+        booth_number, booth_size, products_services, logo_url, website_url, 
+        special_requirements, sponsor_level)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+       RETURNING *`,
+      [
+        eventId, vendor_name, contact_name, contact_email, contact_phone, 
+        booth_number, booth_size, products_services, logo_url, website_url, 
+        special_requirements, sponsor_level
+      ]
+    );
+    
+    res.status(201).json({
+      message: 'Vendor added successfully',
+      vendor: newVendor.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Add vendor error:', error);
+    res.status(500).json({ message: 'Server error while adding vendor' });
+  }
+});
+
+// Get all vendors for an event
+app.get('/api/events/:id/vendors', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    
+    // Check if the event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id, organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    // Only organizers or admins can see all vendor details
+    const isOrganizer = eventCheck.rows[0].organizer_id === req.user.user_id;
+    const isAdmin = req.user.role === 'admin';
+    
+    let query;
+    if (isOrganizer || isAdmin) {
+      // Full vendor details for organizer/admin
+      query = `
+        SELECT * FROM eventvendors 
+        WHERE event_id = $1
+        ORDER BY vendor_name
+      `;
+    } else {
+      // Limited vendor details for attendees/public
+      query = `
+        SELECT 
+          vendor_id, event_id, vendor_name, booth_number, 
+          products_services, logo_url, website_url, sponsor_level
+        FROM eventvendors 
+        WHERE event_id = $1
+        ORDER BY vendor_name
+      `;
+    }
+    
+    const vendors = await pool.query(query, [eventId]);
+    
+    res.json({ vendors: vendors.rows });
+    
+  } catch (error) {
+    console.error('Get vendors error:', error);
+    res.status(500).json({ message: 'Server error while fetching vendors' });
+  }
+});
+
+// Update a vendor
+app.put('/api/events/:eventId/vendors/:vendorId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, vendorId } = req.params;
+    const { 
+      vendor_name, 
+      contact_name,
+      contact_email,
+      contact_phone,
+      booth_number,
+      booth_size,
+      products_services,
+      logo_url,
+      website_url,
+      special_requirements,
+      sponsor_level
+    } = req.body;
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to update vendors for this event' });
+    }
+    
+    // Check if vendor exists for this event
+    const vendorCheck = await pool.query(
+      'SELECT vendor_id FROM eventvendors WHERE vendor_id = $1 AND event_id = $2',
+      [vendorId, eventId]
+    );
+    
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Vendor not found for this event' });
+    }
+    
+    // Build dynamic update query with only provided fields
+    let updateFields = [];
+    let queryParams = [vendorId];
+    let paramIndex = 2;
+    
+    if (vendor_name !== undefined) {
+      updateFields.push(`vendor_name = $${paramIndex++}`);
+      queryParams.push(vendor_name);
+    }
+    
+    if (contact_name !== undefined) {
+      updateFields.push(`contact_name = $${paramIndex++}`);
+      queryParams.push(contact_name);
+    }
+    
+    if (contact_email !== undefined) {
+      updateFields.push(`contact_email = $${paramIndex++}`);
+      queryParams.push(contact_email);
+    }
+    
+    if (contact_phone !== undefined) {
+      updateFields.push(`contact_phone = $${paramIndex++}`);
+      queryParams.push(contact_phone);
+    }
+    
+    if (booth_number !== undefined) {
+      updateFields.push(`booth_number = $${paramIndex++}`);
+      queryParams.push(booth_number);
+    }
+    
+    if (booth_size !== undefined) {
+      updateFields.push(`booth_size = $${paramIndex++}`);
+      queryParams.push(booth_size);
+    }
+    
+    if (products_services !== undefined) {
+      updateFields.push(`products_services = $${paramIndex++}`);
+      queryParams.push(products_services);
+    }
+    
+    if (logo_url !== undefined) {
+      updateFields.push(`logo_url = $${paramIndex++}`);
+      queryParams.push(logo_url);
+    }
+    
+    if (website_url !== undefined) {
+      updateFields.push(`website_url = $${paramIndex++}`);
+      queryParams.push(website_url);
+    }
+    
+    if (special_requirements !== undefined) {
+      updateFields.push(`special_requirements = $${paramIndex++}`);
+      queryParams.push(special_requirements);
+    }
+    
+    if (sponsor_level !== undefined) {
+      updateFields.push(`sponsor_level = $${paramIndex++}`);
+      queryParams.push(sponsor_level);
+    }
+    
+    if (updateFields.length === 0) {
+      return res.status(400).json({ message: 'No fields provided to update' });
+    }
+    
+    updateFields.push(`updated_at = NOW()`);
+    
+    const query = `
+      UPDATE eventvendors
+      SET ${updateFields.join(', ')}
+      WHERE vendor_id = $1
+      RETURNING *
+    `;
+    
+    const updatedVendor = await pool.query(query, queryParams);
+    
+    res.json({
+      message: 'Vendor updated successfully',
+      vendor: updatedVendor.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Update vendor error:', error);
+    res.status(500).json({ message: 'Server error while updating vendor' });
+  }
+});
+
+// Delete a vendor
+app.delete('/api/events/:eventId/vendors/:vendorId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, vendorId } = req.params;
+    
+    // Check if the event exists and user is authorized
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to delete vendors for this event' });
+    }
+    
+    // Check if vendor exists for this event
+    const vendorCheck = await pool.query(
+      'SELECT vendor_id FROM eventvendors WHERE vendor_id = $1 AND event_id = $2',
+      [vendorId, eventId]
+    );
+    
+    if (vendorCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Vendor not found for this event' });
+    }
+    
+    // Delete vendor
+    await pool.query(
+      'DELETE FROM eventvendors WHERE vendor_id = $1',
+      [vendorId]
+    );
+    
+    res.json({ message: 'Vendor deleted successfully' });
+    
+  } catch (error) {
+    console.error('Delete vendor error:', error);
+    res.status(500).json({ message: 'Server error while deleting vendor' });
+  }
+});
+
+// ===== ATTENDANCE ROUTES =====
+
+// Record attendance using QR code
+app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { qr_code } = req.body;
+    
+    if (!qr_code) {
+      return res.status(400).json({ message: 'QR code is required' });
+    }
+    
+    // Extract registration ID from QR code
+    // Format: EVENT-{eventId}-REG-{registrationId}-USER-{userId}
+    const qrParts = qr_code.split('-');
+    
+    if (qrParts.length !== 6 || qrParts[0] !== 'EVENT' || qrParts[1] !== eventId || qrParts[2] !== 'REG' || qrParts[4] !== 'USER') {
+      return res.status(400).json({ message: 'Invalid QR code format' });
+    }
+    
+    const registrationId = qrParts[3];
+    const userId = qrParts[5];
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to record attendance for this event' });
+    }
+    
+    // Check if registration exists and is confirmed
+    const registrationCheck = await pool.query(
+      'SELECT r.*, a.full_name, a.email FROM eventregistrations r JOIN attendees a ON r.attendee_id = a.attendee_id WHERE r.registration_id = $1 AND r.event_id = $2',
+      [registrationId, eventId]
+    );
+    
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+    
+    const registration = registrationCheck.rows[0];
+    
+    if (registration.status !== 'confirmed') {
+      return res.status(400).json({ 
+        message: 'Registration is not confirmed', 
+        status: registration.status 
+      });
+    }
+    
+    // Check if attendance already recorded
+    const attendanceCheck = await pool.query(
+      'SELECT * FROM attendancelogs WHERE registration_id = $1 AND event_id = $2',
+      [registrationId, eventId]
+    );
+    
+    if (attendanceCheck.rows.length > 0) {
+      return res.status(409).json({ 
+        message: 'Attendance already recorded',
+        attendance: attendanceCheck.rows[0]
+      });
+    }
+    
+    // Record attendance
+    const attendance = await pool.query(
+      `INSERT INTO attendancelogs 
+       (event_id, registration_id, attendee_id, check_in_time, recorded_by)
+       VALUES ($1, $2, $3, NOW(), $4)
+       RETURNING *`,
+      [eventId, registrationId, registration.attendee_id, req.user.user_id]
+    );
+    
+    res.status(201).json({
+      message: 'Attendance recorded successfully',
+      attendance: attendance.rows[0],
+      attendee: {
+        name: registration.full_name,
+        email: registration.email
+      }
+    });
+    
+  } catch (error) {
+    console.error('Record attendance error:', error);
+    res.status(500).json({ message: 'Server error while recording attendance' });
+  }
+});
+
+// Manual attendance check-in
+app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { email, phone, registration_id } = req.body;
+    
+    // Check if at least one search parameter is provided
+    if (!email && !phone && !registration_id) {
+      return res.status(400).json({ message: 'Email, phone or registration ID is required' });
+    }
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to record attendance for this event' });
+    }
+    
+    // Find registration
+    let registrationQuery;
+    let queryParams = [eventId];
+    
+    if (registration_id) {
+      registrationQuery = `
+        SELECT r.*, a.full_name, a.email, a.phone_number 
+        FROM eventregistrations r 
+        JOIN attendees a ON r.attendee_id = a.attendee_id 
+        WHERE r.event_id = $1 AND r.registration_id = $2
+      `;
+      queryParams.push(registration_id);
+    } else if (email) {
+      registrationQuery = `
+        SELECT r.*, a.full_name, a.email, a.phone_number 
+        FROM eventregistrations r 
+        JOIN attendees a ON r.attendee_id = a.attendee_id 
+        WHERE r.event_id = $1 AND a.email = $2
+      `;
+      queryParams.push(email);
+    } else {
+      registrationQuery = `
+        SELECT r.*, a.full_name, a.email, a.phone_number 
+        FROM eventregistrations r 
+        JOIN attendees a ON r.attendee_id = a.attendee_id 
+        WHERE r.event_id = $1 AND a.phone_number = $2
+      `;
+      queryParams.push(phone);
+    }
+    
+    const registrationCheck = await pool.query(registrationQuery, queryParams);
+    
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+    
+    const registration = registrationCheck.rows[0];
+    
+    if (registration.status !== 'confirmed') {
+      return res.status(400).json({ 
+        message: 'Registration is not confirmed', 
+        status: registration.status 
+      });
+    }
+    
+    // Check if attendance already recorded
+    const attendanceCheck = await pool.query(
+      'SELECT * FROM attendancelogs WHERE registration_id = $1 AND event_id = $2',
+      [registration.registration_id, eventId]
+    );
+    
+    if (attendanceCheck.rows.length > 0) {
+      return res.status(409).json({ 
+        message: 'Attendance already recorded',
+        attendance: attendanceCheck.rows[0],
+        attendee: {
+          name: registration.full_name,
+          email: registration.email
+        }
+      });
+    }
+    
+    // Record attendance
+    const attendance = await pool.query(
+      `INSERT INTO attendancelogs 
+       (event_id, registration_id, attendee_id, check_in_time, recorded_by)
+       VALUES ($1, $2, $3, NOW(), $4)
+       RETURNING *`,
+      [eventId, registration.registration_id, registration.attendee_id, req.user.user_id]
+    );
+    
+    res.status(201).json({
+      message: 'Attendance recorded successfully',
+      attendance: attendance.rows[0],
+      attendee: {
+        name: registration.full_name,
+        email: registration.email,
+        phone: registration.phone_number
+      }
+    });
+    
+  } catch (error) {
+    console.error('Record manual attendance error:', error);
+    res.status(500).json({ message: 'Server error while recording attendance' });
+  }
+});
+
+// Get attendance for an event
+app.get('/api/events/:eventId/attendance', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { sort = 'check_in_time', order = 'desc', limit = 50, offset = 0 } = req.query;
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      'SELECT organizer_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view attendance for this event' });
+    }
+    
+    // Validate sort field (prevent SQL injection)
+    const allowedSortFields = ['check_in_time', 'full_name'];
+    const sortField = allowedSortFields.includes(sort) ? sort : 'check_in_time';
+    
+    // Validate order direction
+    const orderDir = order.toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    
+    // Get attendance records
+    const attendance = await pool.query(
+      `SELECT al.*, 
+              a.full_name, a.email, a.phone_number,
+              u.username as recorded_by_username,
+              r.ticket_quantity
+       FROM attendancelogs al
+       JOIN attendees a ON al.attendee_id = a.attendee_id
+       JOIN users u ON al.recorded_by = u.user_id
+       JOIN eventregistrations r ON al.registration_id = r.registration_id
+       WHERE al.event_id = $1
+       ORDER BY ${sortField === 'full_name' ? 'a.full_name' : 'al.check_in_time'} ${orderDir}
+       LIMIT $2 OFFSET $3`,
+      [eventId, limit, offset]
+    );
+    
+    // Get total count for pagination
+    const totalCount = await pool.query(
+      'SELECT COUNT(*) as total FROM attendancelogs WHERE event_id = $1',
+      [eventId]
+    );
+    
+    // Get attendance summary
+    const summary = await pool.query(
+      `SELECT 
+         COUNT(*) as total_checked_in,
+         SUM(r.ticket_quantity) as total_tickets_checked_in,
+         (SELECT COUNT(*) FROM eventregistrations WHERE event_id = $1) as total_registrations,
+         (SELECT SUM(ticket_quantity) FROM eventregistrations WHERE event_id = $1) as total_tickets,
+         ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM eventregistrations WHERE event_id = $1), 1) as attendance_rate
+       FROM attendancelogs al
+       JOIN eventregistrations r ON al.registration_id = r.registration_id
+       WHERE al.event_id = $1`,
+      [eventId]
+    );
+    
+    res.json({
+      attendance: attendance.rows,
+      summary: summary.rows[0],
+      pagination: {
+        total: parseInt(totalCount.rows[0].total),
+        limit: parseInt(limit),
+        offset: parseInt(offset),
+        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
+      }
+    });
+    
+  } catch (error) {
+    console.error('Get attendance error:', error);
+    res.status(500).json({ message: 'Server error while fetching attendance records' });
+  }
+});
+
+// ===== VENUE ROUTES =====
+
+// Get all venues
+// NOTE: The venues table does not exist in the database schema
+// Instead of querying the database, we'll return an empty array
+app.get('/api/venues', async (req, res) => {
+  try {
+    // Return an empty venues array since we're not using a venues table
+    res.json({ venues: [], message: 'Venues are entered directly by organizers' });
+  } catch (error) {
+    console.error('Get venues error:', error);
+    res.status(500).json({ message: 'Server error while fetching venues' });
+  }
+});
+
+// NOTE: The venues table does not exist in the database schema
+// Get venue by ID - returns a mock response
+app.get('/api/venues/:id', async (req, res) => {
+  try {
+    const venueId = req.params.id;
+    
+    // Since we don't have a venues table, return a generic response
+    res.json({ 
+      venue: {
+        venue_id: venueId,
+        venue_name: "Default Venue",
+        address: "Please enter venue details directly",
+        message: "Venues are stored directly with events"
+      } 
+    });
+    
+  } catch (error) {
+    console.error('Get venue error:', error);
+    res.status(500).json({ message: 'Server error while fetching venue' });
+  }
+});
+
+// NOTE: The venues table does not exist in the database schema
+// Instead, venues are stored directly with the events
+app.post('/api/venues', authenticateToken, async (req, res) => {
+  try {
+    // Check if user is an organizer or admin
+    if (req.user.role !== 'organizer' && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Only organizers or admins can add venues',
+        error: 'permission_denied',
+        roles_required: ['organizer', 'admin']
+      });
+    }
+    
+    const { 
+      venue_name, 
+      address,
+      city,
+      state,
+      country
+    } = req.body;
+    
+    // Validate required fields
+    if (!venue_name || !address) {
+      return res.status(400).json({ message: 'Venue name and address are required' });
+    }
+    
+    // Return a mock success response with a fake venue ID
+    // The real venue info will be stored directly in the events table
+    res.status(201).json({
+      message: 'Venue information received (note: venues are stored with events)',
+      venue: {
+        venue_id: Date.now(), // Generate a fake ID just for the response
+        venue_name,
+        address,
+        city,
+        state,
+        country,
+        created_by: req.user.user_id
+      }
+    });
+    
+  } catch (error) {
+    console.error('Add venue error:', error);
+    res.status(500).json({ message: 'Server error while processing venue information' });
+  }
+});
+
+// NOTE: The venues table does not exist in the database schema
+// Instead, venues are stored directly with the events
+app.put('/api/venues/:id', authenticateToken, async (req, res) => {
+  try {
+    const venueId = req.params.id;
+    
+    // Check if user is an organizer or admin
+    if (req.user.role !== 'organizer' && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Only organizers or admins can update venues',
+        error: 'permission_denied',
+        roles_required: ['organizer', 'admin']
+      });
+    }
+    
+    const { venue_name, address, city, state, country } = req.body;
+    
+    // Return a mock success response
+    res.json({
+      message: 'Venue information updated (note: venues are stored with events)',
+      venue: {
+        venue_id: venueId,
+        venue_name: venue_name || 'Updated Venue',
+        address: address || 'Updated Address',
+        city: city || '',
+        state: state || '',
+        country: country || '',
+        updated_by: req.user.user_id,
+        updated_at: new Date().toISOString()
+      }
+    });
+    
+  } catch (error) {
+    console.error('Update venue error:', error);
+    res.status(500).json({ message: 'Server error while updating venue' });
   }
 });
 

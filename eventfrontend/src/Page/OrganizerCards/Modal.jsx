@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 
-const Modal = ({ isOpen, onClose, title, children, maxWidth = '900px' }) => {
+const Modal = ({ isOpen, onClose, title, children, maxWidth = '50%' }) => {
   // Handle ESC key press
   useEffect(() => {
     const handleEscape = (e) => {
@@ -32,7 +32,7 @@ const Modal = ({ isOpen, onClose, title, children, maxWidth = '900px' }) => {
 
   return (
     <div className="modal-overlay" onClick={handleBackdropClick}>
-      <div className="modal-container" style={{ maxWidth }}>
+      <div className="modal-container" style={{ maxWidth, width: '100%' }}>
         <div className="modal-header">
           <h3>{title}</h3>
           <button 

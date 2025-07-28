@@ -22,11 +22,11 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     if (name === 'eventId') {
-      const selectedEvent = events.find(event => event.id === parseInt(value));
+      const selectedEvent = events.find(event => event.event_id === parseInt(value));
       setFormData(prev => ({
         ...prev,
         [name]: value,
-        eventName: selectedEvent ? selectedEvent.name : ''
+        eventName: selectedEvent ? selectedEvent.event_name : ''
       }));
     } else {
       setFormData(prev => ({
@@ -96,8 +96,8 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
               >
                 <option value="">Choose an event...</option>
                 {events.map(event => (
-                  <option key={event.id} value={event.id}>
-                    {event.name} - {new Date(event.date).toLocaleDateString()}
+                  <option key={event.event_id} value={event.event_id}>
+                    {event.event_name} - {new Date(event.event_date).toLocaleDateString()}
                   </option>
                 ))}
               </select>
