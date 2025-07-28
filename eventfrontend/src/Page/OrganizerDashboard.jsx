@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-// import axios from 'axios'; // Commented out for UI focus - no backend calls
+import axios from 'axios'; // Uncommented to enable backend API calls
 import './css/OrganizerDashboard.css';
+import AuthTokenService from '../services/AuthTokenService';
 
 // Import components
 import {
@@ -56,29 +57,40 @@ const OrganizerDashboard = () => {
     dateRange: 'all'
   });
   
-  // Form state
+  // Form state - Updated to match normalized schema
   const [formData, setFormData] = useState({
-    name: '',
-    date: '',
-    location: '',
+    event_name: '',
+    event_date: '',
+    venue_name: '',
+    venue_address: '',
     description: '',
     category: '',
-    maxAttendees: '',
-    price: ''
+    event_type: 'Conference',
+    ticket_price: '',
+    image_url: '',
+    registration_deadline: '',
+    refund_policy: '',
+    terms_and_conditions: '',
+    status: 'draft',
+    is_public: true,
+    requires_approval: false,
+    max_tickets_per_person: 5,
+    max_attendees: '',
+    tags: ''
   });
 
   // User data from localStorage
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    // Get user data from localStorage (commented out backend dependency)
-    // const userData = localStorage.getItem('user');
-    // if (userData) {
-    //   setUser(JSON.parse(userData));
-    // }
-    
-    // Mock user data for UI display
-    setUser({ username: 'Demo Organizer' });
+    // Get user data from AuthTokenService
+    const userData = AuthTokenService.getUser();
+    if (userData) {
+      setUser(userData);
+    } else {
+      // Fallback to mock data if no authenticated user
+      setUser({ username: 'Demo Organizer' });
+    }
     
     // Load mock data for UI demonstration
     loadMockData();
@@ -92,40 +104,55 @@ const OrganizerDashboard = () => {
 
   // Load mock data for UI demonstration
   const loadMockData = () => {
-    // Mock events data
+    // Mock events data - updated to match the normalized schema
     setEvents([
       {
-        id: 1,
-        name: 'Tech Conference 2025',
-        date: '2025-02-15T09:00:00Z',
-        location: 'Convention Center Downtown',
+        event_id: 1,
+        event_name: 'Tech Conference 2025',
+        event_date: '2025-02-15T09:00:00Z',
+        venue_name: 'Convention Center Downtown',
+        venue_address: '123 Main St, New York, NY',
         description: 'Annual technology conference featuring latest trends in AI, blockchain, and web development.',
         category: 'Technology',
-        maxAttendees: 500,
-        price: 50,
-        attendeesCount: 350
+        event_type: 'Conference',
+        max_attendees: 500,
+        ticket_price: 50.00,
+        attendees_count: 350,
+        image_url: 'https://example.com/tech-conf.jpg',
+        status: 'published',
+        is_public: true
       },
       {
-        id: 2,
-        name: 'Marketing Workshop',
-        date: '2025-03-22T14:00:00Z',
-        location: 'Business Hub',
+        event_id: 2,
+        event_name: 'Marketing Workshop',
+        event_date: '2025-03-22T14:00:00Z',
+        venue_name: 'Business Hub',
+        venue_address: '456 Business Ave, Chicago, IL',
         description: 'Interactive workshop on digital marketing strategies and social media management.',
         category: 'Business',
-        maxAttendees: 100,
-        price: 75,
-        attendeesCount: 85
+        event_type: 'Workshop',
+        max_attendees: 100,
+        ticket_price: 75.00,
+        attendees_count: 85,
+        image_url: 'https://example.com/marketing-workshop.jpg',
+        status: 'published',
+        is_public: true
       },
       {
-        id: 3,
-        name: 'Networking Event',
-        date: '2025-04-10T18:00:00Z',
-        location: 'Rooftop Lounge',
+        event_id: 3,
+        event_name: 'Networking Event',
+        event_date: '2025-04-10T18:00:00Z',
+        venue_name: 'Rooftop Lounge',
+        venue_address: '789 Skyview Rd, San Francisco, CA',
         description: 'Professional networking event for entrepreneurs and business leaders.',
         category: 'Networking',
-        maxAttendees: 200,
-        price: 25,
-        attendeesCount: 150
+        event_type: 'Networking',
+        max_attendees: 200,
+        ticket_price: 25.00,
+        attendees_count: 150,
+        image_url: 'https://example.com/networking-event.jpg',
+        status: 'published',
+        is_public: true
       }
     ]);
 
@@ -270,13 +297,19 @@ const OrganizerDashboard = () => {
     setIsLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/events', {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      setEvents(response.data.events || []);
+      if (response.data && Array.isArray(response.data)) {
+        setEvents(response.data);
+      } else if (response.data && Array.isArray(response.data.events)) {
+        setEvents(response.data.events);
+      } else {
+        setEvents([]);
+      }
     } catch (error) {
       console.error('Error loading events:', error);
       setError('Failed to load events. Please try again.');
@@ -511,34 +544,39 @@ const OrganizerDashboard = () => {
     return stars;
   };
 
-  // Handle form input changes
+  // Handle form input changes - Updated to handle checkbox and other input types
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
+    
+    // Handle different input types appropriately
+    const newValue = type === 'checkbox' ? checked : value;
+    
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: newValue
     }));
+    
     // Clear messages when user types
     if (error) setError('');
     if (success) setSuccess('');
   };
 
-  // Validate form
+  // Validate form - Updated for new schema field names
   const validateForm = () => {
     setError('');
 
-    if (!formData.name.trim()) {
+    if (!formData.event_name.trim()) {
       setError('Event name is required');
       return false;
     }
 
-    if (!formData.date) {
+    if (!formData.event_date) {
       setError('Event date is required');
       return false;
     }
 
     // Check if date is in the future
-    const eventDate = new Date(formData.date);
+    const eventDate = new Date(formData.event_date);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -547,8 +585,8 @@ const OrganizerDashboard = () => {
       return false;
     }
 
-    if (!formData.location.trim()) {
-      setError('Event location is required');
+    if (!formData.venue_name.trim()) {
+      setError('Venue name is required');
       return false;
     }
 
@@ -557,13 +595,13 @@ const OrganizerDashboard = () => {
       return false;
     }
 
-    if (formData.maxAttendees && (isNaN(formData.maxAttendees) || formData.maxAttendees < 1)) {
+    if (formData.max_attendees && (isNaN(formData.max_attendees) || formData.max_attendees < 1)) {
       setError('Maximum attendees must be a positive number');
       return false;
     }
 
-    if (formData.price && (isNaN(formData.price) || formData.price < 0)) {
-      setError('Price must be a non-negative number');
+    if (formData.ticket_price && (isNaN(formData.ticket_price) || formData.ticket_price < 0)) {
+      setError('Ticket price must be a non-negative number');
       return false;
     }
 
@@ -611,8 +649,8 @@ const OrganizerDashboard = () => {
     setTimeout(() => setSuccess(''), 3000);
   };
 
-  // Mock form submission for UI demonstration
-  const handleSubmit = (e) => {
+  // Event creation with real API endpoint
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (!validateForm()) {
@@ -623,38 +661,98 @@ const OrganizerDashboard = () => {
     setError('');
     setSuccess('');
 
-    // Simulate API delay
-    setTimeout(() => {
-      // Create new event with mock ID
-      const newEvent = {
-        id: events.length + 1,
-        ...formData,
-        maxAttendees: formData.maxAttendees ? parseInt(formData.maxAttendees) : null,
-        price: formData.price ? parseFloat(formData.price) : 0,
-        attendeesCount: 0
-      };
-
-      // Add to events list
+    // Parse numeric values
+    const eventData = {
+      ...formData,
+      max_attendees: formData.max_attendees ? parseInt(formData.max_attendees) : null,
+      ticket_price: formData.ticket_price ? parseFloat(formData.ticket_price) : 0,
+      // Convert tag string to array if needed
+      tags: formData.tags && typeof formData.tags === 'string' ? formData.tags.split(',').map(tag => tag.trim()) : formData.tags
+    };
+    
+    try {
+      // Get token from AuthTokenService instead of directly from localStorage
+      const token = AuthTokenService.getToken();
+      
+      if (!token) {
+        setError('You must be logged in to create events');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Check if token is expired
+      if (AuthTokenService.isTokenExpired()) {
+        setError('Your session has expired. Please log in again.');
+        setIsLoading(false);
+        return;
+      }
+      
+      // Make API call to create event
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events`, 
+        eventData,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      // Add new event to state with data from response
+      const newEvent = response.data.event;
       setEvents(prev => [...prev, newEvent]);
       
-      setSuccess('Event created successfully! (UI Demo Mode)');
+      setSuccess('Event created successfully!');
       
       // Reset form
       setFormData({
-        name: '',
-        date: '',
-        location: '',
+        event_name: '',
+        event_date: '',
+        venue_name: '',
+        venue_address: '',
         description: '',
         category: '',
-        maxAttendees: '',
-        price: ''
+        event_type: 'Conference',
+        ticket_price: '',
+        image_url: '',
+        registration_deadline: '',
+        refund_policy: '',
+        terms_and_conditions: '',
+        status: 'draft',
+        is_public: true,
+        requires_approval: false,
+        max_tickets_per_person: 5,
+        max_attendees: '',
+        tags: ''
       });
       setShowCreateForm(false);
-      setIsLoading(false);
       
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(''), 3000);
-    }, 1000);
+    } catch (error) {
+      console.error('Error creating event:', error);
+      
+      // Check for specific error types
+      if (error.response && error.response.status === 403) {
+        if (error.response.data && error.response.data.error === 'permission_denied') {
+          setError(`${error.response.data.message}. Please upgrade to an organizer account.`);
+        } else if (error.response.data && error.response.data.message === 'Invalid or expired token') {
+          setError('Your session has expired. Please log out and log in again.');
+          // Optional: Auto-logout the user
+          // AuthTokenService.clearAuth();
+          // navigate('/login');
+        } else {
+          setError('You do not have permission to create events. Please verify your account has organizer privileges.');
+        }
+      } else if (error.response && error.response.data) {
+        setError(error.response.data.message || 'Failed to create event. Please try again.');
+      } else {
+        setError('Failed to create event. Please check your connection and try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Format date for display
@@ -687,48 +785,56 @@ const OrganizerDashboard = () => {
             </p>
           </div>
           <div className="header-actions">
-            <button 
-              className="create-event-btn"
-              onClick={() => setShowCreateForm(!showCreateForm)}
-            >
-              <i className="fas fa-plus"></i>
-              {showCreateForm ? 'Cancel' : 'Create Event'}
-            </button>
-            <button 
-              className="register-company-btn"
-              onClick={() => setShowCompanyForm(!showCompanyForm)}
-            >
-              <i className="fas fa-building"></i>
-              {showCompanyForm ? 'Cancel' : 'Register Company'}
-            </button>
-            <button 
-              className="register-people-btn"
-              onClick={() => setShowPeopleForm(!showPeopleForm)}
-            >
-              <i className="fas fa-users"></i>
-              {showPeopleForm ? 'Cancel' : 'Register People'}
-            </button>
-            <button 
-              className="manual-registration-btn"
-              onClick={() => setShowRegistrationForm(!showRegistrationForm)}
-            >
-              <i className="fas fa-user-plus"></i>
-              {showRegistrationForm ? 'Cancel' : 'Manual Registration'}
-            </button>
-            <button 
-              className="ticketing-btn"
-              onClick={() => setShowTicketingForm(!showTicketingForm)}
-            >
-              <i className="fas fa-ticket-alt"></i>
-              {showTicketingForm ? 'Cancel' : 'Ticketing & Payments'}
-            </button>
-            <button 
-              className="attendance-btn"
-              onClick={() => setShowAttendanceForm(!showAttendanceForm)}
-            >
-              <i className="fas fa-user-check"></i>
-              {showAttendanceForm ? 'Cancel' : 'Attendance & Verification'}
-            </button>
+            <div className="action-buttons-group">
+              <div className="action-buttons-row primary-actions">
+                <button 
+                  className="action-button primary-action create-event-btn"
+                  onClick={() => setShowCreateForm(!showCreateForm)}
+                >
+                  <i className="fas fa-plus"></i>
+                  {showCreateForm ? 'Cancel' : 'Create Event'}
+                </button>
+              </div>
+              <div className="action-buttons-row management-actions">
+                <button 
+                  className="action-button register-company-btn"
+                  onClick={() => setShowCompanyForm(!showCompanyForm)}
+                >
+                  <i className="fas fa-building"></i>
+                  {showCompanyForm ? 'Cancel' : 'Register Company'}
+                </button>
+                <button 
+                  className="action-button register-people-btn"
+                  onClick={() => setShowPeopleForm(!showPeopleForm)}
+                >
+                  <i className="fas fa-users"></i>
+                  {showPeopleForm ? 'Cancel' : 'Register People'}
+                </button>
+              </div>
+              <div className="action-buttons-row operations-actions">
+                <button 
+                  className="action-button manual-registration-btn"
+                  onClick={() => setShowRegistrationForm(!showRegistrationForm)}
+                >
+                  <i className="fas fa-user-plus"></i>
+                  {showRegistrationForm ? 'Cancel' : 'Manual Registration'}
+                </button>
+                <button 
+                  className="action-button ticketing-btn"
+                  onClick={() => setShowTicketingForm(!showTicketingForm)}
+                >
+                  <i className="fas fa-ticket-alt"></i>
+                  {showTicketingForm ? 'Cancel' : 'Ticketing & Payments'}
+                </button>
+                <button 
+                  className="action-button attendance-btn"
+                  onClick={() => setShowAttendanceForm(!showAttendanceForm)}
+                >
+                  <i className="fas fa-user-check"></i>
+                  {showAttendanceForm ? 'Cancel' : 'Attendance & Verification'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -757,7 +863,6 @@ const OrganizerDashboard = () => {
             Create New Event
           </>
         }
-        maxWidth="900px"
       >
         <CreateEventForm
           formData={formData}
@@ -777,7 +882,6 @@ const OrganizerDashboard = () => {
             Register Event Company
           </>
         }
-        maxWidth="900px"
       >
         <CompanyRegistration
           onSubmit={handleCompanyRegistration}
@@ -795,7 +899,6 @@ const OrganizerDashboard = () => {
             Register People
           </>
         }
-        maxWidth="800px"
       >
         <PeopleRegistration
           onSubmit={handlePeopleRegistration}
@@ -813,7 +916,6 @@ const OrganizerDashboard = () => {
             Manual Event Registration
           </>
         }
-        maxWidth="900px"
       >
         <ManualEventRegistration
           events={events}
@@ -832,7 +934,6 @@ const OrganizerDashboard = () => {
             Ticketing & Payments Management
           </>
         }
-        maxWidth="1200px"
       >
         <TicketingManagement
           events={events}
@@ -850,7 +951,6 @@ const OrganizerDashboard = () => {
             Attendance & Verification
           </>
         }
-        maxWidth="1400px"
       >
         <AttendanceVerification
           events={events}

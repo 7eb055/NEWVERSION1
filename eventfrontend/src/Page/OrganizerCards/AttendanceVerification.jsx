@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import './AttendanceVerification.css';
+// import './AttendanceVerification.css';
 
 const AttendanceVerification = ({ events, onCancel, isLoading }) => {
   const [activeTab, setActiveTab] = useState('scanner');
