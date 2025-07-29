@@ -130,12 +130,46 @@ const CompanyManagement = () => {
     if (!contactInfo) return { email: '', phone: '', contact_person: '', website: '' };
     
     try {
-      if (typeof contactInfo === 'string') {
-        return JSON.parse(contactInfo);
+      // If it's already an object, just return it
+      if (typeof contactInfo === 'object' && contactInfo !== null) {
+        return contactInfo;
       }
-      return contactInfo;
+      
+      // If it's a string, try to parse it as JSON
+      if (typeof contactInfo === 'string') {
+        // Check if it looks like a JSON object (starts with { and ends with })
+        if (contactInfo.trim().startsWith('{') && contactInfo.trim().endsWith('}')) {
+          return JSON.parse(contactInfo);
+        }
+        
+        // If it seems to be an email, treat it as such
+        if (contactInfo.includes('@')) {
+          return { email: contactInfo, phone: '', contact_person: '', website: '' };
+        }
+        
+        // If it's a phone number (simplistic check)
+        if (contactInfo.replace(/[^0-9+]/g, '').length > 7) {
+          return { email: '', phone: contactInfo, contact_person: '', website: '' };
+        }
+        
+        // For other strings, assume it's a contact person
+        return { email: '', phone: '', contact_person: contactInfo, website: '' };
+      }
+      
+      // Default empty object if nothing else matches
+      return { email: '', phone: '', contact_person: '', website: '' };
     } catch (err) {
       console.error('Error parsing contact info:', err);
+      
+      // If parsing failed but we have a string, make a best effort to use it
+      if (typeof contactInfo === 'string') {
+        if (contactInfo.includes('@')) {
+          return { email: contactInfo, phone: '', contact_person: '', website: '' };
+        } else {
+          return { email: '', phone: '', contact_person: contactInfo, website: '' };
+        }
+      }
+      
       return { email: '', phone: '', contact_person: '', website: '' };
     }
   };
