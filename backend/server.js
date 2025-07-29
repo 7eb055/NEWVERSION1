@@ -1620,78 +1620,55 @@ app.get('/api/events', async (req, res) => {
              (SELECT COUNT(*) FROM eventregistrations er WHERE er.event_id = e.event_id) as registration_count,
              COALESCE((SELECT ROUND(AVG(ef.rating), 1) FROM eventfeedback ef WHERE ef.event_id = e.event_id), 0) as average_rating
       FROM events e
-      LEFT JOIN users u ON e.organizer_id = u.user_id
-      LEFT JOIN organizers o ON e.organizer_id = o.user_id
+      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
+      LEFT JOIN users u ON o.user_id = u.user_id
       WHERE 1=1
     `;
-    
-    const queryParams = [];
-    let paramCounter = 1;
 
-    // Add filters if provided
+    const queryParams = [];
+    let paramCount = 0;
+
+    // Add filters
     if (category) {
-      query += ` AND e.category = $${paramCounter++}`;
+      paramCount++;
+      query += ` AND e.category = $${paramCount}`;
       queryParams.push(category);
     }
 
     if (status) {
-      query += ` AND e.status = $${paramCounter++}`;
+      paramCount++;
+      query += ` AND e.status = $${paramCount}`;
       queryParams.push(status);
     }
 
     if (organizer_id) {
-      query += ` AND e.organizer_id = $${paramCounter++}`;
+      paramCount++;
+      query += ` AND e.organizer_id = $${paramCount}`;
       queryParams.push(organizer_id);
     }
 
     if (upcoming === 'true') {
       query += ` AND e.event_date >= NOW()`;
-    } else if (upcoming === 'false') {
-      query += ` AND e.event_date < NOW()`;
     }
 
-    // Add sorting and pagination
-    query += ` ORDER BY e.event_date DESC LIMIT $${paramCounter++} OFFSET $${paramCounter++}`;
-    queryParams.push(parseInt(limit), parseInt(offset));
+    query += ` ORDER BY e.event_date ASC`;
+    query += ` LIMIT ${parseInt(limit)} OFFSET ${parseInt(offset)}`;
 
-    const events = await pool.query(query, queryParams);
-
-    // Get total count for pagination
-    const countQuery = `
-      SELECT COUNT(*) as total 
-      FROM events e 
-      WHERE 1=1 
-      ${category ? ' AND e.category = $1' : ''}
-      ${status ? (category ? ' AND e.status = $2' : ' AND e.status = $1') : ''}
-      ${organizer_id ? (category || status ? ' AND e.organizer_id = $3' : ' AND e.organizer_id = $1') : ''}
-      ${upcoming === 'true' ? ' AND e.event_date >= NOW()' : ''}
-      ${upcoming === 'false' ? ' AND e.event_date < NOW()' : ''}
-    `;
-    
-    const countParams = [];
-    if (category) countParams.push(category);
-    if (status) countParams.push(status);
-    if (organizer_id) countParams.push(organizer_id);
-
-    const totalCount = await pool.query(countQuery, countParams);
+    const result = await pool.query(query, queryParams);
     
     res.json({ 
-      events: events.rows,
-      pagination: {
-        total: parseInt(totalCount.rows[0].total),
-        limit: parseInt(limit),
-        offset: parseInt(offset),
-        has_more: parseInt(offset) + parseInt(limit) < parseInt(totalCount.rows[0].total)
-      }
+      events: result.rows,
+      total: result.rows.length,
+      limit: parseInt(limit),
+      offset: parseInt(offset)
     });
-
   } catch (error) {
     console.error('Get events error:', error);
     res.status(500).json({ message: 'Server error while fetching events' });
   }
 });
 
-// Get events by user
+// Get events by authenticated organizer
 app.get('/api/events/my-events', authenticateToken, async (req, res) => {
   try {
     // Query parameters for filtering
@@ -1701,6 +1678,21 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
       limit = 10,
       offset = 0
     } = req.query;
+
+    // First, get the organizer_id for the authenticated user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(404).json({ 
+        message: 'Organizer profile not found. Please create an event first.',
+        events: []
+      });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
 
     // Build the query dynamically based on filters
     let query = `
@@ -1712,7 +1704,7 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
       WHERE e.organizer_id = $1
     `;
     
-    const queryParams = [req.user.user_id];
+    const queryParams = [organizerId];
     let paramCounter = 2;
 
     // Add filters if provided
@@ -1743,7 +1735,7 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
       ${upcoming === 'false' ? ' AND e.event_date < NOW()' : ''}
     `;
     
-    const countParams = [req.user.user_id];
+    const countParams = [organizerId];
     if (status) countParams.push(status);
 
     const totalCount = await pool.query(countQuery, countParams);
@@ -1763,6 +1755,8 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error while fetching user events' });
   }
 });
+
+
 
 // Create new event
 app.post('/api/events', authenticateToken, async (req, res) => {
@@ -3596,6 +3590,418 @@ app.get('/api/roles', async (req, res) => {
   } catch (error) {
     console.error('Get roles error:', error);
     res.status(500).json({ message: 'Server error while fetching roles' });
+  }
+});
+
+// ===== TICKET MANAGEMENT ROUTES =====
+
+// Get ticket types for an event
+app.get('/api/events/:eventId/ticket-types', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Verify event exists and user has permission to view it
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to view this event' });
+    }
+    
+    const result = await pool.query(`
+      SELECT 
+        ticket_type_id,
+        event_id,
+        type_name,
+        price,
+        quantity_available,
+        quantity_sold,
+        description,
+        benefits,
+        created_at,
+        updated_at
+      FROM tickettypes 
+      WHERE event_id = $1 
+      ORDER BY price ASC
+    `, [eventId]);
+    
+    res.json({ ticketTypes: result.rows });
+  } catch (error) {
+    console.error('Error fetching ticket types:', error);
+    res.status(500).json({ message: 'Failed to fetch ticket types' });
+  }
+});
+
+// Create a new ticket type for an event
+app.post('/api/events/:eventId/ticket-types', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { type_name, price, quantity_available, description, benefits } = req.body;
+    
+    // Validate required fields
+    if (!type_name || !price || !quantity_available) {
+      return res.status(400).json({ message: 'Ticket type name, price, and quantity are required' });
+    }
+    
+    // Verify event exists and user has permission
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to manage this event' });
+    }
+    
+    // Convert benefits to array format if it's a string
+    let benefitsArray = null;
+    if (benefits) {
+      if (Array.isArray(benefits)) {
+        benefitsArray = benefits;
+      } else if (typeof benefits === 'string') {
+        // Split by comma, semicolon, or newline and clean up
+        benefitsArray = benefits.split(/[,;\n]/).map(b => b.trim()).filter(b => b.length > 0);
+      }
+    }
+    
+    const result = await pool.query(`
+      INSERT INTO tickettypes (event_id, type_name, price, quantity_available, description, benefits)
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [eventId, type_name, parseFloat(price), parseInt(quantity_available), description, benefitsArray]);
+    
+    res.status(201).json({ 
+      message: 'Ticket type created successfully',
+      ticketType: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error creating ticket type:', error);
+    res.status(500).json({ message: 'Failed to create ticket type' });
+  }
+});
+
+// Update a ticket type
+app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, ticketTypeId } = req.params;
+    const { type_name, price, quantity_available, description, benefits } = req.body;
+    
+    // Verify event exists and user has permission
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to manage this event' });
+    }
+    
+    // Convert benefits to array format if it's a string
+    let benefitsArray = null;
+    if (benefits) {
+      if (Array.isArray(benefits)) {
+        benefitsArray = benefits;
+      } else if (typeof benefits === 'string') {
+        // Split by comma, semicolon, or newline and clean up
+        benefitsArray = benefits.split(/[,;\n]/).map(b => b.trim()).filter(b => b.length > 0);
+      }
+    }
+    
+    const result = await pool.query(`
+      UPDATE tickettypes 
+      SET type_name = $1, price = $2, quantity_available = $3, description = $4, benefits = $5, updated_at = NOW()
+      WHERE ticket_type_id = $6 AND event_id = $7
+      RETURNING *
+    `, [type_name, parseFloat(price), parseInt(quantity_available), description, benefitsArray, ticketTypeId, eventId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket type not found' });
+    }
+    
+    res.json({ 
+      message: 'Ticket type updated successfully',
+      ticketType: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error updating ticket type:', error);
+    res.status(500).json({ message: 'Failed to update ticket type' });
+  }
+});
+
+// Delete a ticket type
+app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, ticketTypeId } = req.params;
+    
+    // Verify event exists and user has permission
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to manage this event' });
+    }
+    
+    // Check if ticket type has any sales
+    const salesCheck = await pool.query(`
+      SELECT COUNT(*) as sales_count 
+      FROM eventregistrations er
+      JOIN tickettypes tt ON er.event_id = tt.event_id
+      WHERE tt.ticket_type_id = $1 AND er.event_id = $2
+    `, [ticketTypeId, eventId]);
+    
+    if (parseInt(salesCheck.rows[0].sales_count) > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete ticket type with existing registrations' 
+      });
+    }
+    
+    const result = await pool.query(`
+      DELETE FROM tickettypes 
+      WHERE ticket_type_id = $1 AND event_id = $2
+      RETURNING *
+    `, [ticketTypeId, eventId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket type not found' });
+    }
+    
+    res.json({ message: 'Ticket type deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting ticket type:', error);
+    res.status(500).json({ message: 'Failed to delete ticket type' });
+  }
+});
+
+// Get ticket sales summary for an event
+app.get('/api/events/:eventId/ticket-sales', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Verify event exists and user has permission
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, e.event_name, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to view this event' });
+    }
+    
+    // Get ticket sales summary
+    const salesSummary = await pool.query(`
+      SELECT 
+        tt.ticket_type_id,
+        tt.type_name,
+        tt.price,
+        tt.quantity_available,
+        tt.quantity_sold,
+        (tt.quantity_sold * tt.price) as revenue
+      FROM tickettypes tt
+      WHERE tt.event_id = $1
+      ORDER BY tt.price ASC
+    `, [eventId]);
+    
+    // Get total revenue and tickets sold
+    const totals = await pool.query(`
+      SELECT 
+        COALESCE(SUM(tt.quantity_sold), 0) as total_tickets_sold,
+        COALESCE(SUM(tt.quantity_sold * tt.price), 0) as total_revenue,
+        COALESCE(SUM(tt.quantity_available), 0) as total_capacity
+      FROM tickettypes tt
+      WHERE tt.event_id = $1
+    `, [eventId]);
+    
+    res.json({
+      eventName: eventCheck.rows[0].event_name,
+      ticketTypes: salesSummary.rows,
+      summary: {
+        totalTicketsSold: parseInt(totals.rows[0].total_tickets_sold),
+        totalRevenue: parseFloat(totals.rows[0].total_revenue),
+        totalCapacity: parseInt(totals.rows[0].total_capacity)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching ticket sales:', error);
+    res.status(500).json({ message: 'Failed to fetch ticket sales data' });
+  }
+});
+
+// Get event registrations with ticket information
+app.get('/api/events/:eventId/registrations-detailed', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Verify event exists and user has permission
+    const eventCheck = await pool.query(`
+      SELECT e.event_id, o.user_id 
+      FROM events e 
+      JOIN organizers o ON e.organizer_id = o.organizer_id 
+      WHERE e.event_id = $1
+    `, [eventId]);
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].user_id !== req.user.user_id) {
+      return res.status(403).json({ message: 'Not authorized to view this event' });
+    }
+    
+    const registrations = await pool.query(`
+      SELECT 
+        er.registration_id,
+        er.registration_date,
+        er.ticket_quantity,
+        er.total_amount,
+        er.payment_status,
+        er.payment_method,
+        er.qr_code,
+        er.status,
+        er.check_in_status,
+        er.check_in_time,
+        a.full_name as attendee_name,
+        u.email as attendee_email,
+        a.phone as attendee_phone,
+        p.payment_id,
+        p.transaction_id,
+        p.payment_date
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN payments p ON er.registration_id = p.registration_id
+      WHERE er.event_id = $1
+      ORDER BY er.registration_date DESC
+    `, [eventId]);
+    
+    res.json({ registrations: registrations.rows });
+  } catch (error) {
+    console.error('Error fetching registrations:', error);
+    res.status(500).json({ message: 'Failed to fetch registrations' });
+  }
+});
+
+// Generate QR code for a registration
+app.post('/api/registrations/:registrationId/generate-qr', authenticateToken, async (req, res) => {
+  try {
+    const { registrationId } = req.params;
+    
+    // Generate unique QR code
+    const qrCode = `QR${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+    
+    // Update registration with QR code
+    const result = await pool.query(`
+      UPDATE eventregistrations 
+      SET qr_code = $1, updated_at = NOW()
+      WHERE registration_id = $2
+      RETURNING *
+    `, [qrCode, registrationId]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+    
+    res.json({ 
+      message: 'QR code generated successfully',
+      qrCode: qrCode,
+      registration: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({ message: 'Failed to generate QR code' });
+  }
+});
+
+// Process payment for a registration
+app.post('/api/registrations/:registrationId/process-payment', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { registrationId } = req.params;
+    const { payment_method, transaction_id, amount } = req.body;
+    
+    // Validate required fields
+    if (!payment_method || !transaction_id || !amount) {
+      return res.status(400).json({ 
+        message: 'Payment method, transaction ID, and amount are required' 
+      });
+    }
+    
+    // Get registration details
+    const registration = await client.query(`
+      SELECT er.*, e.event_name 
+      FROM eventregistrations er
+      JOIN events e ON er.event_id = e.event_id
+      WHERE er.registration_id = $1
+    `, [registrationId]);
+    
+    if (registration.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+    
+    // Create payment record
+    const payment = await client.query(`
+      INSERT INTO payments (registration_id, amount, payment_method, payment_status, transaction_id)
+      VALUES ($1, $2, $3, 'completed', $4)
+      RETURNING *
+    `, [registrationId, parseFloat(amount), payment_method, transaction_id]);
+    
+    // Update registration payment status
+    await client.query(`
+      UPDATE eventregistrations 
+      SET payment_status = 'completed', payment_method = $1, payment_reference = $2
+      WHERE registration_id = $3
+    `, [payment_method, transaction_id, registrationId]);
+    
+    await client.query('COMMIT');
+    
+    res.json({
+      message: 'Payment processed successfully',
+      payment: payment.rows[0],
+      registration: registration.rows[0]
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error processing payment:', error);
+    res.status(500).json({ message: 'Failed to process payment' });
+  } finally {
+    client.release();
   }
 });
 

@@ -1,155 +1,215 @@
-import React, { useState } from 'react';
-import QRCodeGenerator from './QRCodeGenerator';
-// import './TicketingManagement.css';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import AuthTokenService from '../../services/AuthTokenService';
+import './css/TicketingManagement.css';
 
-const TicketingManagement = ({ events, onCancel, isLoading }) => {
-  const [activeTab, setActiveTab] = useState('tiers');
-  const [selectedEvent, setSelectedEvent] = useState('');
-  const [ticketTiers, setTicketTiers] = useState([]);
-  const [tickets, setTickets] = useState([]);
-  const [showQRGenerator, setShowQRGenerator] = useState(false);
-  const [selectedTicket, setSelectedTicket] = useState(null);
-
-  // Mock initial ticket tiers
-  const mockTiers = [
-    {
-      id: 1,
-      name: 'Early Bird',
-      description: 'Limited time offer for early supporters',
-      price: 99.99,
-      quota: 100,
-      sold: 45,
-      deadline: '2025-02-15T23:59:59',
-      features: ['Priority seating', 'Welcome gift', 'Networking session'],
-      status: 'active'
-    },
-    {
-      id: 2,
-      name: 'Standard',
-      description: 'Regular admission ticket',
-      price: 149.99,
-      quota: 500,
-      sold: 230,
-      deadline: '2025-03-01T23:59:59',
-      features: ['Standard seating', 'Conference materials'],
-      status: 'active'
-    },
-    {
-      id: 3,
-      name: 'VIP',
-      description: 'Premium experience with exclusive access',
-      price: 299.99,
-      quota: 50,
-      sold: 12,
-      deadline: '2025-03-05T23:59:59',
-      features: ['Premium seating', 'VIP lounge access', 'Meet & greet', 'Exclusive workshops'],
-      status: 'active'
-    }
-  ];
-
-  // Mock tickets data
-  const mockTickets = [
-    {
-      id: 'TK001',
-      eventId: 1,
-      tierName: 'VIP',
-      attendeeName: 'John Smith',
-      attendeeEmail: 'john@example.com',
-      purchaseDate: '2025-01-15T10:30:00Z',
-      price: 299.99,
-      qrCode: 'QR123456789',
-      status: 'valid'
-    },
-    {
-      id: 'TK002',
-      eventId: 1,
-      tierName: 'Standard',
-      attendeeName: 'Sarah Johnson',
-      attendeeEmail: 'sarah@example.com',
-      purchaseDate: '2025-01-16T14:20:00Z',
-      price: 149.99,
-      qrCode: 'QR987654321',
-      status: 'valid'
-    }
-  ];
-
-  useState(() => {
-    setTicketTiers(mockTiers);
-    setTickets(mockTickets);
-  }, []);
-
-  const [newTier, setNewTier] = useState({
-    name: '',
-    description: '',
+const TicketingManagement = () => {
+  const [activeTab, setActiveTab] = useState('ticket-types');
+  const [ticketTypes, setTicketTypes] = useState([]);
+  const [salesData, setSalesData] = useState(null);
+  const [registrations, setRegistrations] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [selectedEventId, setSelectedEventId] = useState('');
+  const [userEvents, setUserEvents] = useState([]);
+  
+  // Form states for ticket type creation/editing
+  const [showTicketForm, setShowTicketForm] = useState(false);
+  const [editingTicket, setEditingTicket] = useState(null);
+  const [ticketForm, setTicketForm] = useState({
+    type_name: '',
     price: '',
-    quota: '',
-    deadline: '',
-    features: ['']
+    quantity_available: '',
+    description: '',
+    benefits: ''
   });
 
-  const handleAddFeature = () => {
-    setNewTier(prev => ({
-      ...prev,
-      features: [...prev.features, '']
-    }));
+  // Load user's events on component mount
+  useEffect(() => {
+    loadUserEvents();
+  }, []);
+
+  // Load ticket data when event is selected
+  useEffect(() => {
+    if (selectedEventId) {
+      loadTicketTypes();
+      if (activeTab === 'sales') loadSalesData();
+      if (activeTab === 'registrations') loadRegistrations();
+    }
+  }, [selectedEventId, activeTab]);
+
+  const loadUserEvents = async () => {
+    try {
+      const token = AuthTokenService.getToken();
+      console.log('Loading user events with token:', !!token);
+      
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      console.log('Events loaded:', response.data);
+      setUserEvents(response.data.events || []);
+      
+      // Add user feedback when no events are found
+      if (!response.data.events || response.data.events.length === 0) {
+        setError('No events found. Create your first event to start managing tickets.');
+      } else {
+        setError(''); // Clear any previous errors
+      }
+    } catch (error) {
+      console.error('Error loading events:', error);
+      console.error('Error response:', error.response?.data);
+      setError(error.response?.data?.message || 'Failed to load events');
+    }
   };
 
-  const handleFeatureChange = (index, value) => {
-    setNewTier(prev => ({
-      ...prev,
-      features: prev.features.map((feature, i) => i === index ? value : feature)
-    }));
-  };
-
-  const handleRemoveFeature = (index) => {
-    setNewTier(prev => ({
-      ...prev,
-      features: prev.features.filter((_, i) => i !== index)
-    }));
-  };
-
-  const handleCreateTier = () => {
-    const tier = {
-      id: Date.now(),
-      ...newTier,
-      price: parseFloat(newTier.price),
-      quota: parseInt(newTier.quota),
-      sold: 0,
-      features: newTier.features.filter(f => f.trim()),
-      status: 'active'
-    };
+  const loadTicketTypes = async () => {
+    if (!selectedEventId) return;
     
-    setTicketTiers(prev => [...prev, tier]);
-    setNewTier({
-      name: '',
-      description: '',
-      price: '',
-      quota: '',
-      deadline: '',
-      features: ['']
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setTicketTypes(response.data.ticketTypes || []);
+      setError('');
+    } catch (error) {
+      console.error('Error loading ticket types:', error);
+      setError('Failed to load ticket types');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadSalesData = async () => {
+    if (!selectedEventId) return;
+    
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-sales`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSalesData(response.data);
+      setError('');
+    } catch (error) {
+      console.error('Error loading sales data:', error);
+      setError('Failed to load sales data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRegistrations = async () => {
+    if (!selectedEventId) return;
+    
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/registrations-detailed`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setRegistrations(response.data.registrations || []);
+      setError('');
+    } catch (error) {
+      console.error('Error loading registrations:', error);
+      setError('Failed to load registrations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleTicketFormSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedEventId) {
+      setError('Please select an event first');
+      return;
+    }
+    
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const url = editingTicket 
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types/${editingTicket.ticket_type_id}`
+        : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types`;
+      
+      const method = editingTicket ? 'put' : 'post';
+      
+      await axios[method](url, ticketForm, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setSuccess(editingTicket ? 'Ticket type updated successfully' : 'Ticket type created successfully');
+      setShowTicketForm(false);
+      setEditingTicket(null);
+      setTicketForm({
+        type_name: '',
+        price: '',
+        quantity_available: '',
+        description: '',
+        benefits: ''
+      });
+      loadTicketTypes();
+    } catch (error) {
+      console.error('Error saving ticket type:', error);
+      setError(error.response?.data?.message || 'Failed to save ticket type');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditTicket = (ticket) => {
+    setEditingTicket(ticket);
+    setTicketForm({
+      type_name: ticket.type_name,
+      price: ticket.price.toString(),
+      quantity_available: ticket.quantity_available.toString(),
+      description: ticket.description || '',
+      benefits: Array.isArray(ticket.benefits) ? ticket.benefits.join(', ') : (ticket.benefits || '')
     });
+    setShowTicketForm(true);
   };
 
-  const generateQRCode = (ticketId) => {
-    // In a real app, this would generate an actual QR code
-    return `QR${Math.random().toString(36).substr(2, 9).toUpperCase()}`;
+  const handleDeleteTicket = async (ticketTypeId) => {
+    if (!window.confirm('Are you sure you want to delete this ticket type?')) return;
+    
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types/${ticketTypeId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('Ticket type deleted successfully');
+      loadTicketTypes();
+    } catch (error) {
+      console.error('Error deleting ticket type:', error);
+      setError(error.response?.data?.message || 'Failed to delete ticket type');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const generateTicketReceipt = (ticket) => {
-    const qrCode = generateQRCode(ticket.id);
-    const receiptData = {
-      ...ticket,
-      qrCode,
-      receiptNumber: `RCP${Date.now()}`,
-      issuedAt: new Date().toISOString()
-    };
-    
-    // Update ticket with QR code
-    setTickets(prev => prev.map(t => 
-      t.id === ticket.id ? { ...t, qrCode } : t
-    ));
-    
-    return receiptData;
+  const generateQRCode = async (registrationId) => {
+    try {
+      const token = AuthTokenService.getToken();
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/registrations/${registrationId}/generate-qr`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setSuccess('QR code generated successfully');
+      loadRegistrations();
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      setError('Failed to generate QR code');
+    }
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
   };
 
   const formatDate = (dateString) => {
@@ -162,415 +222,394 @@ const TicketingManagement = ({ events, onCancel, isLoading }) => {
     });
   };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'active': return '#10b981';
-      case 'sold-out': return '#ef4444';
-      case 'expired': return '#6b7280';
-      case 'valid': return '#10b981';
-      case 'used': return '#f59e0b';
-      case 'cancelled': return '#ef4444';
-      default: return '#6b7280';
-    }
-  };
-
-  // QR Code Generation
-  const handleGenerateQR = (ticket) => {
-    setSelectedTicket(ticket);
-    setShowQRGenerator(true);
-  };
-
   return (
     <div className="ticketing-management">
-      {/* Tab Navigation */}
-      <div className="tab-navigation">
-        <button 
-          className={`tab-btn ${activeTab === 'tiers' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tiers')}
-        >
-          <i className="fas fa-layer-group"></i>
-          Ticket Tiers
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'create' ? 'active' : ''}`}
-          onClick={() => setActiveTab('create')}
-        >
-          <i className="fas fa-plus-circle"></i>
-          Create Tier
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'tickets' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tickets')}
-        >
-          <i className="fas fa-ticket-alt"></i>
-          Manage Tickets
-        </button>
-        <button 
-          className={`tab-btn ${activeTab === 'receipts' ? 'active' : ''}`}
-          onClick={() => setActiveTab('receipts')}
-        >
-          <i className="fas fa-qrcode"></i>
-          QR Receipts
-        </button>
+      <div className="ticketing-header">
+        <h1>Ticketing Management</h1>
+        <p>Manage ticket types, track sales, and monitor registrations for your events</p>
       </div>
 
-      {/* Event Selector */}
-      <div className="event-selector">
-        <label htmlFor="eventSelect">Select Event:</label>
-        <select
-          id="eventSelect"
-          value={selectedEvent}
-          onChange={(e) => setSelectedEvent(e.target.value)}
+      {/* Event Selection */}
+      <div className="event-selection">
+        <label htmlFor="event-select">Select Event:</label>
+        <select 
+          id="event-select"
+          value={selectedEventId} 
+          onChange={(e) => setSelectedEventId(e.target.value)}
+          className="event-select"
         >
           <option value="">Choose an event...</option>
-          {events.map(event => (
-            <option key={event.id} value={event.id}>
-              {event.name} - {formatDate(event.date)}
+          {userEvents.map(event => (
+            <option key={event.event_id} value={event.event_id}>
+              {event.event_name} - {formatDate(event.event_date)}
             </option>
           ))}
         </select>
+        {userEvents.length === 0 && !error && (
+          <p style={{ color: '#666', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+            No events found. Create an event first to manage tickets.
+          </p>
+        )}
       </div>
 
-      {/* Tab Content */}
-      {activeTab === 'tiers' && (
-        <div className="tab-content">
-          <div className="tiers-grid">
-            {ticketTiers.map(tier => (
-              <div key={tier.id} className="tier-card">
-                <div className="tier-header">
-                  <div className="tier-name">{tier.name}</div>
-                  <div 
-                    className="tier-status"
-                    style={{ backgroundColor: getStatusColor(tier.status) }}
-                  >
-                    {tier.status.replace('-', ' ')}
-                  </div>
-                </div>
-                <div className="tier-price">${tier.price}</div>
-                <div className="tier-description">{tier.description}</div>
-                
-                <div className="tier-stats">
-                  <div className="stat">
-                    <span className="stat-label">Sold:</span>
-                    <span className="stat-value">{tier.sold}/{tier.quota}</span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-label">Deadline:</span>
-                    <span className="stat-value">{formatDate(tier.deadline)}</span>
-                  </div>
-                </div>
-
-                <div className="progress-bar">
-                  <div 
-                    className="progress-fill"
-                    style={{ width: `${(tier.sold / tier.quota) * 100}%` }}
-                  ></div>
-                </div>
-
-                <div className="tier-features">
-                  <h4>Features:</h4>
-                  <ul>
-                    {tier.features.map((feature, index) => (
-                      <li key={index}>
-                        <i className="fas fa-check"></i>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <div className="tier-actions">
-                  <button className="btn-edit">
-                    <i className="fas fa-edit"></i>
-                    Edit
-                  </button>
-                  <button className="btn-toggle">
-                    <i className={`fas ${tier.status === 'active' ? 'fa-pause' : 'fa-play'}`}></i>
-                    {tier.status === 'active' ? 'Pause' : 'Activate'}
-                  </button>
-                </div>
-              </div>
-            ))}
+      {selectedEventId && (
+        <>
+          {/* Navigation Tabs */}
+          <div className="tab-navigation">
+            <button 
+              className={`tab-button ${activeTab === 'ticket-types' ? 'active' : ''}`}
+              onClick={() => setActiveTab('ticket-types')}
+            >
+              Ticket Types
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'sales' ? 'active' : ''}`}
+              onClick={() => setActiveTab('sales')}
+            >
+              Sales Overview
+            </button>
+            <button 
+              className={`tab-button ${activeTab === 'registrations' ? 'active' : ''}`}
+              onClick={() => setActiveTab('registrations')}
+            >
+              Registrations
+            </button>
           </div>
-        </div>
-      )}
 
-      {activeTab === 'create' && (
-        <div className="tab-content">
-          <div className="create-tier-form">
-            <div className="form-grid">
-              <div className="form-group">
-                <label>Tier Name *</label>
-                <input
-                  type="text"
-                  value={newTier.name}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Early Bird, VIP, Standard"
-                />
-              </div>
+          {/* Messages */}
+          {error && <div className="error-message">{error}</div>}
+          {success && <div className="success-message">{success}</div>}
 
-              <div className="form-group">
-                <label>Price ($) *</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={newTier.price}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, price: e.target.value }))}
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Quota *</label>
-                <input
-                  type="number"
-                  value={newTier.quota}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, quota: e.target.value }))}
-                  placeholder="Number of tickets"
-                />
-              </div>
-
-              <div className="form-group">
-                <label>Sales Deadline *</label>
-                <input
-                  type="datetime-local"
-                  value={newTier.deadline}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, deadline: e.target.value }))}
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label>Description</label>
-                <textarea
-                  value={newTier.description}
-                  onChange={(e) => setNewTier(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe this ticket tier..."
-                  rows="3"
-                />
-              </div>
-
-              <div className="form-group full-width">
-                <label>Features</label>
-                <div className="features-list">
-                  {newTier.features.map((feature, index) => (
-                    <div key={index} className="feature-input">
-                      <input
-                        type="text"
-                        value={feature}
-                        onChange={(e) => handleFeatureChange(index, e.target.value)}
-                        placeholder="Feature description"
-                      />
-                      {newTier.features.length > 1 && (
-                        <button
-                          type="button"
-                          className="remove-feature"
-                          onClick={() => handleRemoveFeature(index)}
-                        >
-                          <i className="fas fa-times"></i>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <button
-                    type="button"
-                    className="add-feature"
-                    onClick={handleAddFeature}
-                  >
-                    <i className="fas fa-plus"></i>
-                    Add Feature
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="form-actions">
-              <button 
-                type="button" 
-                className="btn-secondary"
-                onClick={onCancel}
-              >
-                Cancel
-              </button>
-              <button 
-                type="button" 
-                className="btn-primary"
-                onClick={handleCreateTier}
-                disabled={!newTier.name || !newTier.price || !newTier.quota}
-              >
-                <i className="fas fa-plus"></i>
-                Create Tier
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'tickets' && (
-        <div className="tab-content">
-          <div className="tickets-table">
-            <div className="table-header">
-              <h3>
-                <i className="fas fa-ticket-alt"></i>
-                Issued Tickets
-              </h3>
-              <div className="table-actions">
-                <button className="btn-export">
-                  <i className="fas fa-download"></i>
-                  Export
+          {/* Ticket Types Tab */}
+          {activeTab === 'ticket-types' && (
+            <div className="tab-content">
+              <div className="content-header">
+                <h2>Ticket Types</h2>
+                <button 
+                  className="add-button"
+                  onClick={() => setShowTicketForm(true)}
+                >
+                  <i className="fas fa-plus"></i>
+                  Add Ticket Type
                 </button>
               </div>
-            </div>
-            
-            <div className="table-container">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ticket ID</th>
-                    <th>Attendee</th>
-                    <th>Email</th>
-                    <th>Tier</th>
-                    <th>Price</th>
-                    <th>Purchase Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {tickets.map(ticket => (
-                    <tr key={ticket.id}>
-                      <td className="ticket-id">{ticket.id}</td>
-                      <td>{ticket.attendeeName}</td>
-                      <td>{ticket.attendeeEmail}</td>
-                      <td>
-                        <span className="tier-badge">{ticket.tierName}</span>
-                      </td>
-                      <td className="price">${ticket.price}</td>
-                      <td>{formatDate(ticket.purchaseDate)}</td>
-                      <td>
-                        <span 
-                          className="status-badge"
-                          style={{ backgroundColor: getStatusColor(ticket.status) }}
-                        >
-                          {ticket.status}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="action-buttons">
-                          <button 
-                            className="btn-qr"
-                            onClick={() => generateTicketReceipt(ticket)}
-                            title="Generate QR Receipt"
-                          >
-                            <i className="fas fa-qrcode"></i>
-                          </button>
-                          <button 
-                            className="btn-email"
-                            title="Resend Ticket"
-                          >
-                            <i className="fas fa-envelope"></i>
-                          </button>
-                          <button 
-                            className="btn-cancel"
-                            title="Cancel Ticket"
-                          >
-                            <i className="fas fa-ban"></i>
-                          </button>
+
+              {/* Ticket Form Modal */}
+              {showTicketForm && (
+                <div className="modal-overlay">
+                  <div className="modal">
+                    <div className="modal-header">
+                      <h3>{editingTicket ? 'Edit Ticket Type' : 'Add New Ticket Type'}</h3>
+                      <button 
+                        className="close-button"
+                        onClick={() => {
+                          setShowTicketForm(false);
+                          setEditingTicket(null);
+                          setTicketForm({
+                            type_name: '',
+                            price: '',
+                            quantity_available: '',
+                            description: '',
+                            benefits: ''
+                          });
+                        }}
+                      >
+                        ×
+                      </button>
+                    </div>
+                    <form onSubmit={handleTicketFormSubmit} className="ticket-form">
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Ticket Type Name *</label>
+                          <input
+                            type="text"
+                            value={ticketForm.type_name}
+                            onChange={(e) => setTicketForm({...ticketForm, type_name: e.target.value})}
+                            required
+                            placeholder="e.g., General Admission, VIP, Early Bird"
+                          />
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'receipts' && (
-        <div className="tab-content">
-          <div className="receipts-section">
-            <div className="section-header">
-              <h3>
-                <i className="fas fa-qrcode"></i>
-                QR Code Receipts
-              </h3>
-              <p>Generate and manage digital tickets with QR codes for verification</p>
-            </div>
-
-            <div className="receipt-generator">
-              <div className="generator-form">
-                <h4>Generate New Receipt</h4>
-                <div className="form-row">
-                  <select className="ticket-select">
-                    <option value="">Select a ticket...</option>
-                    {tickets.map(ticket => (
-                      <option key={ticket.id} value={ticket.id}>
-                        {ticket.id} - {ticket.attendeeName} ({ticket.tierName})
-                      </option>
-                    ))}
-                  </select>
-                  <button 
-                    className="btn-generate"
-                    onClick={() => {
-                      const selectedTicketId = document.querySelector('.ticket-select').value;
-                      if (selectedTicketId) {
-                        const ticket = tickets.find(t => t.id === selectedTicketId);
-                        handleGenerateQR(ticket);
-                      }
-                    }}
-                  >
-                    <i className="fas fa-qrcode"></i>
-                    Generate QR Receipt
-                  </button>
-                </div>
-              </div>
-
-              <div className="qr-preview">
-                <div className="qr-card">
-                  <div className="qr-header">
-                    <h3>Digital Ticket Receipt</h3>
-                    <div className="qr-code-placeholder">
-                      <i className="fas fa-qrcode"></i>
-                      <span>QR Code</span>
-                    </div>
-                  </div>
-                  <div className="qr-details">
-                    <div className="detail-row">
-                      <span>Event:</span>
-                      <span>Tech Conference 2025</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Ticket:</span>
-                      <span>VIP - $299.99</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Attendee:</span>
-                      <span>John Smith</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Date:</span>
-                      <span>March 15, 2025</span>
-                    </div>
-                    <div className="detail-row">
-                      <span>Venue:</span>
-                      <span>Convention Center</span>
-                    </div>
-                  </div>
-                  <div className="qr-footer">
-                    <small>Scan QR code at venue entrance for verification</small>
+                        <div className="form-group">
+                          <label>Price * ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={ticketForm.price}
+                            onChange={(e) => setTicketForm({...ticketForm, price: e.target.value})}
+                            required
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label>Available Quantity *</label>
+                          <input
+                            type="number"
+                            min="1"
+                            value={ticketForm.quantity_available}
+                            onChange={(e) => setTicketForm({...ticketForm, quantity_available: e.target.value})}
+                            required
+                            placeholder="100"
+                          />
+                        </div>
+                      </div>
+                      <div className="form-group">
+                        <label>Description</label>
+                        <textarea
+                          value={ticketForm.description}
+                          onChange={(e) => setTicketForm({...ticketForm, description: e.target.value})}
+                          placeholder="Describe what this ticket includes..."
+                          rows="3"
+                        />
+                      </div>
+                      <div className="form-group">
+                        <label>Benefits/Perks</label>
+                        <textarea
+                          value={ticketForm.benefits}
+                          onChange={(e) => setTicketForm({...ticketForm, benefits: e.target.value})}
+                          placeholder="List special benefits (separate with commas, semicolons, or new lines)&#10;e.g. Front row seating, Meet & greet, Free refreshments"
+                          rows="4"
+                        />
+                      </div>
+                      <div className="form-actions">
+                        <button type="submit" disabled={loading} className="save-button">
+                          <i className="fas fa-save"></i>
+                          {loading ? 'Saving...' : (editingTicket ? 'Update' : 'Create')} Ticket Type
+                        </button>
+                        <button 
+                          type="button" 
+                          onClick={() => {
+                            setShowTicketForm(false);
+                            setEditingTicket(null);
+                          }}
+                          className="cancel-button"
+                        >
+                          <i className="fas fa-times"></i>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
                   </div>
                 </div>
+              )}
+
+              {/* Ticket Types List */}
+              <div className="ticket-types-grid">
+                {loading ? (
+                  <div className="loading">Loading ticket types...</div>
+                ) : ticketTypes.length === 0 ? (
+                  <div className="empty-state">
+                    <p>No ticket types created yet.</p>
+                    <p>Create your first ticket type to start selling tickets!</p>
+                  </div>
+                ) : (
+                  ticketTypes.map(ticket => (
+                    <div key={ticket.ticket_type_id} className="ticket-type-card">
+                      <div className="ticket-header">
+                        <h3>{ticket.type_name}</h3>
+                        <div className="ticket-price">{formatCurrency(ticket.price)}</div>
+                      </div>
+                      <div className="ticket-details">
+                        <div className="quantity-info">
+                          <span className="sold">{ticket.quantity_sold || 0} sold</span>
+                          <span className="available"> / {ticket.quantity_available} available</span>
+                        </div>
+                        {ticket.description && (
+                          <p className="description">{ticket.description}</p>
+                        )}
+                        {ticket.benefits && (
+                          <div className="benefits">
+                            <strong>Benefits:</strong>
+                            <ul>
+                              {(Array.isArray(ticket.benefits) 
+                                ? ticket.benefits 
+                                : ticket.benefits.split(/[,;\n]/).map(b => b.trim()).filter(b => b.length > 0)
+                              ).map((benefit, index) => (
+                                <li key={index}>{benefit.trim()}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                      <div className="ticket-actions">
+                        <button 
+                          onClick={() => handleEditTicket(ticket)}
+                          className="edit-button"
+                        >
+                          <i className="fas fa-edit"></i>
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteTicket(ticket.ticket_type_id)}
+                          className="delete-button"
+                          disabled={ticket.quantity_sold > 0}
+                          title={ticket.quantity_sold > 0 ? "Cannot delete tickets with sales" : "Delete ticket type"}
+                        >
+                          <i className="fas fa-trash"></i>
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-          </div>
-        </div>
+          )}
+
+          {/* Sales Overview Tab */}
+          {activeTab === 'sales' && (
+            <div className="tab-content">
+              <h2>Sales Overview</h2>
+              {loading ? (
+                <div className="loading">Loading sales data...</div>
+              ) : salesData ? (
+                <div className="sales-overview">
+                  <div className="sales-summary">
+                    <div className="summary-card">
+                      <h3>Total Revenue</h3>
+                      <div className="metric">{formatCurrency(salesData.summary.totalRevenue)}</div>
+                    </div>
+                    <div className="summary-card">
+                      <h3>Tickets Sold</h3>
+                      <div className="metric">{salesData.summary.totalTicketsSold}</div>
+                    </div>
+                    <div className="summary-card">
+                      <h3>Total Capacity</h3>
+                      <div className="metric">{salesData.summary.totalCapacity}</div>
+                    </div>
+                    <div className="summary-card">
+                      <h3>Capacity Used</h3>
+                      <div className="metric">
+                        {salesData.summary.totalCapacity > 0 
+                          ? `${Math.round((salesData.summary.totalTicketsSold / salesData.summary.totalCapacity) * 100)}%`
+                          : '0%'
+                        }
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="sales-breakdown">
+                    <h3>Sales by Ticket Type</h3>
+                    <div className="sales-table">
+                      <table>
+                        <thead>
+                          <tr>
+                            <th>Ticket Type</th>
+                            <th>Price</th>
+                            <th>Sold</th>
+                            <th>Available</th>
+                            <th>Revenue</th>
+                            <th>% of Total Sales</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {salesData.ticketTypes.map(ticket => (
+                            <tr key={ticket.ticket_type_id}>
+                              <td>{ticket.type_name}</td>
+                              <td>{formatCurrency(ticket.price)}</td>
+                              <td>{ticket.quantity_sold}</td>
+                              <td>{ticket.quantity_available}</td>
+                              <td>{formatCurrency(ticket.revenue)}</td>
+                              <td>
+                                {salesData.summary.totalRevenue > 0 
+                                  ? `${Math.round((ticket.revenue / salesData.summary.totalRevenue) * 100)}%`
+                                  : '0%'
+                                }
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <p>No sales data available for this event.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Registrations Tab */}
+          {activeTab === 'registrations' && (
+            <div className="tab-content">
+              <h2>Event Registrations</h2>
+              {loading ? (
+                <div className="loading">Loading registrations...</div>
+              ) : registrations.length === 0 ? (
+                <div className="empty-state">
+                  <p>No registrations found for this event.</p>
+                </div>
+              ) : (
+                <div className="registrations-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Attendee</th>
+                        <th>Email</th>
+                        <th>Registration Date</th>
+                        <th>Tickets</th>
+                        <th>Amount</th>
+                        <th>Payment Status</th>
+                        <th>Check-in Status</th>
+                        <th>QR Code</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {registrations.map(registration => (
+                        <tr key={registration.registration_id}>
+                          <td>{registration.attendee_name}</td>
+                          <td>{registration.attendee_email}</td>
+                          <td>{formatDate(registration.registration_date)}</td>
+                          <td>{registration.ticket_quantity}</td>
+                          <td>{formatCurrency(registration.total_amount)}</td>
+                          <td>
+                            <span className={`status ${registration.payment_status}`}>
+                              {registration.payment_status}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`status ${registration.check_in_status || 'not-checked-in'}`}>
+                              {registration.check_in_status || 'Not Checked In'}
+                            </span>
+                          </td>
+                          <td>
+                            {registration.qr_code ? (
+                              <span className="qr-code">{registration.qr_code}</span>
+                            ) : (
+                              <span className="no-qr">No QR Code</span>
+                            )}
+                          </td>
+                          <td>
+                            {!registration.qr_code && (
+                              <button 
+                                onClick={() => generateQRCode(registration.registration_id)}
+                                className="generate-qr-button"
+                                title="Generate QR Code"
+                              >
+                                Generate QR
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </>
       )}
 
-      {showQRGenerator && selectedTicket && (
-        <QRCodeGenerator 
-          ticket={selectedTicket}
-          onClose={() => setShowQRGenerator(false)}
-        />
+      {!selectedEventId && (
+        <div className="empty-state">
+          <p>Please select an event to manage its ticketing.</p>
+        </div>
       )}
     </div>
   );
