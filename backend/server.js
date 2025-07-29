@@ -1276,6 +1276,327 @@ app.post('/api/companies', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== ATTENDEE ROUTES =====
+
+// Get all attendees
+app.get('/api/attendees', authenticateToken, async (req, res) => {
+  try {
+    // Get user ID from token
+    const userId = req.user.user_id;
+    
+    // Check if user is an organizer
+    const organizerCheck = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (organizerCheck.rows.length === 0) {
+      return res.status(403).json({ message: 'Only organizers can access this resource' });
+    }
+    
+    // Get all attendees with their user info
+    const result = await pool.query(`
+      SELECT 
+        a.attendee_id, 
+        a.full_name, 
+        a.phone, 
+        a.date_of_birth, 
+        a.gender, 
+        a.interests, 
+        a.emergency_contact_name, 
+        a.emergency_contact_phone, 
+        a.dietary_restrictions, 
+        a.accessibility_needs,
+        a.profile_picture_url,
+        a.bio,
+        a.social_media_links,
+        a.notification_preferences,
+        a.created_at,
+        a.updated_at,
+        u.email
+      FROM attendees a
+      JOIN users u ON a.user_id = u.user_id
+      ORDER BY a.full_name
+    `);
+    
+    return res.status(200).json({ attendees: result.rows });
+  } catch (err) {
+    console.error('Error fetching attendees:', err);
+    return res.status(500).json({ message: 'Failed to fetch attendees' });
+  }
+});
+
+// Get attendee by ID
+app.get('/api/attendees/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Fetch attendee by ID with user info
+    const result = await pool.query(`
+      SELECT 
+        a.attendee_id, 
+        a.full_name, 
+        a.phone, 
+        a.date_of_birth, 
+        a.gender, 
+        a.interests, 
+        a.emergency_contact_name, 
+        a.emergency_contact_phone, 
+        a.dietary_restrictions, 
+        a.accessibility_needs,
+        a.profile_picture_url,
+        a.bio,
+        a.social_media_links,
+        a.notification_preferences,
+        a.created_at,
+        a.updated_at,
+        u.email
+      FROM attendees a
+      JOIN users u ON a.user_id = u.user_id
+      WHERE a.attendee_id = $1
+    `, [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Attendee not found' });
+    }
+    
+    return res.status(200).json({ attendee: result.rows[0] });
+  } catch (err) {
+    console.error('Error fetching attendee:', err);
+    return res.status(500).json({ message: 'Failed to fetch attendee' });
+  }
+});
+
+// Create new attendee
+app.post('/api/attendees', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const {
+      email, full_name, phone, date_of_birth, gender, interests,
+      emergency_contact_name, emergency_contact_phone, dietary_restrictions,
+      accessibility_needs, profile_picture_url, bio, social_media_links,
+      notification_preferences
+    } = req.body;
+    
+    // Validate required fields
+    if (!full_name || !email) {
+      return res.status(400).json({ message: 'Name and email are required' });
+    }
+    
+    // Check if user exists
+    let userResult = await client.query(
+      'SELECT user_id FROM users WHERE email = $1',
+      [email]
+    );
+    
+    let userId;
+    
+    if (userResult.rows.length === 0) {
+      // Create new user if doesn't exist
+      // Generate random password
+      const tempPassword = crypto.randomBytes(8).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      // Generate verification token
+      const verificationToken = generateVerificationToken();
+      const tokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+      
+      // Insert new user
+      const newUserResult = await client.query(
+        `INSERT INTO users 
+        (email, password, role_type, email_verification_token, email_verification_token_expires) 
+        VALUES ($1, $2, $3, $4, $5) RETURNING user_id`,
+        [email, hashedPassword, 'attendee', verificationToken, tokenExpires]
+      );
+      
+      userId = newUserResult.rows[0].user_id;
+      
+      // TODO: Send verification email to new user with the temporary password
+    } else {
+      userId = userResult.rows[0].user_id;
+    }
+    
+    // Check if attendee profile already exists for this user
+    const attendeeCheck = await client.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (attendeeCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ message: 'Attendee profile already exists for this email' });
+    }
+    
+    // Create attendee
+    const result = await client.query(
+      `INSERT INTO attendees (
+        user_id, full_name, phone, date_of_birth, gender, interests,
+        emergency_contact_name, emergency_contact_phone, dietary_restrictions,
+        accessibility_needs, profile_picture_url, bio, social_media_links,
+        notification_preferences
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING *`,
+      [
+        userId, full_name, phone, date_of_birth || null, gender, interests,
+        emergency_contact_name, emergency_contact_phone, dietary_restrictions,
+        accessibility_needs, profile_picture_url, bio, social_media_links,
+        notification_preferences
+      ]
+    );
+    
+    await client.query('COMMIT');
+    
+    return res.status(201).json({
+      attendee: {...result.rows[0], email},
+      message: 'Attendee registered successfully'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error creating attendee:', err);
+    return res.status(500).json({ message: 'Failed to register attendee' });
+  } finally {
+    client.release();
+  }
+});
+
+// Update attendee
+app.put('/api/attendees/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    const {
+      full_name, phone, date_of_birth, gender, interests,
+      emergency_contact_name, emergency_contact_phone, dietary_restrictions,
+      accessibility_needs, profile_picture_url, bio, social_media_links,
+      notification_preferences
+    } = req.body;
+    
+    // Validate required fields
+    if (!full_name) {
+      return res.status(400).json({ message: 'Full name is required' });
+    }
+    
+    // Check if attendee exists
+    const attendeeCheck = await client.query(
+      'SELECT attendee_id FROM attendees WHERE attendee_id = $1',
+      [id]
+    );
+    
+    if (attendeeCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Attendee not found' });
+    }
+    
+    // Update attendee
+    const result = await client.query(
+      `UPDATE attendees SET
+        full_name = $1,
+        phone = $2,
+        date_of_birth = $3,
+        gender = $4,
+        interests = $5,
+        emergency_contact_name = $6,
+        emergency_contact_phone = $7,
+        dietary_restrictions = $8,
+        accessibility_needs = $9,
+        profile_picture_url = $10,
+        bio = $11,
+        social_media_links = $12,
+        notification_preferences = $13,
+        updated_at = NOW()
+      WHERE attendee_id = $14
+      RETURNING *`,
+      [
+        full_name, phone, date_of_birth || null, gender, interests,
+        emergency_contact_name, emergency_contact_phone, dietary_restrictions,
+        accessibility_needs, profile_picture_url, bio, social_media_links,
+        notification_preferences, id
+      ]
+    );
+    
+    // Get the email for the attendee
+    const userResult = await client.query(
+      `SELECT u.email FROM users u
+       JOIN attendees a ON u.user_id = a.user_id
+       WHERE a.attendee_id = $1`,
+      [id]
+    );
+    
+    await client.query('COMMIT');
+    
+    return res.status(200).json({
+      attendee: {...result.rows[0], email: userResult.rows[0]?.email},
+      message: 'Attendee updated successfully'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error updating attendee:', err);
+    return res.status(500).json({ message: 'Failed to update attendee' });
+  } finally {
+    client.release();
+  }
+});
+
+// Delete attendee
+app.delete('/api/attendees/:id', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    const { id } = req.params;
+    
+    // Check if attendee exists
+    const attendeeCheck = await client.query(
+      'SELECT user_id FROM attendees WHERE attendee_id = $1',
+      [id]
+    );
+    
+    if (attendeeCheck.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Attendee not found' });
+    }
+    
+    // Check for registrations
+    const registrationsCheck = await client.query(
+      'SELECT registration_id FROM eventregistrations WHERE attendee_id = $1 LIMIT 1',
+      [id]
+    );
+    
+    if (registrationsCheck.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ 
+        message: 'Cannot delete attendee with active event registrations'
+      });
+    }
+    
+    // Delete attendee
+    await client.query(
+      'DELETE FROM attendees WHERE attendee_id = $1',
+      [id]
+    );
+    
+    // Note: We don't delete the user account, just the attendee profile
+    
+    await client.query('COMMIT');
+    
+    return res.status(200).json({
+      message: 'Attendee deleted successfully'
+    });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('Error deleting attendee:', err);
+    return res.status(500).json({ message: 'Failed to delete attendee' });
+  } finally {
+    client.release();
+  }
+});
+
 // ===== EVENT ROUTES =====
 
 // Get all events
