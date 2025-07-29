@@ -436,50 +436,50 @@ const OrganizerDashboard = () => {
       setFeedbackData([
         {
           id: 1,
-          eventId: 1,
-          eventName: 'Tech Conference 2025',
-          attendeeName: 'John Smith',
-          attendeeEmail: 'john@example.com',
+          event_id: 1,
+          event_name: 'Tech Conference 2025',
+          attendee_name: 'John Smith',
+          attendee_email: 'john@example.com',
           rating: 5,
           comment: 'Excellent event! Very informative speakers and great networking opportunities.',
           submittedAt: '2025-01-15T10:30:00Z'
         },
         {
           id: 2,
-          eventId: 1,
-          eventName: 'Tech Conference 2025',
-          attendeeName: 'Sarah Johnson',
-          attendeeEmail: 'sarah@example.com',
+          event_id: 1,
+          event_name: 'Tech Conference 2025',
+          attendee_name: 'Sarah Johnson',
+          attendee_email: 'sarah@example.com',
           rating: 4,
           comment: 'Good content but the venue was a bit crowded. Overall enjoyed it.',
           submittedAt: '2025-01-16T14:22:00Z'
         },
         {
           id: 3,
-          eventId: 2,
-          eventName: 'Marketing Workshop',
-          attendeeName: 'Mike Davis',
-          attendeeEmail: 'mike@example.com',
+          event_id: 2,
+          event_name: 'Marketing Workshop',
+          attendee_name: 'Mike Davis',
+          attendee_email: 'mike@example.com',
           rating: 5,
           comment: 'Amazing workshop! Learned practical strategies I can implement immediately.',
           submittedAt: '2025-01-12T09:15:00Z'
         },
         {
           id: 4,
-          eventId: 1,
-          eventName: 'Tech Conference 2025',
-          attendeeName: 'Emily Chen',
-          attendeeEmail: 'emily@example.com',
+          event_id: 1,
+          event_name: 'Tech Conference 2025',
+          attendee_name: 'Emily Chen',
+          attendee_email: 'emily@example.com',
           rating: 4,
           comment: 'Great speakers and well organized. Would love to see more interactive sessions.',
           submittedAt: '2025-01-17T11:45:00Z'
         },
         {
           id: 5,
-          eventId: 3,
-          eventName: 'Networking Event',
-          attendeeName: 'Robert Wilson',
-          attendeeEmail: 'robert@example.com',
+          event_id: 3,
+          event_name: 'Networking Event',
+          attendee_name: 'Robert Wilson',
+          attendee_email: 'robert@example.com',
           rating: 3,
           comment: 'Nice event but could have been better organized. Food was good though.',
           submittedAt: '2025-01-10T16:30:00Z'
@@ -488,9 +488,9 @@ const OrganizerDashboard = () => {
       
       // Mock summary data
       setFeedbackSummary({
-        1: { averageRating: 4.3, totalReviews: 3, eventName: 'Tech Conference 2025' },
-        2: { averageRating: 5.0, totalReviews: 1, eventName: 'Marketing Workshop' },
-        3: { averageRating: 3.0, totalReviews: 1, eventName: 'Networking Event' }
+        1: { averageRating: 4.3, totalReviews: 3, event_name: 'Tech Conference 2025' },
+        2: { averageRating: 5.0, totalReviews: 1, event_name: 'Marketing Workshop' },
+        3: { averageRating: 3.0, totalReviews: 1, event_name: 'Networking Event' }
       });
     }
   };
@@ -502,7 +502,11 @@ const OrganizerDashboard = () => {
     
     // Filter by event
     if (feedbackFilter.eventId !== 'all') {
-      filtered = filtered.filter(feedback => feedback.eventId === parseInt(feedbackFilter.eventId));
+      filtered = filtered.filter(feedback => {
+        // Support both property naming conventions
+        const feedbackEventId = feedback.event_id || feedback.eventId;
+        return feedbackEventId === parseInt(feedbackFilter.eventId);
+      });
     }
     
     // Filter by date range

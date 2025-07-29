@@ -31,7 +31,7 @@ const FeedbackSection = ({
             {Object.entries(feedbackSummary).map(([eventId, summary]) => (
               <div key={eventId} className="summary-card">
                 <div className="summary-header">
-                  <h4 className="event-name">{summary.eventName}</h4>
+                  <h4 className="event-name">{summary.eventName || summary.event_name}</h4>
                   <div className="average-rating">
                     <span className="rating-number">{summary.averageRating.toFixed(1)}</span>
                     <div className="rating-stars">
@@ -78,8 +78,8 @@ const FeedbackSection = ({
             >
               <option value="all">All Events</option>
               {events.map(event => (
-                <option key={event.id} value={event.id}>
-                  {event.name}
+                <option key={event.event_id} value={event.event_id}>
+                  {event.event_name}
                 </option>
               ))}
             </select>
@@ -112,15 +112,15 @@ const FeedbackSection = ({
         {getFilteredFeedback().length > 0 ? (
           <div className="feedback-items">
             {getFilteredFeedback().map(feedback => (
-              <div key={feedback.id} className="feedback-item">
+              <div key={feedback.id || `feedback-${Math.random()}`} className="feedback-item">
                 <div className="feedback-header">
                   <div className="feedback-user">
                     <div className="user-avatar">
                       <i className="fas fa-user"></i>
                     </div>
                     <div className="user-info">
-                      <h4 className="user-name">{feedback.attendeeName}</h4>
-                      <p className="event-name">{feedback.eventName}</p>
+                      <h4 className="user-name">{feedback.attendeeName || feedback.attendee_name}</h4>
+                      <p className="event-name">{feedback.eventName || feedback.event_name}</p>
                     </div>
                   </div>
                   

@@ -38,9 +38,9 @@ const EventList = ({
   return (
     <div className="events-grid">
       {events.map((event) => (
-        <div key={event.id} className="event-card">
+        <div key={event.event_id} className="event-card">
           <div className="event-header">
-            <h3 className="event-title">{event.name}</h3>
+            <h3 className="event-title">{event.event_name}</h3>
             {event.category && (
               <span className={`event-category ${event.category}`}>
                 {event.category}
@@ -51,24 +51,24 @@ const EventList = ({
           <div className="event-details">
             <div className="event-detail">
               <i className="fas fa-calendar"></i>
-              <span>{formatDate(event.date)}</span>
+              <span>{formatDate(event.event_date)}</span>
             </div>
             
             <div className="event-detail">
               <i className="fas fa-map-marker-alt"></i>
-              <span>{event.location}</span>
+              <span>{event.venue_name || event.venue_address}</span>
             </div>
             
-            {event.maxAttendees && (
+            {event.max_attendees && (
               <div className="event-detail">
                 <i className="fas fa-users"></i>
-                <span>Max: {event.maxAttendees} attendees</span>
+                <span>Max: {event.max_attendees} attendees</span>
               </div>
             )}
             
             <div className="event-detail">
               <i className="fas fa-dollar-sign"></i>
-              <span>{event.price > 0 ? `$${event.price}` : 'Free'}</span>
+              <span>{event.ticket_price > 0 ? `$${event.ticket_price}` : 'Free'}</span>
             </div>
           </div>
           
