@@ -9,6 +9,7 @@ export { default as FeedbackSection } from './FeedbackSection';
 export { default as CompanyRegistration } from './CompanyRegistration';
 export { default as CompanyManagement } from './CompanyManagement';
 export { default as PeopleRegistration } from './PeopleRegistration';
+export { default as AttendeeManagement } from './AttendeeManagement';
 export { default as ManualEventRegistration } from './ManualEventRegistration';
 
 // Ticketing & Payments Components
