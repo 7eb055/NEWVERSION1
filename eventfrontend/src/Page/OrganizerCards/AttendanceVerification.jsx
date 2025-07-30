@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
-// import './AttendanceVerification.css';
+import axios from 'axios';
+import AuthTokenService from '../../services/AuthTokenService';
+import './css/AttendanceVerification.css';
 
-const AttendanceVerification = ({ events, onCancel, isLoading }) => {
+const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedEvent, setSelectedEvent] = useState('');
+  // Remove events state since we're using events prop from parent
   const [attendees, setAttendees] = useState([]);
   const [scannedQRCode, setScannedQRCode] = useState('');
   const [scanResult, setScanResult] = useState(null);
@@ -11,125 +14,121 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
   const [attendanceStats, setAttendanceStats] = useState({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  // Mock attendees data
-  const mockAttendees = [
-    {
-      id: 'ATT001',
-      name: 'John Smith',
-      email: 'john.smith@company.com',
-      phone: '+1-555-1111',
-      ticketType: 'VIP',
-      qrCode: 'QR001JOHN2025',
-      status: 'registered',
-      checkInTime: null,
-      eventId: 1
-    },
-    {
-      id: 'ATT002',
-      name: 'Emily Rodriguez',
-      email: 'emily.r@marketing.com',
-      phone: '+1-555-2222',
-      ticketType: 'Standard',
-      qrCode: 'QR002EMILY2025',
-      status: 'checked-in',
-      checkInTime: '2025-07-17T09:15:00Z',
-      eventId: 1
-    },
-    {
-      id: 'ATT003',
-      name: 'Michael Johnson',
-      email: 'michael.j@vipguest.com',
-      phone: '+1-555-3333',
-      ticketType: 'VIP',
-      qrCode: 'QR003MICHAEL2025',
-      status: 'checked-in',
-      checkInTime: '2025-07-17T08:45:00Z',
-      eventId: 1
-    },
-    {
-      id: 'ATT004',
-      name: 'Sarah Chen',
-      email: 'sarah.chen@example.com',
-      phone: '+1-555-4444',
-      ticketType: 'Standard',
-      qrCode: 'QR004SARAH2025',
-      status: 'registered',
-      checkInTime: null,
-      eventId: 2
-    },
-    {
-      id: 'ATT005',
-      name: 'David Wilson',
-      email: 'david.w@company.com',
-      phone: '+1-555-5555',
-      ticketType: 'Premium',
-      qrCode: 'QR005DAVID2025',
-      status: 'no-show',
-      checkInTime: null,
-      eventId: 3
-    }
-  ];
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
+  // Load organizer's events on component mount - now use events prop
+  // useEffect(() => {
+  //   loadUserEvents();
+  // }, []);
+
+  // Load attendees when event is selected
   useEffect(() => {
-    // Load mock data
-    setAttendees(mockAttendees);
-    calculateAttendanceStats(mockAttendees);
-    
-    // Mock scan history
-    setScanHistory([
-      {
-        id: 1,
-        qrCode: 'QR002EMILY2025',
-        attendeeName: 'Emily Rodriguez',
-        eventName: 'Tech Conference 2025',
-        scanTime: '2025-07-17T09:15:00Z',
-        status: 'success',
-        ticketType: 'Standard'
-      },
-      {
-        id: 2,
-        qrCode: 'QR003MICHAEL2025',
-        attendeeName: 'Michael Johnson',
-        eventName: 'Tech Conference 2025',
-        scanTime: '2025-07-17T08:45:00Z',
-        status: 'success',
-        ticketType: 'VIP'
-      },
-      {
-        id: 3,
-        qrCode: 'QR999INVALID',
-        attendeeName: 'Unknown',
-        eventName: 'Tech Conference 2025',
-        scanTime: '2025-07-17T10:30:00Z',
-        status: 'invalid',
-        ticketType: 'N/A'
-      }
-    ]);
-  }, []);
+    if (selectedEvent) {
+      loadAttendees();
+      loadAttendanceStats();
+      loadScanHistory();
+    } else {
+      setAttendees([]);
+      setAttendanceStats({});
+      setScanHistory([]);
+    }
+  }, [selectedEvent]);
 
-  const calculateAttendanceStats = (attendeeList) => {
-    const stats = {};
+  // Remove this function since we're using events prop
+  // const loadUserEvents = async () => {
+  //   setLoading(true);
+  //   try {
+  //     const token = AuthTokenService.getToken();
+  //     const response = await axios.get(
+  //       `${API_URL}/api/events/my-events`,
+  //       {
+  //         headers: { 'Authorization': `Bearer ${token}` }
+  //       }
+  //     );
+  //     
+  //     console.log('📋 Loaded events for organizer:', response.data.events);
+  //     setEvents(response.data.events || []);
+  //     setError('');
+  //   } catch (error) {
+  //     console.error('Error loading user events:', error);
+  //     setError('Failed to load events');
+  //     setEvents([]);
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+  // Load attendees for the selected event
+  const loadAttendees = async () => {
+    if (!selectedEvent) return;
     
-    events.forEach(event => {
-      const eventAttendees = attendeeList.filter(a => a.eventId === event.id);
-      const checkedIn = eventAttendees.filter(a => a.status === 'checked-in').length;
-      const registered = eventAttendees.filter(a => a.status === 'registered').length;
-      const noShow = eventAttendees.filter(a => a.status === 'no-show').length;
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendees`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` },
+          params: { status: filterStatus, search: searchTerm }
+        }
+      );
       
-      stats[event.id] = {
-        total: eventAttendees.length,
-        checkedIn,
-        registered,
-        noShow,
-        attendanceRate: eventAttendees.length > 0 ? ((checkedIn / eventAttendees.length) * 100).toFixed(1) : 0
-      };
-    });
-    
-    setAttendanceStats(stats);
+      setAttendees(response.data.attendees || []);
+      setError('');
+    } catch (error) {
+      console.error('Error loading attendees:', error);
+      setError('Failed to load attendees');
+      setAttendees([]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleQRScan = () => {
+  // Load attendance statistics
+  const loadAttendanceStats = async () => {
+    if (!selectedEvent) return;
+    
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendance/stats`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      setAttendanceStats({
+        [selectedEvent]: response.data
+      });
+    } catch (error) {
+      console.error('Error loading attendance stats:', error);
+    }
+  };
+
+  // Load scan history
+  const loadScanHistory = async () => {
+    if (!selectedEvent) return;
+    
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendance/history`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      setScanHistory(response.data.history || []);
+    } catch (error) {
+      console.error('Error loading scan history:', error);
+    }
+  };
+
+  // Handle QR code scanning
+  const handleQRScan = async () => {
     if (!scannedQRCode.trim()) {
       setScanResult({
         status: 'error',
@@ -146,102 +145,104 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
       return;
     }
 
-    // Find attendee by QR code
-    const attendee = attendees.find(a => 
-      a.qrCode === scannedQRCode && a.eventId === parseInt(selectedEvent)
-    );
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.post(
+        `${API_URL}/api/events/${selectedEvent}/attendance/scan`,
+        { qr_code: scannedQRCode },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
 
-    if (!attendee) {
       setScanResult({
-        status: 'invalid',
-        message: 'Invalid QR code or attendee not registered for this event',
-        qrCode: scannedQRCode
+        status: response.data.status,
+        message: response.data.message,
+        attendee: response.data.attendee
       });
+
+      // Reload data to reflect changes
+      loadAttendees();
+      loadAttendanceStats();
+      loadScanHistory();
       
-      // Add to scan history
-      const newScan = {
-        id: scanHistory.length + 1,
-        qrCode: scannedQRCode,
-        attendeeName: 'Unknown',
-        eventName: events.find(e => e.id === parseInt(selectedEvent))?.name || 'Unknown Event',
-        scanTime: new Date().toISOString(),
-        status: 'invalid',
-        ticketType: 'N/A'
-      };
-      setScanHistory(prev => [newScan, ...prev]);
+    } catch (error) {
+      console.error('Error scanning QR code:', error);
+      
+      if (error.response?.data) {
+        setScanResult({
+          status: error.response.data.status || 'error',
+          message: error.response.data.message || 'QR scan failed',
+          attendee: error.response.data.attendee,
+          checkInTime: error.response.data.checkInTime
+        });
+      } else {
+        setScanResult({
+          status: 'error',
+          message: 'Failed to scan QR code. Please try again.'
+        });
+      }
+    } finally {
+      setLoading(false);
       setScannedQRCode('');
-      return;
     }
+  };
 
-    if (attendee.status === 'checked-in') {
-      setScanResult({
-        status: 'duplicate',
-        message: `${attendee.name} is already checked in`,
-        attendee,
-        checkInTime: attendee.checkInTime
-      });
-      setScannedQRCode('');
-      return;
+  // Manual check-in
+  const manualCheckIn = async (registrationId) => {
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      await axios.post(
+        `${API_URL}/api/events/${selectedEvent}/attendance/manual`,
+        { registration_id: registrationId },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      // Reload data to reflect changes
+      loadAttendees();
+      loadAttendanceStats();
+      loadScanHistory();
+      
+    } catch (error) {
+      console.error('Error checking in attendee:', error);
+      setError('Failed to check in attendee');
+    } finally {
+      setLoading(false);
     }
-
-    // Check in the attendee
-    const updatedAttendees = attendees.map(a => 
-      a.id === attendee.id 
-        ? { ...a, status: 'checked-in', checkInTime: new Date().toISOString() }
-        : a
-    );
-    
-    setAttendees(updatedAttendees);
-    calculateAttendanceStats(updatedAttendees);
-
-    setScanResult({
-      status: 'success',
-      message: `${attendee.name} successfully checked in!`,
-      attendee: { ...attendee, status: 'checked-in', checkInTime: new Date().toISOString() }
-    });
-
-    // Add to scan history
-    const newScan = {
-      id: scanHistory.length + 1,
-      qrCode: scannedQRCode,
-      attendeeName: attendee.name,
-      eventName: events.find(e => e.id === parseInt(selectedEvent))?.name || 'Unknown Event',
-      scanTime: new Date().toISOString(),
-      status: 'success',
-      ticketType: attendee.ticketType
-    };
-    setScanHistory(prev => [newScan, ...prev]);
-    setScannedQRCode('');
   };
 
-  const manualCheckIn = (attendeeId) => {
-    const updatedAttendees = attendees.map(a => 
-      a.id === attendeeId 
-        ? { ...a, status: 'checked-in', checkInTime: new Date().toISOString() }
-        : a
-    );
-    
-    setAttendees(updatedAttendees);
-    calculateAttendanceStats(updatedAttendees);
+  // Manual check-out (undo check-in)
+  const manualCheckOut = async (registrationId) => {
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      await axios.post(
+        `${API_URL}/api/events/${selectedEvent}/attendance/checkout`,
+        { registration_id: registrationId },
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+
+      // Reload data to reflect changes
+      loadAttendees();
+      loadAttendanceStats();
+      
+    } catch (error) {
+      console.error('Error undoing check-in:', error);
+      setError('Failed to undo check-in');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const manualCheckOut = (attendeeId) => {
-    const updatedAttendees = attendees.map(a => 
-      a.id === attendeeId 
-        ? { ...a, status: 'registered', checkInTime: null }
-        : a
-    );
-    
-    setAttendees(updatedAttendees);
-    calculateAttendanceStats(updatedAttendees);
-  };
-
+  // Filter attendees based on search and status
   const getFilteredAttendees = () => {
     let filtered = attendees;
-    
-    if (selectedEvent) {
-      filtered = filtered.filter(a => a.eventId === parseInt(selectedEvent));
-    }
     
     if (filterStatus !== 'all') {
       filtered = filtered.filter(a => a.status === filterStatus);
@@ -251,13 +252,14 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
       filtered = filtered.filter(a => 
         a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.qrCode.toLowerCase().includes(searchTerm.toLowerCase())
+        a.qrCode?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
     return filtered;
   };
 
+  // Format date/time for display
   const formatTime = (dateString) => {
     if (!dateString) return 'Not checked in';
     return new Date(dateString).toLocaleString('en-US', {
@@ -268,12 +270,15 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
     });
   };
 
+  // Get status icon
   const getStatusIcon = (status) => {
     switch (status) {
       case 'checked-in':
         return <i className="fas fa-check-circle status-checked-in"></i>;
       case 'registered':
         return <i className="fas fa-clock status-registered"></i>;
+      case 'checked-out':
+        return <i className="fas fa-sign-out-alt status-checked-out"></i>;
       case 'no-show':
         return <i className="fas fa-times-circle status-no-show"></i>;
       default:
@@ -281,6 +286,7 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
     }
   };
 
+  // Get scan result status icon
   const getScanStatusIcon = (status) => {
     switch (status) {
       case 'success':
@@ -289,10 +295,19 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
         return <i className="fas fa-times-circle scan-invalid"></i>;
       case 'duplicate':
         return <i className="fas fa-exclamation-triangle scan-duplicate"></i>;
+      case 'error':
+        return <i className="fas fa-exclamation-circle scan-error"></i>;
       default:
         return <i className="fas fa-info-circle"></i>;
     }
   };
+
+  // Reload attendees when filter changes
+  useEffect(() => {
+    if (selectedEvent) {
+      loadAttendees();
+    }
+  }, [filterStatus, searchTerm]);
 
   return (
     <div className="attendance-verification">
@@ -303,6 +318,14 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
         </h3>
         <p>Scan QR codes and manage real-time attendance tracking</p>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="error-message">
+          <i className="fas fa-exclamation-triangle"></i>
+          {error}
+        </div>
+      )}
 
       <div className="attendance-tabs">
         <button 
@@ -341,13 +364,16 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
           <label>Select Event:</label>
           <select 
             value={selectedEvent} 
-            onChange={(e) => setSelectedEvent(e.target.value)}
+            onChange={(e) => {
+              console.log('🎯 Selected event ID:', e.target.value);
+              setSelectedEvent(e.target.value);
+            }}
             className="event-select"
           >
             <option value="">Choose an event...</option>
-            {events.map(event => (
-              <option key={event.id} value={event.id}>
-                {event.name} - {new Date(event.date).toLocaleDateString()}
+            {events && events.map((event, index) => (
+              <option key={event.event_id || `event-${index}`} value={event.event_id}>
+                {event.event_name} - {new Date(event.event_date).toLocaleDateString()}
               </option>
             ))}
           </select>
@@ -382,17 +408,17 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                         type="text"
                         value={scannedQRCode}
                         onChange={(e) => setScannedQRCode(e.target.value)}
-                        placeholder="Enter QR code (e.g., QR001JOHN2025)"
+                        placeholder="Enter QR code"
                         className="qr-input"
                         onKeyPress={(e) => e.key === 'Enter' && handleQRScan()}
                       />
                       <button 
                         onClick={handleQRScan}
                         className="scan-btn"
-                        disabled={!selectedEvent}
+                        disabled={!selectedEvent || loading}
                       >
                         <i className="fas fa-search"></i>
-                        Verify
+                        {loading ? 'Verifying...' : 'Verify'}
                       </button>
                     </div>
                   </div>
@@ -448,9 +474,16 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
               </div>
             </div>
 
+            {loading && (
+              <div className="loading-message">
+                <i className="fas fa-spinner fa-spin"></i>
+                Loading attendees...
+              </div>
+            )}
+
             <div className="attendees-list">
-              {getFilteredAttendees().map(attendee => (
-                <div key={attendee.id} className="attendee-card">
+              {getFilteredAttendees().map((attendee, index) => (
+                <div key={attendee.id || `attendee-${index}`} className="attendee-card">
                   <div className="attendee-info">
                     <div className="attendee-header">
                       <h4>{attendee.name}</h4>
@@ -463,9 +496,10 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                     </div>
                     <div className="attendee-details">
                       <p><i className="fas fa-envelope"></i> {attendee.email}</p>
-                      <p><i className="fas fa-phone"></i> {attendee.phone}</p>
+                      <p><i className="fas fa-phone"></i> {attendee.phone || 'N/A'}</p>
                       <p><i className="fas fa-ticket-alt"></i> {attendee.ticketType}</p>
-                      <p><i className="fas fa-qrcode"></i> {attendee.qrCode}</p>
+                      <p><i className="fas fa-qrcode"></i> {attendee.qrCode || 'N/A'}</p>
+                      <p><i className="fas fa-money-bill"></i> Payment: {attendee.paymentStatus || 'N/A'}</p>
                       {attendee.checkInTime && (
                         <p><i className="fas fa-clock"></i> Checked in: {formatTime(attendee.checkInTime)}</p>
                       )}
@@ -474,16 +508,18 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                   <div className="attendee-actions">
                     {attendee.status === 'registered' ? (
                       <button 
-                        onClick={() => manualCheckIn(attendee.id)}
+                        onClick={() => manualCheckIn(attendee.registrationId)}
                         className="check-in-btn"
+                        disabled={loading}
                       >
                         <i className="fas fa-check"></i>
                         Check In
                       </button>
                     ) : attendee.status === 'checked-in' ? (
                       <button 
-                        onClick={() => manualCheckOut(attendee.id)}
+                        onClick={() => manualCheckOut(attendee.registrationId)}
                         className="check-out-btn"
+                        disabled={loading}
                       >
                         <i className="fas fa-undo"></i>
                         Undo Check-in
@@ -493,6 +529,17 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                 </div>
               ))}
             </div>
+
+            {!loading && getFilteredAttendees().length === 0 && (
+              <div className="no-attendees">
+                <i className="fas fa-users"></i>
+                <p>No attendees found</p>
+                {selectedEvent ? 
+                  <small>Try adjusting your search or filter criteria</small> :
+                  <small>Please select an event to view attendees</small>
+                }
+              </div>
+            )}
           </div>
         )}
 
@@ -504,17 +551,14 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
               Attendance Statistics
             </h4>
             
-            <div className="stats-grid">
-              {events.map(event => {
-                const stats = attendanceStats[event.id];
-                if (!stats) return null;
-                
-                return (
-                  <div key={event.id} className="event-stats-card">
+            {selectedEvent ? (
+              <div className="stats-grid">
+                {attendanceStats[selectedEvent] && (
+                  <div className="event-stats-card">
                     <div className="event-stats-header">
-                      <h5>{event.name}</h5>
+                      <h5>{attendanceStats[selectedEvent].eventName}</h5>
                       <div className="attendance-rate">
-                        <span className="rate-value">{stats.attendanceRate}%</span>
+                        <span className="rate-value">{attendanceStats[selectedEvent].attendanceRate}%</span>
                         <span className="rate-label">Attendance Rate</span>
                       </div>
                     </div>
@@ -522,22 +566,22 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                     <div className="stats-breakdown">
                       <div className="stat-item checked-in">
                         <i className="fas fa-check-circle"></i>
-                        <span className="stat-number">{stats.checkedIn}</span>
+                        <span className="stat-number">{attendanceStats[selectedEvent].checkedIn}</span>
                         <span className="stat-label">Checked In</span>
                       </div>
                       <div className="stat-item registered">
                         <i className="fas fa-clock"></i>
-                        <span className="stat-number">{stats.registered}</span>
+                        <span className="stat-number">{attendanceStats[selectedEvent].registered}</span>
                         <span className="stat-label">Registered</span>
                       </div>
                       <div className="stat-item no-show">
                         <i className="fas fa-times-circle"></i>
-                        <span className="stat-number">{stats.noShow}</span>
+                        <span className="stat-number">{attendanceStats[selectedEvent].noShow}</span>
                         <span className="stat-label">No Show</span>
                       </div>
                       <div className="stat-item total">
                         <i className="fas fa-users"></i>
-                        <span className="stat-number">{stats.total}</span>
+                        <span className="stat-number">{attendanceStats[selectedEvent].total}</span>
                         <span className="stat-label">Total</span>
                       </div>
                     </div>
@@ -545,13 +589,18 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
                     <div className="progress-bar">
                       <div 
                         className="progress-fill"
-                        style={{ width: `${stats.attendanceRate}%` }}
+                        style={{ width: `${attendanceStats[selectedEvent].attendanceRate}%` }}
                       ></div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                )}
+              </div>
+            ) : (
+              <div className="no-stats">
+                <i className="fas fa-chart-bar"></i>
+                <p>Please select an event to view statistics</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -563,31 +612,46 @@ const AttendanceVerification = ({ events, onCancel, isLoading }) => {
               Scan History
             </h4>
             
-            <div className="history-list">
-              {scanHistory.map(scan => (
-                <div key={scan.id} className={`history-item ${scan.status}`}>
-                  <div className="history-icon">
-                    {getScanStatusIcon(scan.status)}
-                  </div>
-                  <div className="history-content">
-                    <div className="history-header">
-                      <h5>{scan.attendeeName}</h5>
-                      <span className="scan-time">{formatTime(scan.scanTime)}</span>
+            {scanHistory.length > 0 ? (
+              <div className="history-list">
+                {scanHistory.map((scan, index) => (
+                  <div key={scan.id || `scan-${index}`} className={`history-item ${scan.status}`}>
+                    <div className="history-icon">
+                      {getScanStatusIcon(scan.status)}
                     </div>
-                    <div className="history-details">
-                      <p><strong>Event:</strong> {scan.eventName}</p>
-                      <p><strong>QR Code:</strong> {scan.qrCode}</p>
-                      <p><strong>Ticket:</strong> {scan.ticketType}</p>
-                      <p><strong>Status:</strong> 
-                        <span className={`status-badge ${scan.status}`}>
-                          {scan.status.toUpperCase()}
-                        </span>
-                      </p>
+                    <div className="history-content">
+                      <div className="history-header">
+                        <h5>{scan.attendeeName}</h5>
+                        <span className="scan-time">{formatTime(scan.scanTime)}</span>
+                      </div>
+                      <div className="history-details">
+                        <p><strong>Event:</strong> {scan.eventName}</p>
+                        <p><strong>QR Code:</strong> {scan.qrCode}</p>
+                        <p><strong>Ticket:</strong> {scan.ticketType}</p>
+                        <p><strong>Method:</strong> {scan.scanMethod || 'QR Code'}</p>
+                        <p><strong>Status:</strong> 
+                          <span className={`status-badge ${scan.status}`}>
+                            {scan.status.toUpperCase()}
+                          </span>
+                        </p>
+                        {scan.scannedBy && (
+                          <p><strong>Scanned by:</strong> {scan.scannedBy}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="no-history">
+                <i className="fas fa-history"></i>
+                <p>No scan history available</p>
+                {selectedEvent ? 
+                  <small>Start scanning QR codes to see history</small> :
+                  <small>Please select an event to view scan history</small>
+                }
+              </div>
+            )}
           </div>
         )}
       </div>

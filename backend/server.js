@@ -29,6 +29,11 @@ pool.connect((err, client, release) => {
   }
 });
 
+// Add query logging for debugging
+pool.on('query', (query) => {
+  console.log('Executing query:', query.text);
+});
+
 // Middleware
 app.use(cors({
   origin: [
@@ -1799,7 +1804,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
         
         // First, get the user's information for the full_name field
         const userQuery = await pool.query(
-          'SELECT username, email FROM users WHERE user_id = $1',
+          'SELECT email FROM users WHERE user_id = $1',
           [req.user.user_id]
         );
         
@@ -1811,7 +1816,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
         }
         
         const user = userQuery.rows[0];
-        const fullName = user.username || user.email.split('@')[0];
+        const fullName = user.email.split('@')[0];
         
         // Insert user as an organizer with required fields
         await pool.query(
@@ -2250,6 +2255,331 @@ app.post('/api/events/:id/register', authenticateToken, async (req, res) => {
   }
 });
 
+// Manual attendee registration (for organizers)
+app.post('/api/events/:id/manual-registration', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { email, full_name, phone, ticket_quantity = 1, special_requirements } = req.body;
+
+    console.log('Manual registration request received:');
+    console.log('Event ID:', eventId);
+    console.log('Request body:', req.body);
+    console.log('Extracted fields:', { email, full_name, phone, ticket_quantity, special_requirements });
+
+    // Validate required fields
+    if (!email || !full_name) {
+      console.log('Validation failed - missing required fields:', { email: !!email, full_name: !!full_name });
+      return res.status(400).json({ message: 'Email and full name are required' });
+    }
+
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, e.event_name, e.max_attendees, e.ticket_price, e.max_tickets_per_person, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to manually register attendees for this event' });
+    }
+
+    const event = eventCheck.rows[0];
+
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Create or get user
+      let userResult = await client.query(
+        'SELECT user_id FROM users WHERE email = $1',
+        [email]
+      );
+
+      let userId;
+      if (userResult.rows.length === 0) {
+        // Create new user with temporary password
+        const tempPassword = crypto.randomBytes(8).toString('hex');
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+        
+        const newUserResult = await client.query(
+          `INSERT INTO users 
+           (email, password, role_type, is_email_verified, email_verified_at) 
+           VALUES ($1, $2, 'attendee', true, NOW()) 
+           RETURNING user_id`,
+          [email, hashedPassword]
+        );
+        userId = newUserResult.rows[0].user_id;
+      } else {
+        userId = userResult.rows[0].user_id;
+      }
+
+      // 2. Create or update attendee
+      const attendeeResult = await client.query(
+        `INSERT INTO attendees (user_id, full_name, phone)
+         VALUES ($1, $2, $3) 
+         ON CONFLICT (user_id) DO UPDATE SET
+           full_name = EXCLUDED.full_name,
+           phone = EXCLUDED.phone
+         RETURNING attendee_id`,
+        [userId, full_name, phone]
+      );
+
+      const attendeeId = attendeeResult.rows[0].attendee_id;
+
+      // 3. Check if already registered
+      const existingRegistration = await client.query(
+        'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
+        [eventId, attendeeId]
+      );
+
+      if (existingRegistration.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ message: 'Attendee is already registered for this event' });
+      }
+
+      // 4. Check if event is full
+      if (event.max_attendees) {
+        const currentRegistrations = await client.query(
+          'SELECT SUM(ticket_quantity) as total FROM eventregistrations WHERE event_id = $1 AND status = $2',
+          [eventId, 'confirmed']
+        );
+        
+        const currentTotal = parseInt(currentRegistrations.rows[0].total) || 0;
+        if (currentTotal + ticket_quantity > event.max_attendees) {
+          await client.query('ROLLBACK');
+          return res.status(400).json({ 
+            message: 'Event is full',
+            available: event.max_attendees - currentTotal,
+            requested: ticket_quantity
+          });
+        }
+      }
+
+      // 5. Calculate total amount
+      const totalAmount = ticket_quantity * event.ticket_price;
+
+      // 6. Create event registration
+      const registration = await client.query(
+        `INSERT INTO eventregistrations 
+         (event_id, attendee_id, ticket_quantity, total_amount, payment_status, special_requirements, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
+         RETURNING *`,
+        [eventId, attendeeId, ticket_quantity, totalAmount, 'completed', special_requirements]
+      );
+
+      // 7. Generate QR code for the registration
+      const qrCode = `EVENT-${eventId}-REG-${registration.rows[0].registration_id}-USER-${userId}`;
+      
+      await client.query(
+        'UPDATE eventregistrations SET qr_code = $1 WHERE registration_id = $2',
+        [qrCode, registration.rows[0].registration_id]
+      );
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        message: 'Attendee registered successfully',
+        registration: {
+          ...registration.rows[0],
+          qr_code: qrCode,
+          attendee: {
+            full_name,
+            email,
+            phone
+          }
+        },
+        event: {
+          id: event.event_id,
+          name: event.event_name
+        }
+      });
+
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+
+  } catch (error) {
+    console.error('Manual registration error:', error);
+    res.status(500).json({ message: 'Error processing manual registration' });
+  }
+});
+
+// Bulk manual attendee registration (for organizers)
+app.post('/api/events/:id/bulk-registration', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const { attendees } = req.body;
+
+    // Validate input
+    if (!Array.isArray(attendees) || attendees.length === 0) {
+      return res.status(400).json({ message: 'Attendees array is required and cannot be empty' });
+    }
+
+    // Validate each attendee
+    for (const attendee of attendees) {
+      if (!attendee.email || !attendee.full_name) {
+        return res.status(400).json({ message: 'Each attendee must have email and full_name' });
+      }
+    }
+
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, e.event_name, e.max_attendees, e.ticket_price, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to bulk register attendees for this event' });
+    }
+
+    const event = eventCheck.rows[0];
+    const results = [];
+    const errors = [];
+
+    // Process each attendee
+    for (let i = 0; i < attendees.length; i++) {
+      const attendee = attendees[i];
+      const client = await pool.connect();
+      
+      try {
+        await client.query('BEGIN');
+
+        const { email, full_name, phone, ticket_quantity = 1, special_requirements } = attendee;
+
+        // 1. Create or get user
+        let userResult = await client.query(
+          'SELECT user_id FROM users WHERE email = $1',
+          [email]
+        );
+
+        let userId;
+        if (userResult.rows.length === 0) {
+          // Create new user with temporary password
+          const tempPassword = crypto.randomBytes(8).toString('hex');
+          const hashedPassword = await bcrypt.hash(tempPassword, 10);
+          
+          const newUserResult = await client.query(
+            `INSERT INTO users 
+             (email, password, role_type, is_email_verified, email_verified_at) 
+             VALUES ($1, $2, 'attendee', true, NOW()) 
+             RETURNING user_id`,
+            [email, hashedPassword]
+          );
+          userId = newUserResult.rows[0].user_id;
+        } else {
+          userId = userResult.rows[0].user_id;
+        }
+
+        // 2. Create or update attendee
+        const attendeeResult = await client.query(
+          `INSERT INTO attendees (user_id, full_name, phone)
+           VALUES ($1, $2, $3) 
+           ON CONFLICT (user_id) DO UPDATE SET
+             full_name = EXCLUDED.full_name,
+             phone = EXCLUDED.phone
+           RETURNING attendee_id`,
+          [userId, full_name, phone]
+        );
+
+        const attendeeId = attendeeResult.rows[0].attendee_id;
+
+        // 3. Check if already registered
+        const existingRegistration = await client.query(
+          'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
+          [eventId, attendeeId]
+        );
+
+        if (existingRegistration.rows.length > 0) {
+          await client.query('ROLLBACK');
+          errors.push({
+            index: i,
+            email,
+            error: 'Already registered for this event'
+          });
+          continue;
+        }
+
+        // 4. Calculate total amount
+        const totalAmount = ticket_quantity * event.ticket_price;
+
+        // 5. Create event registration
+        const registration = await client.query(
+          `INSERT INTO eventregistrations 
+           (event_id, attendee_id, ticket_quantity, total_amount, payment_status, special_requirements, status)
+           VALUES ($1, $2, $3, $4, $5, $6, 'confirmed')
+           RETURNING *`,
+          [eventId, attendeeId, ticket_quantity, totalAmount, 'completed', special_requirements]
+        );
+
+        // 6. Generate QR code for the registration
+        const qrCode = `EVENT-${eventId}-REG-${registration.rows[0].registration_id}-USER-${userId}`;
+        
+        await client.query(
+          'UPDATE eventregistrations SET qr_code = $1 WHERE registration_id = $2',
+          [qrCode, registration.rows[0].registration_id]
+        );
+
+        await client.query('COMMIT');
+
+        results.push({
+          index: i,
+          registration: {
+            ...registration.rows[0],
+            qr_code: qrCode,
+            attendee: {
+              full_name,
+              email,
+              phone
+            }
+          }
+        });
+
+      } catch (error) {
+        await client.query('ROLLBACK');
+        errors.push({
+          index: i,
+          email: attendee.email,
+          error: error.message
+        });
+      } finally {
+        client.release();
+      }
+    }
+
+    res.status(201).json({
+      message: `Bulk registration completed. ${results.length} successful, ${errors.length} failed.`,
+      successful: results,
+      errors: errors,
+      summary: {
+        total: attendees.length,
+        successful: results.length,
+        failed: errors.length
+      }
+    });
+
+  } catch (error) {
+    console.error('Bulk registration error:', error);
+    res.status(500).json({ message: 'Error processing bulk registration' });
+  }
+});
+
 // Get my event registrations
 app.get('/api/registrations', authenticateToken, async (req, res) => {
   try {
@@ -2311,8 +2641,8 @@ app.get('/api/events/:id/registrations', authenticateToken, async (req, res) => 
     // Build the query with optional filters
     let query = `
       SELECT r.*, 
-             a.full_name, a.email, a.phone_number,
-             u.username, u.profile_picture
+             a.full_name, a.email, a.phone,
+             u.email as user_email
       FROM eventregistrations r
       JOIN attendees a ON r.attendee_id = a.attendee_id
       JOIN users u ON a.user_id = u.user_id
@@ -3175,30 +3505,18 @@ app.delete('/api/events/:eventId/vendors/:vendorId', authenticateToken, async (r
 
 // ===== ATTENDANCE ROUTES =====
 
-// Record attendance using QR code
-app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, res) => {
+// Get event registrations for attendance tracking
+app.get('/api/events/:eventId/attendees', authenticateToken, async (req, res) => {
   try {
     const eventId = req.params.eventId;
-    const { qr_code } = req.body;
-    
-    if (!qr_code) {
-      return res.status(400).json({ message: 'QR code is required' });
-    }
-    
-    // Extract registration ID from QR code
-    // Format: EVENT-{eventId}-REG-{registrationId}-USER-{userId}
-    const qrParts = qr_code.split('-');
-    
-    if (qrParts.length !== 6 || qrParts[0] !== 'EVENT' || qrParts[1] !== eventId || qrParts[2] !== 'REG' || qrParts[4] !== 'USER') {
-      return res.status(400).json({ message: 'Invalid QR code format' });
-    }
-    
-    const registrationId = qrParts[3];
-    const userId = qrParts[5];
+    const { status = 'all', search = '' } = req.query;
     
     // Check if user is authorized (event organizer or admin)
     const eventCheck = await pool.query(
-      'SELECT organizer_id FROM events WHERE event_id = $1',
+      `SELECT e.organizer_id, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
       [eventId]
     );
     
@@ -3206,63 +3524,348 @@ app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, 
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to record attendance for this event' });
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view attendees for this event' });
     }
     
-    // Check if registration exists and is confirmed
+    let query = `
+      SELECT 
+        r.registration_id,
+        r.event_id,
+        r.attendee_id,
+        r.registration_date,
+        r.ticket_quantity,
+        r.total_amount,
+        r.payment_status,
+        r.check_in_status,
+        r.check_in_time,
+        r.qr_code,
+        r.status as registration_status,
+        a.full_name,
+        u.email,
+        a.phone,
+        tt.type_name as ticket_type,
+        al.check_in_time as attendance_check_in_time,
+        al.check_out_time as attendance_check_out_time,
+        al.scan_method
+      FROM eventregistrations r
+      JOIN attendees a ON r.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN tickettypes tt ON r.ticket_type_id = tt.ticket_type_id
+      LEFT JOIN attendancelogs al ON r.registration_id = al.registration_id
+      WHERE r.event_id = $1
+    `;
+    
+    const queryParams = [eventId];
+    
+    if (status !== 'all') {
+      switch (status) {
+        case 'checked-in':
+          query += ' AND al.check_in_time IS NOT NULL AND al.check_out_time IS NULL';
+          break;
+        case 'checked-out':
+          query += ' AND al.check_out_time IS NOT NULL';
+          break;
+        case 'registered':
+          query += ' AND al.check_in_time IS NULL';
+          break;
+        case 'no-show':
+          query += ' AND al.check_in_time IS NULL AND r.status = $2';
+          queryParams.push('confirmed');
+          break;
+      }
+    }
+    
+    if (search) {
+      query += ` AND (a.full_name ILIKE $${queryParams.length + 1} OR u.email ILIKE $${queryParams.length + 1} OR r.qr_code ILIKE $${queryParams.length + 1})`;
+      queryParams.push(`%${search}%`);
+    }
+    
+    query += ' ORDER BY r.registration_date DESC';
+    
+    const result = await pool.query(query, queryParams);
+    
+    const attendees = result.rows.map(row => ({
+      id: row.registration_id,
+      registrationId: row.registration_id,
+      attendeeId: row.attendee_id,
+      name: row.full_name,
+      email: row.email,
+      phone: row.phone,
+      ticketType: row.ticket_type || 'Standard',
+      qrCode: row.qr_code,
+      registrationDate: row.registration_date,
+      ticketQuantity: row.ticket_quantity,
+      totalAmount: row.total_amount,
+      paymentStatus: row.payment_status,
+      registrationStatus: row.registration_status,
+      checkInStatus: row.check_in_status,
+      checkInTime: row.attendance_check_in_time || row.check_in_time,
+      checkOutTime: row.attendance_check_out_time,
+      scanMethod: row.scan_method,
+      status: row.attendance_check_in_time 
+        ? (row.attendance_check_out_time ? 'checked-out' : 'checked-in')
+        : 'registered',
+      eventId: parseInt(eventId)
+    }));
+    
+    res.json({
+      attendees,
+      total: attendees.length
+    });
+    
+  } catch (error) {
+    console.error('Get attendees error:', error);
+    res.status(500).json({ message: 'Server error while fetching attendees' });
+  }
+});
+
+// Get attendance statistics for an event
+app.get('/api/events/:eventId/attendance/stats', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, e.event_name, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view attendance stats for this event' });
+    }
+    
+    // Get comprehensive stats
+    const stats = await pool.query(`
+      SELECT 
+        COUNT(r.registration_id) as total_registered,
+        COUNT(al.check_in_time) as total_checked_in,
+        COUNT(CASE WHEN al.check_in_time IS NOT NULL AND al.check_out_time IS NOT NULL THEN 1 END) as total_checked_out,
+        COUNT(CASE WHEN al.check_in_time IS NULL AND r.status = 'confirmed' THEN 1 END) as total_no_show,
+        ROUND(
+          CASE 
+            WHEN COUNT(r.registration_id) > 0 
+            THEN (COUNT(al.check_in_time) * 100.0 / COUNT(r.registration_id)) 
+            ELSE 0 
+          END, 1
+        ) as attendance_rate
+      FROM eventregistrations r
+      LEFT JOIN attendancelogs al ON r.registration_id = al.registration_id
+      WHERE r.event_id = $1 AND r.status = 'confirmed'
+    `, [eventId]);
+    
+    const eventStats = stats.rows[0];
+    
+    res.json({
+      eventId: parseInt(eventId),
+      eventName: eventCheck.rows[0].event_name,
+      total: parseInt(eventStats.total_registered),
+      checkedIn: parseInt(eventStats.total_checked_in),
+      checkedOut: parseInt(eventStats.total_checked_out),
+      registered: parseInt(eventStats.total_registered) - parseInt(eventStats.total_checked_in),
+      noShow: parseInt(eventStats.total_no_show),
+      attendanceRate: parseFloat(eventStats.attendance_rate)
+    });
+    
+  } catch (error) {
+    console.error('Get attendance stats error:', error);
+    res.status(500).json({ message: 'Server error while fetching attendance stats' });
+  }
+});
+
+// Get scan history for an event
+app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { limit = 50, offset = 0 } = req.query;
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, e.event_name, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to view scan history for this event' });
+    }
+    
+    const history = await pool.query(`
+      SELECT 
+        al.attendance_id,
+        al.check_in_time as scan_time,
+        al.scan_method,
+        a.full_name as attendee_name,
+        r.qr_code,
+        tt.type_name as ticket_type,
+        scanned_by_user.email as scanned_by_email,
+        'success' as status
+      FROM attendancelogs al
+      JOIN eventregistrations r ON al.registration_id = r.registration_id
+      JOIN attendees a ON r.attendee_id = a.attendee_id
+      LEFT JOIN tickettypes tt ON r.ticket_type_id = tt.ticket_type_id
+      LEFT JOIN users scanned_by_user ON al.scanned_by = scanned_by_user.user_id
+      WHERE al.event_id = $1
+      ORDER BY al.check_in_time DESC
+      LIMIT $2 OFFSET $3
+    `, [eventId, limit, offset]);
+    
+    const scanHistory = history.rows.map((row, index) => ({
+      id: row.attendance_id,
+      qrCode: row.qr_code,
+      attendeeName: row.attendee_name,
+      eventName: eventCheck.rows[0].event_name,
+      scanTime: row.scan_time,
+      status: row.status,
+      ticketType: row.ticket_type || 'Standard',
+      scanMethod: row.scan_method,
+      scannedBy: row.scanned_by_email
+    }));
+    
+    res.json({
+      history: scanHistory,
+      total: scanHistory.length
+    });
+    
+  } catch (error) {
+    console.error('Get scan history error:', error);
+    res.status(500).json({ message: 'Server error while fetching scan history' });
+  }
+});
+
+// Record attendance using QR code
+// Record attendance using QR code scan
+app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { qr_code } = req.body;
+    
+    if (!qr_code) {
+      return res.status(400).json({ 
+        message: 'QR code is required',
+        status: 'error' 
+      });
+    }
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, e.event_name, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        message: 'Event not found',
+        status: 'error' 
+      });
+    }
+    
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ 
+        message: 'Not authorized to scan attendance for this event',
+        status: 'error' 
+      });
+    }
+    
+    // Find registration by QR code
     const registrationCheck = await pool.query(
-      'SELECT r.*, a.full_name, a.email FROM eventregistrations r JOIN attendees a ON r.attendee_id = a.attendee_id WHERE r.registration_id = $1 AND r.event_id = $2',
-      [registrationId, eventId]
+      `SELECT r.*, a.full_name, u.email, a.phone, tt.type_name as ticket_type
+       FROM eventregistrations r 
+       JOIN attendees a ON r.attendee_id = a.attendee_id 
+       JOIN users u ON a.user_id = u.user_id
+       LEFT JOIN tickettypes tt ON r.ticket_type_id = tt.ticket_type_id
+       WHERE r.qr_code = $1 AND r.event_id = $2`,
+      [qr_code, eventId]
     );
     
     if (registrationCheck.rows.length === 0) {
-      return res.status(404).json({ message: 'Registration not found' });
+      return res.status(404).json({ 
+        message: 'Invalid QR code or attendee not registered for this event',
+        status: 'invalid',
+        qrCode: qr_code
+      });
     }
     
     const registration = registrationCheck.rows[0];
     
     if (registration.status !== 'confirmed') {
       return res.status(400).json({ 
-        message: 'Registration is not confirmed', 
-        status: registration.status 
+        message: `Registration is ${registration.status}, cannot check in`,
+        status: 'invalid'
       });
     }
     
     // Check if attendance already recorded
     const attendanceCheck = await pool.query(
       'SELECT * FROM attendancelogs WHERE registration_id = $1 AND event_id = $2',
-      [registrationId, eventId]
+      [registration.registration_id, eventId]
     );
     
     if (attendanceCheck.rows.length > 0) {
+      const existingAttendance = attendanceCheck.rows[0];
       return res.status(409).json({ 
-        message: 'Attendance already recorded',
-        attendance: attendanceCheck.rows[0]
+        message: `${registration.full_name} is already checked in`,
+        status: 'duplicate',
+        attendee: {
+          name: registration.full_name,
+          email: registration.email,
+          phone: registration.phone,
+          ticketType: registration.ticket_type || 'Standard'
+        },
+        checkInTime: existingAttendance.check_in_time
       });
     }
     
     // Record attendance
     const attendance = await pool.query(
       `INSERT INTO attendancelogs 
-       (event_id, registration_id, attendee_id, check_in_time, recorded_by)
-       VALUES ($1, $2, $3, NOW(), $4)
+       (event_id, registration_id, check_in_time, scan_method, scanned_by, created_at, updated_at)
+       VALUES ($1, $2, NOW(), 'qr_code', $3, NOW(), NOW())
        RETURNING *`,
-      [eventId, registrationId, registration.attendee_id, req.user.user_id]
+      [eventId, registration.registration_id, req.user.user_id]
+    );
+    
+    // Update registration check_in status
+    await pool.query(
+      'UPDATE eventregistrations SET check_in_status = true, check_in_time = NOW() WHERE registration_id = $1',
+      [registration.registration_id]
     );
     
     res.status(201).json({
-      message: 'Attendance recorded successfully',
-      attendance: attendance.rows[0],
+      message: `${registration.full_name} successfully checked in!`,
+      status: 'success',
       attendee: {
         name: registration.full_name,
-        email: registration.email
-      }
+        email: registration.email,
+        phone: registration.phone,
+        ticketType: registration.ticket_type || 'Standard',
+        checkInTime: attendance.rows[0].check_in_time
+      },
+      attendance: attendance.rows[0]
     });
     
   } catch (error) {
-    console.error('Record attendance error:', error);
-    res.status(500).json({ message: 'Server error while recording attendance' });
+    console.error('QR scan attendance error:', error);
+    res.status(500).json({ 
+      message: 'Server error while processing QR scan',
+      status: 'error' 
+    });
   }
 });
 
@@ -3270,16 +3873,18 @@ app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, 
 app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req, res) => {
   try {
     const eventId = req.params.eventId;
-    const { email, phone, registration_id } = req.body;
+    const { registration_id } = req.body;
     
-    // Check if at least one search parameter is provided
-    if (!email && !phone && !registration_id) {
-      return res.status(400).json({ message: 'Email, phone or registration ID is required' });
+    if (!registration_id) {
+      return res.status(400).json({ message: 'Registration ID is required' });
     }
     
     // Check if user is authorized (event organizer or admin)
     const eventCheck = await pool.query(
-      'SELECT organizer_id FROM events WHERE event_id = $1',
+      `SELECT e.organizer_id, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
       [eventId]
     );
     
@@ -3287,41 +3892,20 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to record attendance for this event' });
     }
     
     // Find registration
-    let registrationQuery;
-    let queryParams = [eventId];
-    
-    if (registration_id) {
-      registrationQuery = `
-        SELECT r.*, a.full_name, a.email, a.phone_number 
-        FROM eventregistrations r 
-        JOIN attendees a ON r.attendee_id = a.attendee_id 
-        WHERE r.event_id = $1 AND r.registration_id = $2
-      `;
-      queryParams.push(registration_id);
-    } else if (email) {
-      registrationQuery = `
-        SELECT r.*, a.full_name, a.email, a.phone_number 
-        FROM eventregistrations r 
-        JOIN attendees a ON r.attendee_id = a.attendee_id 
-        WHERE r.event_id = $1 AND a.email = $2
-      `;
-      queryParams.push(email);
-    } else {
-      registrationQuery = `
-        SELECT r.*, a.full_name, a.email, a.phone_number 
-        FROM eventregistrations r 
-        JOIN attendees a ON r.attendee_id = a.attendee_id 
-        WHERE r.event_id = $1 AND a.phone_number = $2
-      `;
-      queryParams.push(phone);
-    }
-    
-    const registrationCheck = await pool.query(registrationQuery, queryParams);
+    const registrationCheck = await pool.query(
+      `SELECT r.*, a.full_name, u.email, a.phone, tt.type_name as ticket_type
+       FROM eventregistrations r 
+       JOIN attendees a ON r.attendee_id = a.attendee_id 
+       JOIN users u ON a.user_id = u.user_id
+       LEFT JOIN tickettypes tt ON r.ticket_type_id = tt.ticket_type_id
+       WHERE r.registration_id = $1 AND r.event_id = $2`,
+      [registration_id, eventId]
+    );
     
     if (registrationCheck.rows.length === 0) {
       return res.status(404).json({ message: 'Registration not found' });
@@ -3348,7 +3932,8 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
         attendance: attendanceCheck.rows[0],
         attendee: {
           name: registration.full_name,
-          email: registration.email
+          email: registration.email,
+          phone: registration.phone
         }
       });
     }
@@ -3356,10 +3941,16 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
     // Record attendance
     const attendance = await pool.query(
       `INSERT INTO attendancelogs 
-       (event_id, registration_id, attendee_id, check_in_time, recorded_by)
-       VALUES ($1, $2, $3, NOW(), $4)
+       (event_id, registration_id, check_in_time, scan_method, scanned_by, created_at, updated_at)
+       VALUES ($1, $2, NOW(), 'manual', $3, NOW(), NOW())
        RETURNING *`,
-      [eventId, registration.registration_id, registration.attendee_id, req.user.user_id]
+      [eventId, registration.registration_id, req.user.user_id]
+    );
+    
+    // Update registration check_in status
+    await pool.query(
+      'UPDATE eventregistrations SET check_in_status = true, check_in_time = NOW() WHERE registration_id = $1',
+      [registration.registration_id]
     );
     
     res.status(201).json({
@@ -3368,13 +3959,73 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
       attendee: {
         name: registration.full_name,
         email: registration.email,
-        phone: registration.phone_number
+        phone: registration.phone,
+        ticketType: registration.ticket_type || 'Standard'
       }
     });
     
   } catch (error) {
     console.error('Record manual attendance error:', error);
     res.status(500).json({ message: 'Server error while recording attendance' });
+  }
+});
+
+// Manual attendance check-out / undo check-in
+app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (req, res) => {
+  try {
+    const eventId = req.params.eventId;
+    const { registration_id } = req.body;
+    
+    if (!registration_id) {
+      return res.status(400).json({ message: 'Registration ID is required' });
+    }
+    
+    // Check if user is authorized (event organizer or admin)
+    const eventCheck = await pool.query(
+      `SELECT e.organizer_id, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
+      [eventId]
+    );
+    
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized to modify attendance for this event' });
+    }
+    
+    // Check if attendance exists
+    const attendanceCheck = await pool.query(
+      'SELECT * FROM attendancelogs WHERE registration_id = $1 AND event_id = $2',
+      [registration_id, eventId]
+    );
+    
+    if (attendanceCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'No attendance record found' });
+    }
+    
+    // Delete attendance record (undo check-in)
+    await pool.query(
+      'DELETE FROM attendancelogs WHERE registration_id = $1 AND event_id = $2',
+      [registration_id, eventId]
+    );
+    
+    // Update registration check_in status
+    await pool.query(
+      'UPDATE eventregistrations SET check_in_status = false, check_in_time = NULL WHERE registration_id = $1',
+      [registration_id]
+    );
+    
+    res.json({
+      message: 'Check-in undone successfully'
+    });
+    
+  } catch (error) {
+    console.error('Undo check-in error:', error);
+    res.status(500).json({ message: 'Server error while undoing check-in' });
   }
 });
 
@@ -3386,7 +4037,10 @@ app.get('/api/events/:eventId/attendance', authenticateToken, async (req, res) =
     
     // Check if user is authorized (event organizer or admin)
     const eventCheck = await pool.query(
-      'SELECT organizer_id FROM events WHERE event_id = $1',
+      `SELECT e.organizer_id, o.user_id as organizer_user_id 
+       FROM events e
+       JOIN organizers o ON e.organizer_id = o.organizer_id 
+       WHERE e.event_id = $1`,
       [eventId]
     );
     
@@ -3394,7 +4048,7 @@ app.get('/api/events/:eventId/attendance', authenticateToken, async (req, res) =
       return res.status(404).json({ message: 'Event not found' });
     }
     
-    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
+    if (eventCheck.rows[0].organizer_user_id !== req.user.user_id && req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Not authorized to view attendance for this event' });
     }
     
@@ -3408,13 +4062,13 @@ app.get('/api/events/:eventId/attendance', authenticateToken, async (req, res) =
     // Get attendance records
     const attendance = await pool.query(
       `SELECT al.*, 
-              a.full_name, a.email, a.phone_number,
-              u.username as recorded_by_username,
+              a.full_name, a.email, a.phone,
+              u.email as recorded_by_email,
               r.ticket_quantity
        FROM attendancelogs al
-       JOIN attendees a ON al.attendee_id = a.attendee_id
-       JOIN users u ON al.recorded_by = u.user_id
        JOIN eventregistrations r ON al.registration_id = r.registration_id
+       JOIN attendees a ON r.attendee_id = a.attendee_id
+       JOIN users u ON al.recorded_by = u.user_id
        WHERE al.event_id = $1
        ORDER BY ${sortField === 'full_name' ? 'a.full_name' : 'al.check_in_time'} ${orderDir}
        LIMIT $2 OFFSET $3`,
@@ -4005,7 +4659,16 @@ app.post('/api/registrations/:registrationId/process-payment', authenticateToken
   }
 });
 
+// ===== ERROR HANDLING MIDDLEWARE =====
 
+// Global error handling middleware - must be last middleware
+app.use((err, req, res, next) => {
+  console.error('Unhandled DB Error:', err);
+  res.status(500).json({ 
+    message: 'Database operation failed',
+    error: err.message
+  });
+});
 
 // Start server
 app.listen(PORT, () => {

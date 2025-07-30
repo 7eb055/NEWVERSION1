@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
+import AuthTokenService from '../../services/AuthTokenService';
 
 const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   const [formData, setFormData] = useState({
@@ -8,7 +10,8 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
     attendeeEmail: '',
     attendeePhone: '',
     company: '',
-    ticketType: 'standard',
+    ticketTypeId: '', // Changed from ticketType to ticketTypeId
+    ticketQuantity: 1, // Added quantity field
     registrationType: 'manual',
     paymentStatus: 'paid',
     specialRequirements: '',
@@ -18,22 +21,76 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   });
 
   const [errors, setErrors] = useState({});
+  const [availableTicketTypes, setAvailableTicketTypes] = useState([]);
+  const [loadingTicketTypes, setLoadingTicketTypes] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState(null);
+
+  // Load ticket types when event is selected
+  useEffect(() => {
+    if (formData.eventId) {
+      loadTicketTypes(formData.eventId);
+    } else {
+      setAvailableTicketTypes([]);
+      setSelectedEvent(null);
+    }
+  }, [formData.eventId]);
+
+  // Load available ticket types for selected event
+  const loadTicketTypes = async (eventId) => {
+    setLoadingTicketTypes(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/ticket-types`,
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      
+      console.log('Loaded ticket types for event:', response.data);
+      setAvailableTicketTypes(response.data.ticketTypes || []);
+      
+      // If only one ticket type available, auto-select it
+      if (response.data.ticketTypes?.length === 1) {
+        setFormData(prev => ({
+          ...prev,
+          ticketTypeId: response.data.ticketTypes[0].ticket_type_id.toString()
+        }));
+      }
+    } catch (error) {
+      console.error('Error loading ticket types:', error);
+      setAvailableTicketTypes([]);
+      // If no ticket types exist, we'll use the default event ticket price
+    } finally {
+      setLoadingTicketTypes(false);
+    }
+  };
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    console.log(`📝 Input change - ${name}:`, value);
+    
     if (name === 'eventId') {
       const selectedEvent = events.find(event => event.event_id === parseInt(value));
-      setFormData(prev => ({
-        ...prev,
+      setSelectedEvent(selectedEvent);
+      const updatedData = {
+        ...formData,
         [name]: value,
-        eventName: selectedEvent ? selectedEvent.event_name : ''
-      }));
+        eventName: selectedEvent ? selectedEvent.event_name : '',
+        ticketTypeId: '', // Reset ticket type when event changes
+        ticketQuantity: 1 // Reset quantity
+      };
+      setFormData(updatedData);
+      console.log('📋 Updated form data (event):', updatedData);
     } else {
-      setFormData(prev => ({
-        ...prev,
+      const updatedData = {
+        ...formData,
         [name]: value
-      }));
+      };
+      setFormData(updatedData);
+      console.log('📋 Updated form data (other):', updatedData);
     }
+    
     // Clear error for this field
     if (errors[name]) {
       setErrors(prev => ({
@@ -64,6 +121,24 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
       newErrors.attendeePhone = 'Phone number is required';
     }
 
+    if (!formData.ticketQuantity || formData.ticketQuantity < 1) {
+      newErrors.ticketQuantity = 'Ticket quantity must be at least 1';
+    }
+
+    // Validate ticket quantity against event limits
+    if (selectedEvent && formData.ticketQuantity > selectedEvent.max_tickets_per_person) {
+      newErrors.ticketQuantity = `Maximum ${selectedEvent.max_tickets_per_person} tickets allowed per person`;
+    }
+
+    // Validate ticket type selection if available
+    if (availableTicketTypes.length > 0 && !formData.ticketTypeId) {
+      newErrors.ticketTypeId = 'Please select a ticket type';
+    }
+
+    console.log('🔍 Form validation - Form data:', formData);
+    console.log('❌ Validation errors:', newErrors);
+    console.log('✅ Validation passed:', Object.keys(newErrors).length === 0);
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -71,12 +146,108 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validateForm()) {
-      onSubmit(formData);
+      // Transform form data to match backend expectations
+      const submissionData = {
+        eventId: formData.eventId, // Include eventId for the handler
+        email: formData.attendeeEmail,
+        full_name: formData.attendeeName,
+        phone: formData.attendeePhone,
+        ticket_quantity: parseInt(formData.ticketQuantity),
+        special_requirements: formData.specialRequirements,
+        company: formData.company,
+        dietary_restrictions: formData.dietaryRestrictions,
+        accessibility_needs: formData.accessibilityNeeds,
+        notes: formData.notes,
+        registration_type: formData.registrationType,
+        payment_status: formData.paymentStatus,
+        ticket_type_id: formData.ticketTypeId ? parseInt(formData.ticketTypeId) : null
+      };
+      
+      console.log('🔍 Form data before submission:', formData);
+      console.log('📤 Submitting manual registration data:', submissionData);
+      console.log('📧 Email field:', submissionData.email);
+      console.log('👤 Full name field:', submissionData.full_name);
+      onSubmit(submissionData);
     }
+  };
+
+  // Calculate total cost based on selected ticket type and quantity
+  const calculateTotalCost = () => {
+    if (!formData.ticketTypeId || !formData.ticketQuantity) {
+      return selectedEvent?.ticket_price ? selectedEvent.ticket_price * formData.ticketQuantity : 0;
+    }
+    
+    const selectedTicketType = availableTicketTypes.find(
+      ticket => ticket.ticket_type_id.toString() === formData.ticketTypeId
+    );
+    
+    return selectedTicketType ? selectedTicketType.price * formData.ticketQuantity : 0;
+  };
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount || 0);
   };
 
   return (
     <div className="create-event-section">
+      <style>{`
+        .loading-placeholder {
+          padding: 8px 12px;
+          background: #f5f5f5;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+          color: #666;
+          font-style: italic;
+        }
+        
+        .total-cost-display {
+          font-size: 1.2em;
+          font-weight: bold;
+          color: #2c5282;
+          padding: 8px 12px;
+          background: #e6fffa;
+          border: 1px solid #81e6d9;
+          border-radius: 4px;
+        }
+        
+        .total-cost-display small {
+          display: block;
+          font-size: 0.8em;
+          font-weight: normal;
+          color: #4a5568;
+          margin-top: 4px;
+        }
+        
+        .form-help {
+          display: block;
+          margin-top: 4px;
+          font-size: 0.85em;
+          color: #666;
+        }
+        
+        .ticket-type-info {
+          background: #f7fafc;
+          padding: 12px;
+          border-radius: 6px;
+          margin-top: 8px;
+          border-left: 4px solid #4299e1;
+        }
+        
+        .ticket-type-info h4 {
+          margin: 0 0 8px 0;
+          color: #2d3748;
+          font-size: 1em;
+        }
+        
+        .ticket-type-info p {
+          margin: 4px 0;
+          color: #4a5568;
+          font-size: 0.9em;
+        }
+      `}</style>
       <div className="form-container">
         <div className="form-title">
           <i className="fas fa-user-plus"></i>
@@ -174,21 +345,91 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="ticketType">Ticket Type</label>
-              <select
-                id="ticketType"
-                name="ticketType"
-                value={formData.ticketType}
+              <label htmlFor="ticketQuantity">Ticket Quantity *</label>
+              <input
+                type="number"
+                id="ticketQuantity"
+                name="ticketQuantity"
+                min="1"
+                max={selectedEvent?.max_tickets_per_person || 10}
+                value={formData.ticketQuantity}
                 onChange={handleInputChange}
-              >
-                <option value="standard">Standard</option>
-                <option value="vip">VIP</option>
-                <option value="early-bird">Early Bird</option>
-                <option value="student">Student</option>
-                <option value="group">Group</option>
-                <option value="complimentary">Complimentary</option>
-              </select>
+                placeholder="1"
+                className={errors.ticketQuantity ? 'error' : ''}
+              />
+              {errors.ticketQuantity && <span className="error-text">{errors.ticketQuantity}</span>}
+              {selectedEvent && (
+                <small className="form-help">
+                  Max {selectedEvent.max_tickets_per_person} tickets per person
+                </small>
+              )}
             </div>
+
+            <div className="form-group">
+              <label htmlFor="ticketTypeId">
+                Ticket Type 
+                {availableTicketTypes.length > 0 && ' *'}
+                {loadingTicketTypes && ' (Loading...)'}
+              </label>
+              {loadingTicketTypes ? (
+                <div className="loading-placeholder">Loading ticket types...</div>
+              ) : availableTicketTypes.length > 0 ? (
+                <select
+                  id="ticketTypeId"
+                  name="ticketTypeId"
+                  value={formData.ticketTypeId}
+                  onChange={handleInputChange}
+                  className={errors.ticketTypeId ? 'error' : ''}
+                >
+                  <option value="">Select ticket type...</option>
+                  {availableTicketTypes.map(ticketType => (
+                    <option key={ticketType.ticket_type_id} value={ticketType.ticket_type_id}>
+                      {ticketType.type_name} - {formatCurrency(ticketType.price)}
+                      {ticketType.quantity_available && ` (${ticketType.quantity_available - (ticketType.quantity_sold || 0)} available)`}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <select disabled>
+                  <option>Using event default price: {selectedEvent ? formatCurrency(selectedEvent.ticket_price) : 'N/A'}</option>
+                </select>
+              )}
+              {errors.ticketTypeId && <span className="error-text">{errors.ticketTypeId}</span>}
+              
+              {/* Show selected ticket type details */}
+              {formData.ticketTypeId && availableTicketTypes.length > 0 && (() => {
+                const selectedTicketType = availableTicketTypes.find(
+                  ticket => ticket.ticket_type_id.toString() === formData.ticketTypeId
+                );
+                return selectedTicketType && (selectedTicketType.description || selectedTicketType.benefits) ? (
+                  <div className="ticket-type-info">
+                    <h4>{selectedTicketType.type_name}</h4>
+                    {selectedTicketType.description && (
+                      <p><strong>Description:</strong> {selectedTicketType.description}</p>
+                    )}
+                    {selectedTicketType.benefits && (
+                      <p><strong>Benefits:</strong> {selectedTicketType.benefits}</p>
+                    )}
+                    <p><strong>Available:</strong> {selectedTicketType.quantity_available - (selectedTicketType.quantity_sold || 0)} tickets</p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
+            {/* Show total cost calculation */}
+            {formData.ticketQuantity > 0 && (
+              <div className="form-group">
+                <label>Total Cost</label>
+                <div className="total-cost-display">
+                  {formatCurrency(calculateTotalCost())}
+                  {formData.ticketQuantity > 1 && (
+                    <small>
+                      ({formData.ticketQuantity} × {formatCurrency(calculateTotalCost() / formData.ticketQuantity)})
+                    </small>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="form-group">
               <label htmlFor="paymentStatus">Payment Status</label>
