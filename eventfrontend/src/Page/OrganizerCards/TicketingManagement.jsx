@@ -3,7 +3,7 @@ import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/TicketingManagement.css';
 
-const TicketingManagement = () => {
+const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
   const [activeTab, setActiveTab] = useState('ticket-types');
   const [ticketTypes, setTicketTypes] = useState([]);
   const [salesData, setSalesData] = useState(null);
@@ -12,7 +12,7 @@ const TicketingManagement = () => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedEventId, setSelectedEventId] = useState('');
-  const [userEvents, setUserEvents] = useState([]);
+  // Remove userEvents state since we're using events prop
   
   // Form states for ticket type creation/editing
   const [showTicketForm, setShowTicketForm] = useState(false);
@@ -25,10 +25,10 @@ const TicketingManagement = () => {
     benefits: ''
   });
 
-  // Load user's events on component mount
-  useEffect(() => {
-    loadUserEvents();
-  }, []);
+  // Load user's events on component mount - now use events prop
+  // useEffect(() => {
+  //   loadUserEvents();
+  // }, []);
 
   // Load ticket data when event is selected
   useEffect(() => {
@@ -39,30 +39,31 @@ const TicketingManagement = () => {
     }
   }, [selectedEventId, activeTab]);
 
-  const loadUserEvents = async () => {
-    try {
-      const token = AuthTokenService.getToken();
-      console.log('Loading user events with token:', !!token);
-      
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      
-      console.log('Events loaded:', response.data);
-      setUserEvents(response.data.events || []);
-      
-      // Add user feedback when no events are found
-      if (!response.data.events || response.data.events.length === 0) {
-        setError('No events found. Create your first event to start managing tickets.');
-      } else {
-        setError(''); // Clear any previous errors
-      }
-    } catch (error) {
-      console.error('Error loading events:', error);
-      console.error('Error response:', error.response?.data);
-      setError(error.response?.data?.message || 'Failed to load events');
-    }
-  };
+  // Remove this function since we're using events prop
+  // const loadUserEvents = async () => {
+  //   try {
+  //     const token = AuthTokenService.getToken();
+  //     console.log('Loading user events with token:', !!token);
+  //     
+  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
+  //       headers: { Authorization: `Bearer ${token}` }
+  //     });
+  //     
+  //     console.log('Events loaded:', response.data);
+  //     setUserEvents(response.data.events || []);
+  //     
+  //     // Add user feedback when no events are found
+  //     if (!response.data.events || response.data.events.length === 0) {
+  //       setError('No events found. Create your first event to start managing tickets.');
+  //     } else {
+  //       setError(''); // Clear any previous errors
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading events:', error);
+  //     console.error('Error response:', error.response?.data);
+  //     setError(error.response?.data?.message || 'Failed to load events');
+  //   }
+  // };
 
   const loadTicketTypes = async () => {
     if (!selectedEventId) return;
@@ -239,13 +240,13 @@ const TicketingManagement = () => {
           className="event-select"
         >
           <option value="">Choose an event...</option>
-          {userEvents.map(event => (
+          {events.map(event => (
             <option key={event.event_id} value={event.event_id}>
               {event.event_name} - {formatDate(event.event_date)}
             </option>
           ))}
         </select>
-        {userEvents.length === 0 && !error && (
+        {events.length === 0 && !error && (
           <p style={{ color: '#666', fontSize: '0.9rem', marginTop: '0.5rem' }}>
             No events found. Create an event first to manage tickets.
           </p>

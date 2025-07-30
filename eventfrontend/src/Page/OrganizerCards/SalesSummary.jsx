@@ -19,7 +19,7 @@ const SalesSummary = ({ salesData, events }) => {
             </div>
             <div className="sales-info">
               <h3>Total Revenue</h3>
-              <p className="sales-amount">${salesData.totalIncome.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="sales-amount">${Number(salesData.totalIncome || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
             </div>
           </div>
           <div className="sales-details">
@@ -35,7 +35,7 @@ const SalesSummary = ({ salesData, events }) => {
             </div>
             <div className="sales-info">
               <h3>Tickets Sold</h3>
-              <p className="sales-amount">{salesData.eventSales.reduce((total, event) => total + event.ticketsSold, 0).toLocaleString()}</p>
+              <p className="sales-amount">{salesData.eventSales.reduce((total, event) => total + Number(event.ticketsSold || 0), 0).toLocaleString()}</p>
             </div>
           </div>
           <div className="sales-details">
@@ -51,7 +51,7 @@ const SalesSummary = ({ salesData, events }) => {
             </div>
             <div className="sales-info">
               <h3>Avg. Revenue</h3>
-              <p className="sales-amount">${events.length > 0 ? (salesData.totalIncome / events.length).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</p>
+              <p className="sales-amount">${events.length > 0 ? (Number(salesData.totalIncome || 0) / events.length).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00'}</p>
             </div>
           </div>
           <div className="sales-details">
@@ -87,12 +87,12 @@ const SalesSummary = ({ salesData, events }) => {
                         <span className="event-name">{eventSale.eventName}</span>
                       </div>
                     </td>
-                    <td className="price-cell">${eventSale.ticketPrice.toFixed(2)}</td>
+                    <td className="price-cell">${Number(eventSale.ticketPrice || 0).toFixed(2)}</td>
                     <td className="tickets-cell">
                       <span className="tickets-count">{eventSale.ticketsSold}</span>
                     </td>
                     <td className="revenue-cell">
-                      <span className="revenue-amount">${eventSale.revenue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="revenue-amount">${Number(eventSale.revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </td>
                     <td className="status-cell">
                       <span className={`status-badge ${eventSale.ticketsSold > 100 ? 'high-sales' : eventSale.ticketsSold > 50 ? 'medium-sales' : 'low-sales'}`}>

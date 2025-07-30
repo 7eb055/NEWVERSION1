@@ -89,25 +89,42 @@ const OrganizerDashboard = () => {
     const userData = AuthTokenService.getUser();
     if (userData) {
       setUser(userData);
+      
+      // Try to restore cached sales data first
+      try {
+        const cacheKey = userData?.user_id ? `organizer_sales_data_${userData.user_id}` : 'organizer_sales_data';
+        const cachedSalesData = localStorage.getItem(cacheKey);
+        if (cachedSalesData) {
+          const parsedSalesData = JSON.parse(cachedSalesData);
+          setSalesData(parsedSalesData);
+          console.log('🔄 Restored cached sales data:', parsedSalesData);
+        }
+      } catch (err) {
+        console.warn('Could not restore cached sales data:', err);
+      }
+      
+      // Load real data if authenticated
+      loadEvents(); // This will also load sales data
+      loadCompanies();
+      loadAttendees();
     } else {
       // Fallback to mock data if no authenticated user
       setUser({ username: 'Demo Organizer' });
+      loadMockData();
     }
-    
-    // Load mock data for UI demonstration
-    loadMockData();
-    
-    // Backend API calls - commented out for UI focus
-    // loadEvents();
-    // loadSalesData();
-    // loadVendors();
-    // loadFeedbackData();
   }, []);
+
+  // Recalculate sales data whenever events change
+  useEffect(() => {
+    if (events.length > 0) {
+      loadSalesData(events);
+    }
+  }, [events]);
 
   // Load mock data for UI demonstration
   const loadMockData = () => {
     // Mock events data - updated to match the normalized schema
-    setEvents([
+    const mockEvents = [
       {
         event_id: 1,
         event_name: 'Tech Conference 2025',
@@ -119,7 +136,7 @@ const OrganizerDashboard = () => {
         event_type: 'Conference',
         max_attendees: 500,
         ticket_price: 50.00,
-        attendees_count: 350,
+        registration_count: 150, // Add registration count for sales calculation
         image_url: 'https://example.com/tech-conf.jpg',
         status: 'published',
         is_public: true
@@ -135,7 +152,7 @@ const OrganizerDashboard = () => {
         event_type: 'Workshop',
         max_attendees: 100,
         ticket_price: 75.00,
-        attendees_count: 85,
+        registration_count: 85, // Add registration count for sales calculation
         image_url: 'https://example.com/marketing-workshop.jpg',
         status: 'published',
         is_public: true
@@ -151,22 +168,17 @@ const OrganizerDashboard = () => {
         event_type: 'Networking',
         max_attendees: 200,
         ticket_price: 25.00,
-        attendees_count: 150,
+        registration_count: 200, // Add registration count for sales calculation
         image_url: 'https://example.com/networking-event.jpg',
         status: 'published',
         is_public: true
       }
-    ]);
-
-    // Mock sales data
-    setSalesData({
-      totalIncome: 15750.00,
-      eventSales: [
-        { eventId: 1, eventName: 'Tech Conference 2025', ticketsSold: 150, revenue: 7500.00, ticketPrice: 50.00 },
-        { eventId: 2, eventName: 'Marketing Workshop', ticketsSold: 85, revenue: 4250.00, ticketPrice: 50.00 },
-        { eventId: 3, eventName: 'Networking Event', ticketsSold: 200, revenue: 4000.00, ticketPrice: 20.00 }
-      ]
-    });
+    ];
+    
+    setEvents(mockEvents);
+    
+    // Calculate sales data from mock events
+    loadSalesData(mockEvents);
 
     // Mock companies data
     setCompanies([
@@ -293,33 +305,131 @@ const OrganizerDashboard = () => {
   };
 
   // Backend API functions - commented out for UI focus
-  /*
-  // Load events from API
+  
+  // Load organizer-specific events from API
   const loadEvents = async () => {
     setIsLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events`, {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
       
-      if (response.data && Array.isArray(response.data)) {
-        setEvents(response.data);
-      } else if (response.data && Array.isArray(response.data.events)) {
-        setEvents(response.data.events);
+      let loadedEvents = [];
+      if (response.data && Array.isArray(response.data.events)) {
+        loadedEvents = response.data.events;
+      } else if (response.data && Array.isArray(response.data)) {
+        loadedEvents = response.data;
       } else {
-        setEvents([]);
+        loadedEvents = [];
       }
+      
+      setEvents(loadedEvents);
+      
+      // Load sales data immediately after events are loaded
+      loadSalesData(loadedEvents);
+      
     } catch (error) {
       console.error('Error loading events:', error);
       setError('Failed to load events. Please try again.');
+      // Fallback to empty array on error
+      setEvents([]);
+      setSalesData({ totalIncome: 0, eventSales: [] });
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Load companies from API
+  const loadCompanies = async () => {
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      setCompanies(response.data.companies || response.data || []);
+    } catch (error) {
+      console.error('Error loading companies:', error);
+      setCompanies([]);
+    }
+  };
+
+  // Load attendees from API
+  const loadAttendees = async () => {
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      setPeople(response.data.attendees || response.data || []);
+    } catch (error) {
+      console.error('Error loading attendees:', error);
+      setPeople([]);
+    }
+  };
+
+  // Load sales data from organizer-specific events
+  const loadSalesData = async (eventsData = null) => {
+    try {
+      // Use provided events data or fall back to state
+      const eventsToProcess = eventsData || events;
+      
+      console.log('📊 Loading sales data from events:', eventsToProcess);
+      
+      // Calculate sales data from loaded events
+      let totalIncome = 0;
+      const eventSales = [];
+
+      eventsToProcess.forEach(event => {
+        // Ensure we have numeric values
+        const registrationCount = parseInt(event.registration_count || 0);
+        const ticketPrice = parseFloat(event.ticket_price || 0);
+        const revenue = registrationCount * ticketPrice;
+        
+        totalIncome += revenue;
+        
+        eventSales.push({
+          eventId: event.event_id,
+          eventName: event.event_name,
+          ticketsSold: registrationCount,
+          revenue: revenue,
+          ticketPrice: ticketPrice
+        });
+      });
+
+      const salesData = {
+        totalIncome,
+        eventSales
+      };
+
+      console.log('💰 Calculated sales data:', salesData);
+
+      setSalesData(salesData);
+      
+      // Cache sales data in localStorage for persistence (with user ID to avoid conflicts)
+      try {
+        const user = AuthTokenService.getUser();
+        const cacheKey = user?.user_id ? `organizer_sales_data_${user.user_id}` : 'organizer_sales_data';
+        localStorage.setItem(cacheKey, JSON.stringify(salesData));
+      } catch (err) {
+        console.warn('Could not cache sales data:', err);
+      }
+      
+    } catch (error) {
+      console.error('Error calculating sales data:', error);
+      setSalesData({ totalIncome: 0, eventSales: [] });
+    }
+  };
+
+  /*
   // Load sales data from API
   const loadSalesData = async () => {
     try {
@@ -682,31 +792,142 @@ const OrganizerDashboard = () => {
     }
   };
 
-  const handlePeopleRegistration = (personData) => {
-    const newPerson = {
-      id: people.length + 1,
-      ...personData,
-      registeredAt: new Date().toISOString(),
-      status: 'confirmed'
-    };
-    setPeople(prev => [...prev, newPerson]);
-    setSuccess('Person registered successfully! (UI Demo Mode)');
-    setShowPeopleForm(false);
-    setTimeout(() => setSuccess(''), 3000);
+  const handlePeopleRegistration = async (personData) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const token = AuthTokenService.getToken();
+      
+      if (!token) {
+        setError('You must be logged in to register a person');
+        return;
+      }
+
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`,
+        {
+          email: personData.email,
+          full_name: personData.full_name || personData.name,
+          phone: personData.phone,
+          date_of_birth: personData.date_of_birth,
+          gender: personData.gender,
+          interests: personData.interests,
+          emergency_contact_name: personData.emergency_contact_name,
+          emergency_contact_phone: personData.emergency_contact_phone,
+          dietary_restrictions: personData.dietary_restrictions,
+          accessibility_needs: personData.accessibility_needs,
+          profile_picture_url: personData.profile_picture_url,
+          bio: personData.bio,
+          social_media_links: personData.social_media_links,
+          notification_preferences: personData.notification_preferences
+        },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+
+      if (response.data) {
+        setSuccess('Person registered successfully!');
+        setShowPeopleForm(false);
+        
+        // Refresh attendees list
+        loadAttendees();
+        
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error during people registration:', error);
+      
+      if (error.response) {
+        setError(error.response.data.message || 'Failed to register person');
+      } else {
+        setError('Failed to register person. Please check your connection.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleManualEventRegistration = (registrationData) => {
-    const newRegistration = {
-      id: eventRegistrations.length + 1,
-      ...registrationData,
-      registeredBy: user?.username || 'Demo Organizer',
-      registeredAt: new Date().toISOString(),
-      status: 'confirmed'
-    };
-    setEventRegistrations(prev => [...prev, newRegistration]);
-    setSuccess('Event registration completed successfully! (UI Demo Mode)');
-    setShowRegistrationForm(false);
-    setTimeout(() => setSuccess(''), 3000);
+  const handleManualEventRegistration = async (registrationData) => {
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const token = AuthTokenService.getToken();
+      
+      // Debug the incoming registration data
+      console.log('🔍 Received registration data in handler:', registrationData);
+      console.log('📧 Email in data:', registrationData.email);
+      console.log('👤 Full name in data:', registrationData.full_name);
+      console.log('🎯 Event ID:', registrationData.eventId);
+      
+      // Extract eventId from the registration data
+      const eventId = registrationData.eventId;
+      
+      if (!eventId) {
+        throw new Error('Event ID is required for registration');
+      }
+      
+      // Create payload manually to ensure all fields are included
+      const payload = {
+        email: registrationData.email,
+        full_name: registrationData.full_name,
+        phone: registrationData.phone,
+        ticket_quantity: registrationData.ticket_quantity,
+        special_requirements: registrationData.special_requirements || '',
+        company: registrationData.company || '',
+        dietary_restrictions: registrationData.dietary_restrictions || '',
+        accessibility_needs: registrationData.accessibility_needs || '',
+        notes: registrationData.notes || '',
+        registration_type: registrationData.registration_type || 'manual',
+        payment_status: registrationData.payment_status || 'paid',
+        ticket_type_id: registrationData.ticket_type_id || null
+      };
+      
+      console.log('📤 Final payload being sent to backend:', payload);
+      console.log('� URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/manual-registration`);
+      
+      // Validate required fields before sending
+      if (!payload.email || !payload.full_name) {
+        throw new Error(`Missing required fields: email=${!!payload.email}, full_name=${!!payload.full_name}`);
+      }
+      
+      const response = await axios.post(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/manual-registration`,
+        payload,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.data) {
+        setSuccess('Event registration completed successfully!');
+        setShowRegistrationForm(false);
+        
+        // Refresh data to update counts (loadEvents will also refresh sales data)
+        loadEvents();
+        loadAttendees();
+        
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error during manual registration:', error);
+      console.error('Error response data:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
+      const errorMessage = error.response?.data?.message || 'Failed to register attendee. Please try again.';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Event creation with real API endpoint
@@ -764,6 +985,8 @@ const OrganizerDashboard = () => {
       setEvents(prev => [...prev, newEvent]);
       
       setSuccess('Event created successfully!');
+      
+      // Sales data will be automatically recalculated by the useEffect when events change
       
       // Reset form
       setFormData({
