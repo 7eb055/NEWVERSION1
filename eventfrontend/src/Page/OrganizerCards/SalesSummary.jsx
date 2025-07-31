@@ -1,4 +1,5 @@
 import React from 'react';
+import formatters from '../../utils/formatters';
 
 const SalesSummary = ({ salesData, events }) => {
   return (
@@ -19,7 +20,7 @@ const SalesSummary = ({ salesData, events }) => {
             </div>
             <div className="sales-info">
               <h3>Total Revenue</h3>
-              <p className="sales-amount">${Number(salesData.totalIncome || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="sales-amount">${formatters.formatCurrency(salesData.totalIncome, 2)}</p>
             </div>
           </div>
           <div className="sales-details">
@@ -87,12 +88,12 @@ const SalesSummary = ({ salesData, events }) => {
                         <span className="event-name">{eventSale.eventName}</span>
                       </div>
                     </td>
-                    <td className="price-cell">${Number(eventSale.ticketPrice || 0).toFixed(2)}</td>
+                    <td className="price-cell">${formatters.formatCurrency(eventSale.ticketPrice)}</td>
                     <td className="tickets-cell">
                       <span className="tickets-count">{eventSale.ticketsSold}</span>
                     </td>
                     <td className="revenue-cell">
-                      <span className="revenue-amount">${Number(eventSale.revenue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      <span className="revenue-amount">${formatters.formatCurrency(eventSale.revenue)}</span>
                     </td>
                     <td className="status-cell">
                       <span className={`status-badge ${eventSale.ticketsSold > 100 ? 'high-sales' : eventSale.ticketsSold > 50 ? 'medium-sales' : 'low-sales'}`}>

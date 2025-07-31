@@ -4659,6 +4659,361 @@ app.post('/api/registrations/:registrationId/process-payment', authenticateToken
   }
 });
 
+// ===== EVENT ATTENDEE LISTING ENDPOINTS =====
+
+// Get all attendees for a specific event with comprehensive details
+app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { organizer_id } = req.query;
+
+    // Build query with optional organizer filter
+    let query = `
+      SELECT 
+        -- Event Information
+        e.event_id,
+        e.event_name,
+        e.event_date,
+        e.event_time,
+        e.end_date,
+        e.end_time,
+        e.venue_name,
+        e.venue_address,
+        e.event_type,
+        e.category,
+        e.ticket_price,
+        e.max_attendees,
+        
+        -- Organizer Information
+        o.organizer_id,
+        o.organizer_name,
+        o.email as organizer_email,
+        o.company as organizer_company,
+        
+        -- Registration Information
+        er.registration_id,
+        er.registration_date,
+        er.ticket_quantity,
+        er.total_amount,
+        er.payment_status,
+        er.payment_method,
+        er.payment_reference,
+        er.special_requirements,
+        er.qr_code,
+        er.registration_status,
+        er.cancellation_reason,
+        
+        -- Attendee Information
+        a.attendee_id,
+        a.full_name as attendee_name,
+        u.email as attendee_email,
+        a.phone as attendee_phone,
+        a.date_of_birth,
+        a.gender,
+        a.interests,
+        a.dietary_restrictions,
+        a.accessibility_needs,
+        a.emergency_contact_name,
+        a.emergency_contact_phone,
+        a.profile_picture_url,
+        a.bio,
+        a.social_media_links,
+        a.notification_preferences,
+        
+        -- Attendance Tracking
+        CASE WHEN al.log_id IS NOT NULL THEN true ELSE false END as check_in_status,
+        al.log_id as attendance_id,
+        al.check_in_time,
+        al.check_out_time,
+        al.scan_method,
+        al.scanned_by_user_id,
+        sbu.email as scanned_by_email,
+        CASE 
+          WHEN al.log_id IS NOT NULL THEN 'checked_in'
+          ELSE 'registered'
+        END as attendance_status,
+        CASE 
+          WHEN al.check_in_time IS NOT NULL AND al.check_out_time IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (al.check_out_time - al.check_in_time))/3600.0
+          ELSE NULL
+        END as attendance_duration_hours,
+        
+        -- Ticket Information
+        tt.ticket_type_id,
+        tt.type_name as ticket_type,
+        tt.price as ticket_type_price,
+        tt.description as ticket_description
+        
+      FROM events e
+      JOIN organizers o ON e.organizer_id = o.organizer_id
+      JOIN eventregistrations er ON e.event_id = er.event_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
+      LEFT JOIN users sbu ON al.scanned_by_user_id = sbu.user_id
+      LEFT JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
+      WHERE e.event_id = $1
+    `;
+
+    let queryParams = [eventId];
+
+    // Add organizer filter if provided
+    if (organizer_id) {
+      query += ` AND o.organizer_id = $2`;
+      queryParams.push(organizer_id);
+    }
+
+    query += ` ORDER BY er.registration_date DESC`;
+
+    const result = await pool.query(query, queryParams);
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      attendees: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching event attendee listing:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch event attendee listing',
+      error: error.message 
+    });
+  }
+});
+
+// Get attendee listing for all events by a specific organizer
+app.get('/api/organizers/:organizerId/attendee-listing', authenticateToken, async (req, res) => {
+  try {
+    const { organizerId } = req.params;
+    const { event_id, attendance_status, payment_status, limit, offset } = req.query;
+
+    let query = `
+      SELECT 
+        -- Event Information
+        e.event_id,
+        e.event_name,
+        e.event_date,
+        e.event_time,
+        e.venue_name,
+        e.category,
+        
+        -- Organizer Information
+        o.organizer_id,
+        o.organizer_name,
+        o.email as organizer_email,
+        
+        -- Registration Information
+        er.registration_id,
+        er.registration_date,
+        er.ticket_quantity,
+        er.total_amount,
+        er.payment_status,
+        er.registration_status,
+        
+        -- Attendee Information
+        a.attendee_id,
+        a.full_name as attendee_name,
+        u.email as attendee_email,
+        a.phone as attendee_phone,
+        
+        -- Attendance Tracking
+        CASE WHEN al.log_id IS NOT NULL THEN true ELSE false END as check_in_status,
+        al.check_in_time,
+        CASE 
+          WHEN al.log_id IS NOT NULL THEN 'checked_in'
+          ELSE 'registered'
+        END as attendance_status
+        
+      FROM events e
+      JOIN organizers o ON e.organizer_id = o.organizer_id
+      JOIN eventregistrations er ON e.event_id = er.event_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
+      WHERE o.organizer_id = $1
+    `;
+
+    let queryParams = [organizerId];
+    let paramIndex = 2;
+
+    // Add optional filters
+    if (event_id) {
+      query += ` AND e.event_id = $${paramIndex}`;
+      queryParams.push(event_id);
+      paramIndex++;
+    }
+
+    if (attendance_status) {
+      if (attendance_status === 'checked_in') {
+        query += ` AND al.log_id IS NOT NULL`;
+      } else if (attendance_status === 'registered') {
+        query += ` AND al.log_id IS NULL`;
+      }
+    }
+
+    if (payment_status) {
+      query += ` AND er.payment_status = $${paramIndex}`;
+      queryParams.push(payment_status);
+      paramIndex++;
+    }
+
+    query += ` ORDER BY er.registration_date DESC`;
+
+    // Add pagination
+    if (limit) {
+      query += ` LIMIT $${paramIndex}`;
+      queryParams.push(parseInt(limit));
+      paramIndex++;
+    }
+
+    if (offset) {
+      query += ` OFFSET $${paramIndex}`;
+      queryParams.push(parseInt(offset));
+    }
+
+    const result = await pool.query(query, queryParams);
+
+    // Get total count for pagination
+    let countQuery = `
+      SELECT COUNT(*) as total
+      FROM events e
+      JOIN organizers o ON e.organizer_id = o.organizer_id
+      JOIN eventregistrations er ON e.event_id = er.event_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
+      WHERE o.organizer_id = $1
+    `;
+
+    let countParams = [organizerId];
+    let countParamIndex = 2;
+
+    if (event_id) {
+      countQuery += ` AND e.event_id = $${countParamIndex}`;
+      countParams.push(event_id);
+      countParamIndex++;
+    }
+
+    if (attendance_status) {
+      if (attendance_status === 'checked_in') {
+        countQuery += ` AND al.log_id IS NOT NULL`;
+      } else if (attendance_status === 'registered') {
+        countQuery += ` AND al.log_id IS NULL`;
+      }
+    }
+
+    if (payment_status) {
+      countQuery += ` AND er.payment_status = $${countParamIndex}`;
+      countParams.push(payment_status);
+    }
+
+    const countResult = await pool.query(countQuery, countParams);
+
+    res.json({
+      success: true,
+      count: result.rows.length,
+      total: parseInt(countResult.rows[0].total),
+      pagination: {
+        limit: limit ? parseInt(limit) : null,
+        offset: offset ? parseInt(offset) : 0,
+        has_more: limit ? (parseInt(offset) || 0) + result.rows.length < parseInt(countResult.rows[0].total) : false
+      },
+      attendees: result.rows
+    });
+
+  } catch (error) {
+    console.error('Error fetching organizer attendee listing:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch organizer attendee listing',
+      error: error.message 
+    });
+  }
+});
+
+// Get attendee listing summary/statistics for an event
+app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    const result = await pool.query(`
+      SELECT 
+        -- Basic counts
+        COUNT(*) as total_registered,
+        COUNT(CASE WHEN er.payment_status = 'completed' THEN 1 END) as total_paid,
+        COUNT(CASE WHEN er.payment_status = 'pending' THEN 1 END) as total_pending,
+        COUNT(CASE WHEN al.log_id IS NOT NULL THEN 1 END) as total_checked_in,
+        
+        -- Revenue
+        SUM(er.total_amount) as total_revenue,
+        SUM(CASE WHEN er.payment_status = 'completed' THEN er.total_amount ELSE 0 END) as collected_revenue,
+        
+        -- Ticket quantities
+        SUM(er.ticket_quantity) as total_tickets_sold,
+        
+        -- Event capacity
+        e.max_attendees,
+        CASE 
+          WHEN e.max_attendees > 0 THEN 
+            ROUND((COUNT(*) * 100.0) / e.max_attendees, 2)
+          ELSE NULL 
+        END as capacity_percentage
+        
+      FROM events e
+      LEFT JOIN eventregistrations er ON e.event_id = er.event_id
+      LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
+      WHERE e.event_id = $1
+      GROUP BY e.event_id, e.max_attendees
+    `, [eventId]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Event not found' 
+      });
+    }
+
+    const stats = result.rows[0];
+
+    // Format the response
+    res.json({
+      success: true,
+      event_id: parseInt(eventId),
+      statistics: {
+        registrations: {
+          total: parseInt(stats.total_registered || 0),
+          paid: parseInt(stats.total_paid || 0),
+          pending: parseInt(stats.total_pending || 0),
+          checked_in: parseInt(stats.total_checked_in || 0)
+        },
+        revenue: {
+          total: parseFloat(stats.total_revenue || 0),
+          collected: parseFloat(stats.collected_revenue || 0),
+          pending: parseFloat((stats.total_revenue || 0) - (stats.collected_revenue || 0))
+        },
+        tickets: {
+          sold: parseInt(stats.total_tickets_sold || 0)
+        },
+        capacity: {
+          max_attendees: stats.max_attendees,
+          current_registrations: parseInt(stats.total_registered || 0),
+          percentage_filled: stats.capacity_percentage ? parseFloat(stats.capacity_percentage) : null,
+          remaining_spots: stats.max_attendees ? stats.max_attendees - parseInt(stats.total_registered || 0) : null
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Error fetching event attendee statistics:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch event attendee statistics',
+      error: error.message 
+    });
+  }
+});
+
 // ===== ERROR HANDLING MIDDLEWARE =====
 
 // Global error handling middleware - must be last middleware

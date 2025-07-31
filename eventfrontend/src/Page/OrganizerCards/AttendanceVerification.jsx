@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
+import AttendeeListingService from '../../services/attendeeListingService';
+import formatters, { toNumber } from '../../utils/formatters';
 import './css/AttendanceVerification.css';
 
 const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
@@ -16,6 +18,18 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Helper function to safely calculate attendance percentage
+  const calculateAttendancePercentage = (stats) => {
+    if (!stats?.registrations?.total || !stats?.registrations?.checked_in) {
+      return 0;
+    }
+    const total = toNumber(stats.registrations.total);
+    const checkedIn = toNumber(stats.registrations.checked_in);
+    
+    if (total === 0) return 0;
+    return Math.round((checkedIn / total) * 100);
+  };
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
@@ -61,7 +75,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
   //   }
   // };
 
-  // Load attendees for the selected event
+  // Load attendees for the selected event using the new comprehensive attendee listing API
   const loadAttendees = async () => {
     if (!selectedEvent) return;
     
@@ -69,13 +83,13 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(
-        `${API_URL}/api/events/${selectedEvent}/attendees`,
+        `${API_URL}/api/events/${selectedEvent}/attendee-listing`,
         {
-          headers: { 'Authorization': `Bearer ${token}` },
-          params: { status: filterStatus, search: searchTerm }
+          headers: { 'Authorization': `Bearer ${token}` }
         }
       );
       
+      console.log('📋 Loaded comprehensive attendee data:', response.data);
       setAttendees(response.data.attendees || []);
       setError('');
     } catch (error) {
@@ -87,24 +101,42 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     }
   };
 
-  // Load attendance statistics
+  // Load attendance statistics using the new comprehensive stats API
   const loadAttendanceStats = async () => {
     if (!selectedEvent) return;
     
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(
-        `${API_URL}/api/events/${selectedEvent}/attendance/stats`,
+        `${API_URL}/api/events/${selectedEvent}/attendee-stats`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
       );
       
-      setAttendanceStats({
-        [selectedEvent]: response.data
-      });
+      console.log('📊 Loaded comprehensive stats:', response.data);
+      if (response.data.success) {
+        setAttendanceStats({
+          [selectedEvent]: response.data.statistics
+        });
+      }
     } catch (error) {
       console.error('Error loading attendance stats:', error);
+      // Try fallback to old endpoint if new one fails
+      try {
+        const token = AuthTokenService.getToken(); // Get token again since it might be undefined in this scope
+        const fallbackResponse = await axios.get(
+          `${API_URL}/api/events/${selectedEvent}/attendance/stats`,
+          {
+            headers: { 'Authorization': `Bearer ${token}` }
+          }
+        );
+        setAttendanceStats({
+          [selectedEvent]: fallbackResponse.data
+        });
+      } catch (fallbackError) {
+        console.error('Fallback stats loading also failed:', fallbackError);
+      }
     }
   };
 
@@ -240,19 +272,24 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     }
   };
 
-  // Filter attendees based on search and status
+  // Filter attendees based on search and status - Updated for new attendee listing structure
   const getFilteredAttendees = () => {
     let filtered = attendees;
     
     if (filterStatus !== 'all') {
-      filtered = filtered.filter(a => a.status === filterStatus);
+      filtered = filtered.filter(a => {
+        // Map new attendance_status to old status values for compatibility
+        const status = a.attendance_status === 'checked_in' ? 'checked-in' : 'registered';
+        return status === filterStatus;
+      });
     }
     
     if (searchTerm) {
       filtered = filtered.filter(a => 
-        a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        a.qrCode?.toLowerCase().includes(searchTerm.toLowerCase())
+        a.attendee_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.attendee_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.qr_code?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        a.attendee_phone?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
     
@@ -483,48 +520,55 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
 
             <div className="attendees-list">
               {getFilteredAttendees().map((attendee, index) => (
-                <div key={attendee.id || `attendee-${index}`} className="attendee-card">
+                <div key={attendee.registration_id || `attendee-${index}`} className="attendee-card">
                   <div className="attendee-info">
                     <div className="attendee-header">
-                      <h4>{attendee.name}</h4>
+                      <h4>{attendee.attendee_name}</h4>
                       <div className="attendee-status">
-                        {getStatusIcon(attendee.status)}
-                        <span className={`status-text ${attendee.status}`}>
-                          {attendee.status.replace('-', ' ').toUpperCase()}
+                        {getStatusIcon(attendee.attendance_status === 'checked_in' ? 'checked-in' : 'registered')}
+                        <span className={`status-text ${attendee.attendance_status === 'checked_in' ? 'checked-in' : 'registered'}`}>
+                          {attendee.attendance_status === 'checked_in' ? 'CHECKED IN' : 'REGISTERED'}
                         </span>
                       </div>
                     </div>
                     <div className="attendee-details">
-                      <p><i className="fas fa-envelope"></i> {attendee.email}</p>
-                      <p><i className="fas fa-phone"></i> {attendee.phone || 'N/A'}</p>
-                      <p><i className="fas fa-ticket-alt"></i> {attendee.ticketType}</p>
-                      <p><i className="fas fa-qrcode"></i> {attendee.qrCode || 'N/A'}</p>
-                      <p><i className="fas fa-money-bill"></i> Payment: {attendee.paymentStatus || 'N/A'}</p>
-                      {attendee.checkInTime && (
-                        <p><i className="fas fa-clock"></i> Checked in: {formatTime(attendee.checkInTime)}</p>
+                      <p><i className="fas fa-envelope"></i> {attendee.attendee_email}</p>
+                      <p><i className="fas fa-phone"></i> {attendee.attendee_phone || 'N/A'}</p>
+                      <p><i className="fas fa-ticket-alt"></i> {attendee.ticket_type || 'Standard'}</p>
+                      <p><i className="fas fa-qrcode"></i> {attendee.qr_code || 'N/A'}</p>
+                      <p><i className="fas fa-money-bill"></i> Payment: {attendee.payment_status || 'N/A'}</p>
+                      <p><i className="fas fa-dollar-sign"></i> Amount: ${formatters.formatCurrency(attendee.total_amount)}</p>
+                      {attendee.special_requirements && (
+                        <p><i className="fas fa-info-circle"></i> Special: {attendee.special_requirements}</p>
+                      )}
+                      {attendee.check_in_time && (
+                        <p><i className="fas fa-clock"></i> Checked in: {formatTime(attendee.check_in_time)}</p>
+                      )}
+                      {attendee.dietary_restrictions && (
+                        <p><i className="fas fa-utensils"></i> Dietary: {attendee.dietary_restrictions}</p>
                       )}
                     </div>
                   </div>
                   <div className="attendee-actions">
-                    {attendee.status === 'registered' ? (
+                    {attendee.attendance_status !== 'checked_in' ? (
                       <button 
-                        onClick={() => manualCheckIn(attendee.registrationId)}
+                        onClick={() => manualCheckIn(attendee.registration_id)}
                         className="check-in-btn"
                         disabled={loading}
                       >
                         <i className="fas fa-check"></i>
                         Check In
                       </button>
-                    ) : attendee.status === 'checked-in' ? (
+                    ) : (
                       <button 
-                        onClick={() => manualCheckOut(attendee.registrationId)}
+                        onClick={() => manualCheckOut(attendee.registration_id)}
                         className="check-out-btn"
                         disabled={loading}
                       >
                         <i className="fas fa-undo"></i>
                         Undo Check-in
                       </button>
-                    ) : null}
+                    )}
                   </div>
                 </div>
               ))}
@@ -556,40 +600,59 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                 {attendanceStats[selectedEvent] && (
                   <div className="event-stats-card">
                     <div className="event-stats-header">
-                      <h5>{attendanceStats[selectedEvent].eventName}</h5>
+                      <h5>Event Statistics</h5>
                       <div className="attendance-rate">
-                        <span className="rate-value">{attendanceStats[selectedEvent].attendanceRate}%</span>
+                        <span className="rate-value">
+                          {calculateAttendancePercentage(attendanceStats[selectedEvent])}%
+                        </span>
                         <span className="rate-label">Attendance Rate</span>
                       </div>
                     </div>
                     
                     <div className="stats-breakdown">
-                      <div className="stat-item checked-in">
-                        <i className="fas fa-check-circle"></i>
-                        <span className="stat-number">{attendanceStats[selectedEvent].checkedIn}</span>
-                        <span className="stat-label">Checked In</span>
-                      </div>
-                      <div className="stat-item registered">
-                        <i className="fas fa-clock"></i>
-                        <span className="stat-number">{attendanceStats[selectedEvent].registered}</span>
-                        <span className="stat-label">Registered</span>
-                      </div>
-                      <div className="stat-item no-show">
-                        <i className="fas fa-times-circle"></i>
-                        <span className="stat-number">{attendanceStats[selectedEvent].noShow}</span>
-                        <span className="stat-label">No Show</span>
-                      </div>
-                      <div className="stat-item total">
-                        <i className="fas fa-users"></i>
-                        <span className="stat-number">{attendanceStats[selectedEvent].total}</span>
-                        <span className="stat-label">Total</span>
-                      </div>
+                      {attendanceStats[selectedEvent]?.registrations && (
+                        <>
+                          <div className="stat-item checked-in">
+                            <i className="fas fa-check-circle"></i>
+                            <span className="stat-number">{toNumber(attendanceStats[selectedEvent]?.registrations?.checked_in)}</span>
+                            <span className="stat-label">Checked In</span>
+                          </div>
+                          <div className="stat-item registered">
+                            <i className="fas fa-clock"></i>
+                            <span className="stat-number">
+                              {toNumber(attendanceStats[selectedEvent]?.registrations?.total) - toNumber(attendanceStats[selectedEvent]?.registrations?.checked_in)}
+                            </span>
+                            <span className="stat-label">Not Checked In</span>
+                          </div>
+                          <div className="stat-item total">
+                            <i className="fas fa-users"></i>
+                            <span className="stat-number">{toNumber(attendanceStats[selectedEvent]?.registrations?.total)}</span>
+                            <span className="stat-label">Total Registered</span>
+                          </div>
+                          <div className="stat-item revenue">
+                            <i className="fas fa-dollar-sign"></i>
+                            <span className="stat-number">${formatters.formatCurrency(attendanceStats[selectedEvent]?.revenue?.collected)}</span>
+                            <span className="stat-label">Revenue Collected</span>
+                          </div>
+                        </>
+                      )}
                     </div>
+                    
+                    {attendanceStats[selectedEvent].capacity && (
+                      <div className="capacity-info">
+                        <p><strong>Capacity:</strong> {attendanceStats[selectedEvent].capacity.current_registrations} / {attendanceStats[selectedEvent].capacity.max_attendees || 'Unlimited'}</p>
+                        {attendanceStats[selectedEvent].capacity.percentage_filled && (
+                          <p><strong>Filled:</strong> {attendanceStats[selectedEvent].capacity.percentage_filled}%</p>
+                        )}
+                      </div>
+                    )}
                     
                     <div className="progress-bar">
                       <div 
                         className="progress-fill"
-                        style={{ width: `${attendanceStats[selectedEvent].attendanceRate}%` }}
+                        style={{ 
+                          width: `${calculateAttendancePercentage(attendanceStats[selectedEvent])}%` 
+                        }}
                       ></div>
                     </div>
                   </div>

@@ -39,6 +39,65 @@
   margin: 0;
 }
 
+/* Enhanced attendee details for comprehensive listing */
+.attendee-details {
+  margin-top: 0.75rem;
+}
+
+.attendee-details p {
+  margin: 0.5rem 0;
+  font-size: 0.875rem;
+  color: #4b5563;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.attendee-details p i {
+  width: 16px;
+  color: #6b7280;
+  font-size: 0.75rem;
+}
+
+/* Special requirement styling */
+.attendee-details p i.fa-info-circle {
+  color: #3b82f6;
+}
+
+.attendee-details p i.fa-utensils {
+  color: #f59e0b;
+}
+
+.attendee-details p i.fa-dollar-sign {
+  color: #10b981;
+}
+
+/* Capacity information styling */
+.capacity-info {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border-radius: 6px;
+  border-left: 4px solid #3b82f6;
+}
+
+.capacity-info p {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+/* Revenue stat item styling */
+.stat-item.revenue {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: white;
+}
+
+.stat-item.revenue .stat-number,
+.stat-item.revenue .stat-label {
+  color: white;
+}
+
 /* Error Message */
 .error-message {
   background: #fef2f2;
