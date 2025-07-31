@@ -1157,7 +1157,6 @@ const OrganizerDashboard = () => {
     // Parse numeric values
     const eventData = {
       ...formData,
-      organizer_id: AuthTokenService.getOrganizerId() || selectedEvent.organizer_id, // Use our new helper method
       max_attendees: formData.max_attendees ? parseInt(formData.max_attendees) : null,
       ticket_price: formData.ticket_price ? parseFloat(formData.ticket_price) : 0,
       tags: formData.tags && typeof formData.tags === 'string' ? formData.tags.split(',').map(tag => tag.trim()) : formData.tags
@@ -1170,10 +1169,6 @@ const OrganizerDashboard = () => {
         setError('Your session has expired. Please log in again.');
         return;
       }
-      
-      console.log('Updating event with user_id:', AuthTokenService.getUser()?.user_id);
-      console.log('Updating event with organizer_id:', AuthTokenService.getOrganizerId() || selectedEvent.organizer_id);
-      console.log('Event being updated:', selectedEvent.event_id);
       
       const response = await axios.put(
         `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEvent.event_id}`,
@@ -1221,22 +1216,9 @@ const OrganizerDashboard = () => {
     } catch (error) {
       console.error('Error updating event:', error);
       
-      // Handle 403 Forbidden specifically
-      if (error.response && error.response.status === 403) {
-        const userData = AuthTokenService.getUser();
-        console.log('Current user data:', userData);
-        console.log('Selected event data:', selectedEvent);
-        console.log('User organizer_id from AuthTokenService:', AuthTokenService.getOrganizerId());
-        
-        // Detailed error message with debugging info
-        setError(`You don't have permission to update this event. Only the event organizer or an admin can modify this event. 
-                  (Error 403: ${error.response?.data?.message || 'Forbidden'})
-                  User ID: ${userData?.user_id}, Event Organizer ID: ${selectedEvent.organizer_id}`);
-      } else {
-        const errorMessage = error.response?.data?.message || 'Failed to update event. Please try again.';
-        setError(errorMessage);
-      }
-      setTimeout(() => setError(''), 8000); // Give more time to read the detailed error
+      const errorMessage = error.response?.data?.message || 'Failed to update event. Please try again.';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
     } finally {
       setIsLoading(false);
     }

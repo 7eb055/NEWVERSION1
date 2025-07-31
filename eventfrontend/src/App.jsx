@@ -1,126 +1,39 @@
+
 import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import AuthTokenService from './services/AuthTokenService';
 import Home from './Page/Home';
 import Login from './Page/Login';
 import SignUp from './Page/SignUp';
 import ForgotPassword from './Page/ForgotPassword';
-import ResetPassword from './Page/ResetPassword';
-import EmailVerification from './Page/EmailVerification';
-import AttendeeDashboard from './Page/AttendeeDashboard';
-import EventListPage from './Page/Eventslist';
-import OrganizerDashboard from './Page/OrganizerDashboard';
-import Profile from './Page/Profile';
-import Settings from './Page/Settings';
-
-// Import protected route components
-import ProtectedRoute, { 
-  PublicRoute, 
-  AttendeeProtectedRoute, 
-  OrganizerProtectedRoute 
-} from './components/ProtectedRoute';
-
+import AdminDashboard from './Page/AdminDashboard';
 import './App.css';
-
-
+import Attendee from './Page/Eventdetails';
+import OrganizerDashboard from './Page/OrganizerDashboard';
+import EventListPage from './Page/Eventslist';
 
 function App() {
-  // Component to handle dashboard redirects based on user role
-  const DashboardRedirect = () => {
-    const dashboardRoute = AuthTokenService.getDashboardRoute();
-    return <Navigate to={dashboardRoute} replace />;
-  };
-
   return (
     <Router>
       <Routes>
-        {/* Public routes - redirect authenticated users to dashboard */}
-        <Route path="/" element={<PublicRoute><Home /></PublicRoute>} />
-        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
-        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
-        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        {/* Home route - default landing page */}
+        <Route path="/" element={<Home />} />
         
-        {/* Email verification - accessible to all */}
-        <Route path="/verify-email" element={<EmailVerification />} />
-        
-        {/* Protected routes - require authentication */}
-        
-        {/* Attendee Dashboard - requires attendee role or any authenticated user */}
-        <Route 
-          path="/attendee-dashboard" 
-          element={
-            <ProtectedRoute>
-              <AttendeeDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Alternative attendee route for backwards compatibility */}
-        <Route 
-          path="/Attendee" 
-          element={
-            <ProtectedRoute>
-              <AttendeeDashboard />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Events list - accessible to all authenticated users */}
-        <Route 
-          path="/eventslist" 
-          element={
-            <ProtectedRoute>
-              <EventListPage />
-            </ProtectedRoute>
-          } 
-        />
-        
-        {/* Organizer Dashboard - requires organizer role */}
-        <Route 
-          path="/organizer-dashboard" 
-          element={
-            <OrganizerProtectedRoute>
-              <OrganizerDashboard />
-            </OrganizerProtectedRoute>
-          } 
-        />
+        {/* Authentication routes */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<SignUp />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/Attendee" element={<Attendee />} />
+        <Route path="/eventslist" element={<EventListPage />} />
 
-        {/* Profile page - accessible to all authenticated users */}
-        <Route 
-          path="/profile" 
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Settings page - accessible to all authenticated users */}
-        <Route 
-          path="/settings" 
-          element={
-            <ProtectedRoute>
-              <Settings />
-            </ProtectedRoute>
-          } 
-        />
-
-        {/* Dashboard redirect - redirect to appropriate dashboard based on role */}
-        <Route 
-          path="/dashboard" 
-          element={
-            <ProtectedRoute>
-              <DashboardRedirect />
-            </ProtectedRoute>
-          } 
-        />
+        {/* Dashboard routes */}
+        <Route path="/organizer-dashboard" element={<OrganizerDashboard />} />
+        <Route path="/admin-dashboard" element={<AdminDashboard />} />
       
         {/* Redirect any unknown routes to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>
-  )
+  );
 }
 
-export default App
+export default App;
