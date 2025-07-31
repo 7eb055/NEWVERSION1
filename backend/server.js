@@ -1984,7 +1984,10 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
 
     // Check if user owns this event or is admin
     const eventCheck = await pool.query(
-      'SELECT organizer_id FROM events WHERE event_id = $1',
+      `SELECT e.event_id, e.organizer_id, o.user_id 
+       FROM events e 
+       JOIN organizers o ON e.organizer_id = o.organizer_id
+       WHERE e.event_id = $1`,
       [eventId]
     );
 
@@ -1992,8 +1995,21 @@ app.put('/api/events/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    if (eventCheck.rows[0].organizer_id !== req.user.user_id && req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Not authorized to update this event' });
+    // Check if the authenticated user is the organizer of this event
+    const isOwner = eventCheck.rows[0].user_id === req.user.user_id;
+    const isAdmin = req.user.role === 'admin';
+    
+    if (!isOwner && !isAdmin) {
+      console.log('Auth failed for event update:', {
+        eventId,
+        authenticatedUserId: req.user.user_id,
+        eventOrganizerUserId: eventCheck.rows[0].user_id,
+        userRole: req.user.role
+      });
+      return res.status(403).json({ 
+        message: 'Not authorized to update this event',
+        detail: 'Only the event organizer or an admin can modify this event'
+      });
     }
 
     // Validate event date if provided
