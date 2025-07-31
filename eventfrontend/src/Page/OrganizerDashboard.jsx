@@ -83,6 +83,13 @@ const OrganizerDashboard = () => {
 
   // User data from localStorage
   const [user, setUser] = useState(null);
+  
+  // Event management state
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showEventDetails, setShowEventDetails] = useState(false);
+  const [showEditForm, setShowEditForm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [eventToDelete, setEventToDelete] = useState(null);
 
   useEffect(() => {
     // Get user data from AuthTokenService
@@ -1050,6 +1057,173 @@ const OrganizerDashboard = () => {
     });
   };
 
+  // Event management functions
+  const handleViewEvent = (event) => {
+    console.log('Viewing event:', event);
+    setSelectedEvent(event);
+    setShowEventDetails(true);
+  };
+
+  const handleEditEvent = (event) => {
+    console.log('Editing event:', event);
+    setSelectedEvent(event);
+    
+    // Populate form with event data
+    setFormData({
+      event_name: event.event_name || '',
+      event_date: event.event_date ? event.event_date.split('T')[0] : '',
+      venue_name: event.venue_name || '',
+      venue_address: event.venue_address || '',
+      description: event.description || '',
+      category: event.category || '',
+      event_type: event.event_type || 'Conference',
+      ticket_price: event.ticket_price || '',
+      image_url: event.image_url || '',
+      registration_deadline: event.registration_deadline ? event.registration_deadline.split('T')[0] : '',
+      refund_policy: event.refund_policy || '',
+      terms_and_conditions: event.terms_and_conditions || '',
+      status: event.status || 'draft',
+      is_public: event.is_public !== undefined ? event.is_public : true,
+      requires_approval: event.requires_approval !== undefined ? event.requires_approval : false,
+      max_tickets_per_person: event.max_tickets_per_person || 5,
+      max_attendees: event.max_attendees || '',
+      tags: Array.isArray(event.tags) ? event.tags.join(', ') : event.tags || ''
+    });
+    
+    setShowEditForm(true);
+  };
+
+  const handleDeleteEvent = (event) => {
+    console.log('Deleting event:', event);
+    setEventToDelete(event);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteEvent = async () => {
+    if (!eventToDelete) return;
+    
+    setIsLoading(true);
+    setError('');
+    
+    try {
+      const token = AuthTokenService.getToken();
+      
+      if (!token || AuthTokenService.isTokenExpired()) {
+        setError('Your session has expired. Please log in again.');
+        return;
+      }
+      
+      const response = await axios.delete(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventToDelete.event_id}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }
+      );
+      
+      if (response.data) {
+        setSuccess(`Event "${eventToDelete.event_name}" deleted successfully!`);
+        setShowDeleteConfirm(false);
+        setEventToDelete(null);
+        
+        // Refresh events list
+        loadEvents();
+        
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      
+      const errorMessage = error.response?.data?.message || 'Failed to delete event. Please try again.';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUpdateEvent = async (e) => {
+    e.preventDefault();
+    
+    if (!validateForm() || !selectedEvent) {
+      return;
+    }
+
+    setIsLoading(true);
+    setError('');
+    setSuccess('');
+
+    // Parse numeric values
+    const eventData = {
+      ...formData,
+      max_attendees: formData.max_attendees ? parseInt(formData.max_attendees) : null,
+      ticket_price: formData.ticket_price ? parseFloat(formData.ticket_price) : 0,
+      tags: formData.tags && typeof formData.tags === 'string' ? formData.tags.split(',').map(tag => tag.trim()) : formData.tags
+    };
+    
+    try {
+      const token = AuthTokenService.getToken();
+      
+      if (!token || AuthTokenService.isTokenExpired()) {
+        setError('Your session has expired. Please log in again.');
+        return;
+      }
+      
+      const response = await axios.put(
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEvent.event_id}`,
+        eventData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (response.data) {
+        setSuccess(`Event "${formData.event_name}" updated successfully!`);
+        setShowEditForm(false);
+        setSelectedEvent(null);
+        
+        // Reset form
+        setFormData({
+          event_name: '',
+          event_date: '',
+          venue_name: '',
+          venue_address: '',
+          description: '',
+          category: '',
+          event_type: 'Conference',
+          ticket_price: '',
+          image_url: '',
+          registration_deadline: '',
+          refund_policy: '',
+          terms_and_conditions: '',
+          status: 'draft',
+          is_public: true,
+          requires_approval: false,
+          max_tickets_per_person: 5,
+          max_attendees: '',
+          tags: ''
+        });
+        
+        // Refresh events list
+        loadEvents();
+        
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (error) {
+      console.error('Error updating event:', error);
+      
+      const errorMessage = error.response?.data?.message || 'Failed to update event. Please try again.';
+      setError(errorMessage);
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <>
       {/* Global Header */}
@@ -1302,10 +1476,327 @@ const OrganizerDashboard = () => {
           showCreateForm={showCreateForm}
           setShowCreateForm={setShowCreateForm}
           formatDate={formatDate}
+          onViewEvent={handleViewEvent}
+          onEditEvent={handleEditEvent}
+          onDeleteEvent={handleDeleteEvent}
         />
       </div>
       
       </div>
+      
+      {/* Event Details Modal */}
+      {showEventDetails && selectedEvent && (
+        <div className="modal-overlay" onClick={() => setShowEventDetails(false)}>
+          <div className="modal-content event-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <i className="fas fa-eye"></i>
+                Event Details
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowEventDetails(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-body">
+              <div className="event-details-grid">
+                <div className="detail-group">
+                  <label>Event Name:</label>
+                  <span>{selectedEvent.event_name}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Date & Time:</label>
+                  <span>{formatDate(selectedEvent.event_date)}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Venue:</label>
+                  <span>{selectedEvent.venue_name}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Address:</label>
+                  <span>{selectedEvent.venue_address}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Category:</label>
+                  <span>{selectedEvent.category}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Type:</label>
+                  <span>{selectedEvent.event_type}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Max Attendees:</label>
+                  <span>{selectedEvent.max_attendees || 'Unlimited'}</span>
+                </div>
+                <div className="detail-group">
+                  <label>Ticket Price:</label>
+                  <span>{selectedEvent.ticket_price > 0 ? `$${selectedEvent.ticket_price}` : 'Free'}</span>
+                </div>
+                <div className="detail-group full-width">
+                  <label>Description:</label>
+                  <p>{selectedEvent.description}</p>
+                </div>
+                <div className="detail-group">
+                  <label>Status:</label>
+                  <span className={`status-badge ${selectedEvent.status}`}>
+                    {selectedEvent.status}
+                  </span>
+                </div>
+                <div className="detail-group">
+                  <label>Public:</label>
+                  <span>{selectedEvent.is_public ? 'Yes' : 'No'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowEventDetails(false)}
+              >
+                Close
+              </button>
+              <button 
+                className="btn btn-primary"
+                onClick={() => {
+                  setShowEventDetails(false);
+                  handleEditEvent(selectedEvent);
+                }}
+              >
+                Edit Event
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {showEditForm && selectedEvent && (
+        <div className="modal-overlay" onClick={() => setShowEditForm(false)}>
+          <div className="modal-content edit-event-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <i className="fas fa-edit"></i>
+                Edit Event
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowEditForm(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <form onSubmit={handleUpdateEvent}>
+              <div className="modal-body">
+                <div className="form-grid">
+                  <div className="form-group">
+                    <label htmlFor="edit_event_name">Event Name *</label>
+                    <input
+                      type="text"
+                      id="edit_event_name"
+                      name="event_name"
+                      value={formData.event_name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_event_date">Event Date *</label>
+                    <input
+                      type="datetime-local"
+                      id="edit_event_date"
+                      name="event_date"
+                      value={formData.event_date}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_venue_name">Venue Name *</label>
+                    <input
+                      type="text"
+                      id="edit_venue_name"
+                      name="venue_name"
+                      value={formData.venue_name}
+                      onChange={handleInputChange}
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_venue_address">Venue Address</label>
+                    <textarea
+                      id="edit_venue_address"
+                      name="venue_address"
+                      value={formData.venue_address}
+                      onChange={handleInputChange}
+                      rows="3"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_category">Category</label>
+                    <select
+                      id="edit_category"
+                      name="category"
+                      value={formData.category}
+                      onChange={handleInputChange}
+                    >
+                      <option value="">Select Category</option>
+                      <option value="conference">Conference</option>
+                      <option value="workshop">Workshop</option>
+                      <option value="seminar">Seminar</option>
+                      <option value="networking">Networking</option>
+                      <option value="social">Social</option>
+                      <option value="sports">Sports</option>
+                      <option value="technology">Technology</option>
+                      <option value="business">Business</option>
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_max_attendees">Max Attendees</label>
+                    <input
+                      type="number"
+                      id="edit_max_attendees"
+                      name="max_attendees"
+                      value={formData.max_attendees}
+                      onChange={handleInputChange}
+                      min="1"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_ticket_price">Ticket Price ($)</label>
+                    <input
+                      type="number"
+                      id="edit_ticket_price"
+                      name="ticket_price"
+                      value={formData.ticket_price}
+                      onChange={handleInputChange}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_image_url">Event Image URL</label>
+                    <input
+                      type="url"
+                      id="edit_image_url"
+                      name="image_url"
+                      value={formData.image_url}
+                      onChange={handleInputChange}
+                      placeholder="https://example.com/image.jpg"
+                    />
+                  </div>
+                  
+                  <div className="form-group full-width">
+                    <label htmlFor="edit_description">Description *</label>
+                    <textarea
+                      id="edit_description"
+                      name="description"
+                      value={formData.description}
+                      onChange={handleInputChange}
+                      rows="4"
+                      required
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>
+                      <input
+                        type="checkbox"
+                        name="is_public"
+                        checked={formData.is_public}
+                        onChange={handleInputChange}
+                      />
+                      Public Event
+                    </label>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label htmlFor="edit_status">Status</label>
+                    <select
+                      id="edit_status"
+                      name="status"
+                      value={formData.status}
+                      onChange={handleInputChange}
+                    >
+                      <option value="draft">Draft</option>
+                      <option value="published">Published</option>
+                      <option value="cancelled">Cancelled</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setShowEditForm(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Updating...' : 'Update Event'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && eventToDelete && (
+        <div className="modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
+          <div className="modal-content delete-confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>
+                <i className="fas fa-exclamation-triangle"></i>
+                Confirm Delete
+              </h2>
+              <button 
+                className="close-btn"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="modal-body">
+              <p>Are you sure you want to delete the event:</p>
+              <h3 className="event-name-highlight">"{eventToDelete.event_name}"</h3>
+              <p className="warning-text">
+                <i className="fas fa-warning"></i>
+                This action cannot be undone. All associated registrations, tickets, and data will be permanently deleted.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button 
+                className="btn btn-secondary"
+                onClick={() => setShowDeleteConfirm(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-danger"
+                onClick={confirmDeleteEvent}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Deleting...' : 'Delete Event'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Global Footer */}
       <Footer />

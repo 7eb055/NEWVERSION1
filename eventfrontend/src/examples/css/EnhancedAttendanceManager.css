@@ -1,0 +1,277 @@
+/* Enhanced Attendance Manager Styles */
+
+.enhanced-attendance-manager {
+  padding: 20px;
+  background: #f8f9fa;
+  min-height: 100vh;
+}
+
+.manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.manager-header h2 {
+  margin: 0;
+  color: #333;
+  font-size: 28px;
+}
+
+.view-toggles {
+  display: flex;
+  gap: 10px;
+}
+
+.view-toggles button {
+  padding: 10px 20px;
+  border: 2px solid #e9ecef;
+  background: white;
+  color: #495057;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-toggles button:hover {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.view-toggles button.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-color: #667eea;
+  color: white;
+}
+
+.view-toggles button i {
+  font-size: 14px;
+}
+
+/* Attendee Listing View */
+.attendee-listing-view {
+  background: white;
+  border-radius: 12px;
+  padding: 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.attendee-listing-view h3 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.attendee-listing-view p {
+  color: #6c757d;
+  margin-bottom: 30px;
+}
+
+.event-listing-card {
+  border: 1px solid #e9ecef;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  background: #f8f9fa;
+}
+
+.event-listing-card h4 {
+  color: #333;
+  margin: 0 0 10px 0;
+  font-size: 18px;
+}
+
+.event-listing-card p {
+  margin: 5px 0;
+  color: #6c757d;
+  font-size: 14px;
+}
+
+/* Event Attendee Details */
+.event-attendee-details {
+  margin-top: 15px;
+}
+
+.expand-toggle {
+  width: 100%;
+  padding: 10px 15px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: opacity 0.3s ease;
+}
+
+.expand-toggle:hover {
+  opacity: 0.9;
+}
+
+.attendee-details-content {
+  margin-top: 15px;
+  padding: 20px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.loading {
+  text-align: center;
+  padding: 20px;
+  color: #6c757d;
+}
+
+/* Statistics Summary */
+.stats-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 15px;
+  margin-bottom: 25px;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 15px;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-card h4 {
+  margin: 0 0 10px 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stat-card p {
+  margin: 3px 0;
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+/* Attendee List */
+.attendee-list h4 {
+  color: #333;
+  margin-bottom: 15px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid #e9ecef;
+}
+
+.attendee-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  margin-bottom: 8px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border-left: 4px solid #e9ecef;
+}
+
+.attendee-item:hover {
+  background: #e9ecef;
+}
+
+.attendee-basic {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.attendee-basic strong {
+  color: #333;
+  font-weight: 600;
+}
+
+.attendee-basic .status {
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.attendee-basic .status.checked_in {
+  background: #d4edda;
+  color: #155724;
+}
+
+.attendee-basic .status.registered {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.attendee-meta {
+  display: flex;
+  gap: 20px;
+  font-size: 13px;
+  color: #6c757d;
+}
+
+.attendee-meta span {
+  white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .manager-header {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+
+  .view-toggles {
+    justify-content: center;
+  }
+
+  .stats-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .attendee-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .attendee-meta {
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+@media (max-width: 480px) {
+  .enhanced-attendance-manager {
+    padding: 10px;
+  }
+
+  .manager-header {
+    padding: 15px;
+  }
+
+  .manager-header h2 {
+    font-size: 22px;
+  }
+
+  .view-toggles button {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  .attendee-listing-view {
+    padding: 20px;
+  }
+}

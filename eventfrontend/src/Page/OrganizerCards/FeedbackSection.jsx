@@ -1,4 +1,5 @@
 import React from 'react';
+import formatters from '../../utils/formatters';
 
 const FeedbackSection = ({
   feedbackData,
@@ -33,7 +34,7 @@ const FeedbackSection = ({
                 <div className="summary-header">
                   <h4 className="event-name">{summary.eventName || summary.event_name}</h4>
                   <div className="average-rating">
-                    <span className="rating-number">{summary.averageRating.toFixed(1)}</span>
+                    <span className="rating-number">{formatters.formatCurrency(summary.averageRating, 1, false)}</span>
                     <div className="rating-stars">
                       {renderStarRating(Math.round(summary.averageRating))}
                     </div>
