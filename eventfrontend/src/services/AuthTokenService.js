@@ -146,6 +146,28 @@ class AuthTokenService {
     const token = this.getToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   }
+  
+  // Get organizer ID for the current user (for event operations)
+  static getOrganizerId() {
+    try {
+      const user = this.getUser();
+      if (!user) return null;
+      
+      // Look for organizer role which might contain organizer_id
+      if (user.roles && Array.isArray(user.roles)) {
+        const organizerRole = user.roles.find(role => role.role === 'organizer');
+        if (organizerRole && organizerRole.organizer_id) {
+          return organizerRole.organizer_id;
+        }
+      }
+      
+      // Fallback: The user might have organizer_id directly in the user object
+      return user.organizer_id || null;
+    } catch (error) {
+      console.error('Error getting organizer ID:', error);
+      return null;
+    }
+  }
 
   // Clear all authentication data (logout)
   static clearAuthData() {
