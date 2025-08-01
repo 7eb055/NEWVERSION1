@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import AttendeeListingService from '../../services/attendeeListingService';
-import formatters, { toNumber } from '../../utils/formatters';
+import { formatCurrency, toNumber } from '../../utils/formatters';
 import './css/AttendanceVerification.css';
 
 const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
@@ -101,7 +101,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     }
   };
 
-  // Load attendance statistics using the new comprehensive stats API
+    // Load attendance statistics using the new comprehensive stats API
   const loadAttendanceStats = async () => {
     if (!selectedEvent) return;
     
@@ -117,7 +117,17 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
       console.log('📊 Loaded comprehensive stats:', response.data);
       if (response.data.success) {
         setAttendanceStats({
-          [selectedEvent]: response.data.statistics
+          [selectedEvent]: {
+            registrations: {
+              total: response.data.stats.total_registered,
+              checked_in: response.data.stats.total_checked_in,
+              currently_present: response.data.stats.currently_present
+            },
+            revenue: {
+              collected: 0 // This would need to be added to the backend
+            },
+            attendance_percentage: response.data.stats.attendance_percentage
+          }
         });
       }
     } catch (error) {
@@ -131,11 +141,26 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
             headers: { 'Authorization': `Bearer ${token}` }
           }
         );
-        setAttendanceStats({
-          [selectedEvent]: fallbackResponse.data
-        });
+        
+        console.log('📊 Loaded fallback stats:', fallbackResponse.data);
+        if (fallbackResponse.data.success) {
+          setAttendanceStats({
+            [selectedEvent]: {
+              registrations: {
+                total: fallbackResponse.data.totalRegistered,
+                checked_in: fallbackResponse.data.totalCheckedIn,
+                currently_present: fallbackResponse.data.currentlyPresent
+              },
+              revenue: {
+                collected: 0 // This would need to be added to the backend
+              },
+              attendance_percentage: fallbackResponse.data.attendancePercentage
+            }
+          });
+        }
       } catch (fallbackError) {
         console.error('Fallback stats loading also failed:', fallbackError);
+        setError('Failed to load attendance statistics');
       }
     }
   };
@@ -537,7 +562,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                       <p><i className="fas fa-ticket-alt"></i> {attendee.ticket_type || 'Standard'}</p>
                       <p><i className="fas fa-qrcode"></i> {attendee.qr_code || 'N/A'}</p>
                       <p><i className="fas fa-money-bill"></i> Payment: {attendee.payment_status || 'N/A'}</p>
-                      <p><i className="fas fa-dollar-sign"></i> Amount: ${formatters.formatCurrency(attendee.total_amount)}</p>
+                      <p><i className="fas fa-dollar-sign"></i> Amount: ${formatCurrency(attendee.total_amount)}</p>
                       {attendee.special_requirements && (
                         <p><i className="fas fa-info-circle"></i> Special: {attendee.special_requirements}</p>
                       )}
@@ -631,7 +656,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                           </div>
                           <div className="stat-item revenue">
                             <i className="fas fa-dollar-sign"></i>
-                            <span className="stat-number">${formatters.formatCurrency(attendanceStats[selectedEvent]?.revenue?.collected)}</span>
+                            <span className="stat-number">${formatCurrency(attendanceStats[selectedEvent]?.revenue?.collected || 0)}</span>
                             <span className="stat-label">Revenue Collected</span>
                           </div>
                         </>

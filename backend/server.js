@@ -977,6 +977,627 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
   }
 });
 
+// Attendance Verification Routes
+// GET attendee listing for event (comprehensive attendee data)
+app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Create attendance_log table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_log (
+          log_id SERIAL PRIMARY KEY,
+          registration_id INTEGER REFERENCES eventregistrations(registration_id) ON DELETE CASCADE,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          check_out_time TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (createError) {
+      console.log('Attendance log table might already exist:', createError.message);
+    }
+
+    // Get comprehensive attendee data with check-in status
+    const attendeesQuery = await pool.query(`
+      SELECT 
+        er.registration_id,
+        er.attendee_id,
+        er.registration_date,
+        er.total_amount,
+        er.payment_status,
+        er.ticket_quantity,
+        a.full_name as attendee_name,
+        a.phone as attendee_phone,
+        u.email as attendee_email,
+        CASE 
+          WHEN aa.check_in_time IS NOT NULL THEN 'checked_in'
+          ELSE 'registered'
+        END as attendance_status,
+        aa.check_in_time,
+        aa.check_out_time,
+        CONCAT(er.registration_id::text, '-', $1::text) as qr_code
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN attendance_log aa ON er.registration_id = aa.registration_id
+      WHERE er.event_id = $1::integer
+      ORDER BY er.registration_date DESC
+    `, [eventId]);
+
+    res.json({
+      success: true,
+      attendees: attendeesQuery.rows,
+      total: attendeesQuery.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching attendee listing:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET attendance statistics for event
+app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Create attendance_log table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_log (
+          log_id SERIAL PRIMARY KEY,
+          registration_id INTEGER REFERENCES eventregistrations(registration_id) ON DELETE CASCADE,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          check_out_time TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (createError) {
+      console.log('Attendance log table might already exist:', createError.message);
+    }
+
+    // Get attendance statistics
+    const statsQuery = await pool.query(`
+      SELECT 
+        COUNT(er.registration_id) as total_registered,
+        COUNT(aa.registration_id) as total_checked_in,
+        COUNT(CASE WHEN aa.check_out_time IS NULL AND aa.check_in_time IS NOT NULL THEN 1 END) as currently_present,
+        ROUND(
+          (COUNT(aa.registration_id)::DECIMAL / NULLIF(COUNT(er.registration_id), 0)) * 100, 
+          2
+        ) as attendance_percentage
+      FROM eventregistrations er
+      LEFT JOIN attendance_log aa ON er.registration_id = aa.registration_id
+      WHERE er.event_id = $1::integer
+    `, [eventId]);
+
+    const stats = statsQuery.rows[0];
+
+    res.json({
+      success: true,
+      stats: {
+        total_registered: parseInt(stats.total_registered || 0),
+        total_checked_in: parseInt(stats.total_checked_in || 0),
+        currently_present: parseInt(stats.currently_present || 0),
+        attendance_percentage: parseFloat(stats.attendance_percentage || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching attendance stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Alternative attendance stats endpoint
+app.get('/api/events/:eventId/attendance/stats', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Get attendance statistics (same as above but different endpoint)
+    const statsQuery = await pool.query(`
+      SELECT 
+        COUNT(er.registration_id) as total_registered,
+        COUNT(aa.registration_id) as total_checked_in,
+        COUNT(CASE WHEN aa.check_out_time IS NULL AND aa.check_in_time IS NOT NULL THEN 1 END) as currently_present
+      FROM eventregistrations er
+      LEFT JOIN attendance_log aa ON er.registration_id = aa.registration_id
+      WHERE er.event_id = $1::integer
+    `, [eventId]);
+
+    const stats = statsQuery.rows[0];
+    const totalRegistered = parseInt(stats.total_registered || 0);
+    const totalCheckedIn = parseInt(stats.total_checked_in || 0);
+    const attendancePercentage = totalRegistered > 0 ? ((totalCheckedIn / totalRegistered) * 100).toFixed(2) : 0;
+
+    res.json({
+      success: true,
+      totalRegistered,
+      totalCheckedIn,
+      currentlyPresent: parseInt(stats.currently_present || 0),
+      attendancePercentage: parseFloat(attendancePercentage)
+    });
+  } catch (error) {
+    console.error('Error fetching attendance stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET attendance scan history
+app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Get scan history
+    const historyQuery = await pool.query(`
+      SELECT 
+        aa.log_id,
+        aa.check_in_time,
+        aa.check_out_time,
+        a.full_name,
+        u.email,
+        er.registration_id,
+        CASE 
+          WHEN aa.check_out_time IS NOT NULL THEN 'checked-out'
+          WHEN aa.check_in_time IS NOT NULL THEN 'checked-in'
+        END as action_type
+      FROM attendance_log aa
+      JOIN eventregistrations er ON aa.registration_id = er.registration_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE aa.event_id = $1::integer
+      ORDER BY aa.check_in_time DESC
+      LIMIT 100
+    `, [eventId]);
+
+    res.json({
+      success: true,
+      history: historyQuery.rows
+    });
+  } catch (error) {
+    console.error('Error fetching scan history:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST check-in attendee (QR scan or manual)
+app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id, qr_code } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    let finalRegistrationId = registration_id;
+
+    // If QR code is provided, extract registration_id from it
+    if (qr_code && !registration_id) {
+      const qrParts = qr_code.split('-');
+      if (qrParts.length >= 2) {
+        finalRegistrationId = parseInt(qrParts[0]);
+      }
+    }
+
+    if (!finalRegistrationId) {
+      return res.status(400).json({ message: 'Registration ID or valid QR code required' });
+    }
+
+    // Verify registration exists for this event
+    const registrationCheck = await pool.query(
+      'SELECT registration_id, attendee_id FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+      [finalRegistrationId, eventId]
+    );
+
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found for this event' });
+    }
+
+    // Check if already checked in
+    const existingCheckIn = await pool.query(
+      'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND check_out_time IS NULL',
+      [finalRegistrationId]
+    );
+
+    if (existingCheckIn.rows.length > 0) {
+      return res.status(400).json({ message: 'Attendee is already checked in' });
+    }
+
+    // Create check-in record
+    const checkInResult = await pool.query(`
+      INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+      VALUES ($1, $2, NOW())
+      RETURNING log_id, check_in_time
+    `, [finalRegistrationId, eventId]);
+
+    // Get attendee details for response
+    const attendeeDetails = await pool.query(`
+      SELECT a.full_name, u.email
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [finalRegistrationId]);
+
+    res.json({
+      success: true,
+      message: 'Check-in successful',
+      data: {
+        log_id: checkInResult.rows[0].log_id,
+        registration_id: finalRegistrationId,
+        check_in_time: checkInResult.rows[0].check_in_time,
+        attendee: attendeeDetails.rows[0]
+      }
+    });
+  } catch (error) {
+    console.error('Error checking in attendee:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST check-out attendee
+app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Find active check-in
+    const activeCheckIn = await pool.query(
+      'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND event_id = $2 AND check_out_time IS NULL',
+      [registration_id, eventId]
+    );
+
+    if (activeCheckIn.rows.length === 0) {
+      return res.status(400).json({ message: 'No active check-in found for this attendee' });
+    }
+
+    // Update with check-out time
+    const checkOutResult = await pool.query(`
+      UPDATE attendance_log 
+      SET check_out_time = NOW()
+      WHERE log_id = $1
+      RETURNING check_out_time
+    `, [activeCheckIn.rows[0].log_id]);
+
+    res.json({
+      success: true,
+      message: 'Check-out successful',
+      check_out_time: checkOutResult.rows[0].check_out_time
+    });
+  } catch (error) {
+    console.error('Error checking out attendee:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST manual check-in (alternative endpoint for frontend compatibility)
+app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Verify registration exists for this event
+    const registrationCheck = await pool.query(
+      'SELECT registration_id, attendee_id FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+      [registration_id, eventId]
+    );
+
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found for this event' });
+    }
+
+    // Check if already checked in
+    const existingCheckIn = await pool.query(
+      'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND check_out_time IS NULL',
+      [registration_id]
+    );
+
+    if (existingCheckIn.rows.length > 0) {
+      return res.status(400).json({ message: 'Attendee is already checked in' });
+    }
+
+    // Create check-in record
+    const checkInResult = await pool.query(`
+      INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+      VALUES ($1, $2, NOW())
+      RETURNING log_id, check_in_time
+    `, [registration_id, eventId]);
+
+    // Get attendee details for response
+    const attendeeDetails = await pool.query(`
+      SELECT a.full_name, u.email
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [registration_id]);
+
+    res.json({
+      success: true,
+      message: 'Manual check-in successful',
+      data: {
+        log_id: checkInResult.rows[0].log_id,
+        registration_id: registration_id,
+        check_in_time: checkInResult.rows[0].check_in_time,
+        attendee: attendeeDetails.rows[0]
+      }
+    });
+  } catch (error) {
+    console.error('Error manually checking in attendee:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST QR scan endpoint (alternative endpoint for frontend compatibility)
+app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { qr_code } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    if (!qr_code) {
+      return res.status(400).json({ 
+        status: 'error',
+        message: 'QR code is required' 
+      });
+    }
+
+    // Extract registration_id from QR code
+    const qrParts = qr_code.split('-');
+    if (qrParts.length < 2) {
+      return res.status(400).json({ 
+        status: 'invalid',
+        message: 'Invalid QR code format' 
+      });
+    }
+
+    const registrationId = parseInt(qrParts[0]);
+    const eventIdFromQR = parseInt(qrParts[1]);
+
+    // Verify the QR code is for this event
+    if (eventIdFromQR !== parseInt(eventId)) {
+      return res.status(400).json({ 
+        status: 'invalid',
+        message: 'QR code is not for this event' 
+      });
+    }
+
+    // Verify registration exists for this event
+    const registrationCheck = await pool.query(
+      'SELECT registration_id, attendee_id FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+      [registrationId, eventId]
+    );
+
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ 
+        status: 'invalid',
+        message: 'Registration not found for this event' 
+      });
+    }
+
+    // Check if already checked in
+    const existingCheckIn = await pool.query(
+      'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND check_out_time IS NULL',
+      [registrationId]
+    );
+
+    if (existingCheckIn.rows.length > 0) {
+      return res.status(400).json({ 
+        status: 'duplicate',
+        message: 'Attendee is already checked in' 
+      });
+    }
+
+    // Create check-in record
+    const checkInResult = await pool.query(`
+      INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+      VALUES ($1, $2, NOW())
+      RETURNING log_id, check_in_time
+    `, [registrationId, eventId]);
+
+    // Get attendee details for response
+    const attendeeDetails = await pool.query(`
+      SELECT a.full_name, u.email, er.ticket_quantity
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [registrationId]);
+
+    const attendee = attendeeDetails.rows[0];
+
+    res.json({
+      status: 'success',
+      message: 'QR scan successful - attendee checked in',
+      attendee: {
+        name: attendee.full_name,
+        email: attendee.email,
+        ticketType: 'Standard', // Could be enhanced with actual ticket type
+        checkInTime: checkInResult.rows[0].check_in_time
+      }
+    });
+  } catch (error) {
+    console.error('Error scanning QR code:', error);
+    res.status(500).json({ 
+      status: 'error',
+      message: 'Internal server error' 
+    });
+  }
+});
+
 // Authentication Routes
 // Login user
 app.post('/api/auth/login', async (req, res) => {
