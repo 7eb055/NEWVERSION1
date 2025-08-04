@@ -115,8 +115,12 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
       );
       
       console.log('📊 Loaded comprehensive stats:', response.data);
+      // Add more detailed logging of the stats structure
+      console.log('📊 Stats data structure:', JSON.stringify(response.data.stats, null, 2));
+      
       if (response.data.success) {
         setAttendanceStats({
+
           [selectedEvent]: {
             registrations: {
               total: response.data.stats.total_registered,
@@ -128,7 +132,10 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
             },
             attendance_percentage: response.data.stats.attendance_percentage
           }
+
         });
+        // Log the updated state to confirm
+        console.log('📊 Updated attendanceStats for event:', selectedEvent, response.data.stats);
       }
     } catch (error) {
       console.error('Error loading attendance stats:', error);
@@ -141,6 +148,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
             headers: { 'Authorization': `Bearer ${token}` }
           }
         );
+
         
         console.log('📊 Loaded fallback stats:', fallbackResponse.data);
         if (fallbackResponse.data.success) {
@@ -178,7 +186,23 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
         }
       );
       
-      setScanHistory(response.data.history || []);
+      // Find the selected event name from the events prop
+      const eventName = events.find(e => e.event_id.toString() === selectedEvent.toString())?.event_name || 'Event';
+      
+      // Process the history data to match the expected format for rendering
+      const processedHistory = (response.data.history || []).map(record => ({
+        id: record.log_id,
+        attendeeName: record.attendee_name || 'Unknown',
+        scanTime: record.check_in_time,
+        eventName: eventName,
+        qrCode: record.registration_id?.toString() || 'N/A',
+        ticketType: `Standard (Qty: ${record.ticket_quantity || 1})`,
+        scanMethod: record.scan_method || 'Manual',
+        status: record.check_out_time ? 'checked-out' : 'checked-in',
+        scannedBy: 'Organizer'
+      }));
+      
+      setScanHistory(processedHistory);
     } catch (error) {
       console.error('Error loading scan history:', error);
     }
@@ -277,7 +301,8 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      await axios.post(
+      console.log(`Sending checkout request for registration ${registrationId} to ${API_URL}/api/events/${selectedEvent}/attendance/checkout`);
+      const response = await axios.post(
         `${API_URL}/api/events/${selectedEvent}/attendance/checkout`,
         { registration_id: registrationId },
         {
@@ -288,10 +313,32 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
       // Reload data to reflect changes
       loadAttendees();
       loadAttendanceStats();
+      loadScanHistory();
+      
+      // Display success message with attendee name if available
+      const attendeeName = response.data?.data?.attendee?.full_name || 'Attendee';
+      setSuccess(`${attendeeName} checked out successfully`);
       
     } catch (error) {
       console.error('Error undoing check-in:', error);
-      setError('Failed to undo check-in');
+      
+      // Provide more specific error messages based on the response
+      if (error.response?.status === 404) {
+        setError('Check-out endpoint not found. Please contact support.');
+      } else if (error.response?.data?.message) {
+        setError(`Check-out failed: ${error.response.data.message}`);
+      } else {
+        setError('Failed to process check-out. Please try again.');
+      }
+      
+      // Still try to reload data in case the operation actually succeeded
+      try {
+        loadAttendees();
+        loadAttendanceStats();
+        loadScanHistory();
+      } catch (refreshError) {
+        console.error('Error refreshing data after checkout error:', refreshError);
+      }
     } finally {
       setLoading(false);
     }
@@ -348,9 +395,21 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     }
   };
 
+  // Get scan status safely with a default
+  const getScanStatus = (scan) => {
+    // Default to 'unknown' if scan is undefined
+    if (!scan) return 'unknown';
+    
+    // If status exists, return it, otherwise return 'unknown'
+    return scan.status || 'unknown';
+  };
+
   // Get scan result status icon
   const getScanStatusIcon = (status) => {
-    switch (status) {
+    // Ensure status is a string with a default value
+    const safeStatus = status || 'unknown';
+    
+    switch (safeStatus) {
       case 'success':
         return <i className="fas fa-check-circle scan-success"></i>;
       case 'invalid':
@@ -705,7 +764,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                 {scanHistory.map((scan, index) => (
                   <div key={scan.id || `scan-${index}`} className={`history-item ${scan.status}`}>
                     <div className="history-icon">
-                      {getScanStatusIcon(scan.status)}
+                      {getScanStatusIcon(getScanStatus(scan))}
                     </div>
                     <div className="history-content">
                       <div className="history-header">
@@ -718,8 +777,8 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                         <p><strong>Ticket:</strong> {scan.ticketType}</p>
                         <p><strong>Method:</strong> {scan.scanMethod || 'QR Code'}</p>
                         <p><strong>Status:</strong> 
-                          <span className={`status-badge ${scan.status}`}>
-                            {scan.status.toUpperCase()}
+                          <span className={`status-badge ${getScanStatus(scan)}`}>
+                            {getScanStatus(scan).toUpperCase()}
                           </span>
                         </p>
                         {scan.scannedBy && (
