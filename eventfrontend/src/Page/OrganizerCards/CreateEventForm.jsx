@@ -21,8 +21,8 @@ const CreateEventForm = ({
       try {
         // Fetch event categories
         const categoriesResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/categories`);
-        if (categoriesResponse.data && categoriesResponse.data.categories) {
-          setCategories(categoriesResponse.data.categories);
+        if (categoriesResponse.data) {
+          setCategories(categoriesResponse.data);
         }
       } catch (error) {
         console.error('Error fetching form data:', error);
