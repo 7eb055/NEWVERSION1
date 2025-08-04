@@ -879,28 +879,28 @@ const OrganizerDashboard = () => {
         throw new Error('Event ID is required for registration');
       }
       
-      // Create payload manually to ensure all fields are included
+      // Create payload manually to ensure all fields are included and match backend expectations
       const payload = {
-        email: registrationData.email,
-        full_name: registrationData.full_name,
-        phone: registrationData.phone,
-        ticket_quantity: registrationData.ticket_quantity,
-        special_requirements: registrationData.special_requirements || '',
+        attendeeName: registrationData.attendeeName,
+        attendeeEmail: registrationData.attendeeEmail,
+        attendeePhone: registrationData.attendeePhone,
+        ticketTypeId: registrationData.ticketTypeId ? parseInt(registrationData.ticketTypeId) : null,
+        ticketQuantity: registrationData.ticketQuantity ? parseInt(registrationData.ticketQuantity) : 1,
+        specialRequirements: registrationData.specialRequirements || '',
         company: registrationData.company || '',
-        dietary_restrictions: registrationData.dietary_restrictions || '',
-        accessibility_needs: registrationData.accessibility_needs || '',
+        dietaryRestrictions: registrationData.dietaryRestrictions || '',
+        accessibilityNeeds: registrationData.accessibilityNeeds || '',
         notes: registrationData.notes || '',
-        registration_type: registrationData.registration_type || 'manual',
-        payment_status: registrationData.payment_status || 'paid',
-        ticket_type_id: registrationData.ticket_type_id || null
+        registrationType: registrationData.registrationType || 'manual',
+        paymentStatus: registrationData.paymentStatus || 'paid'
       };
       
       console.log('📤 Final payload being sent to backend:', payload);
       console.log('� URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/manual-registration`);
       
       // Validate required fields before sending
-      if (!payload.email || !payload.full_name) {
-        throw new Error(`Missing required fields: email=${!!payload.email}, full_name=${!!payload.full_name}`);
+      if (!payload.attendeeEmail || !payload.attendeeName || !payload.ticketTypeId) {
+        throw new Error(`Missing required fields: email=${!!payload.attendeeEmail}, name=${!!payload.attendeeName}, ticket=${!!payload.ticketTypeId}`);
       }
       
       const response = await axios.post(

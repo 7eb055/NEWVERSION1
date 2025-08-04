@@ -93,7 +93,21 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
       const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-sales`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setSalesData(response.data);
+      
+      // Ensure we have the expected data structure with defaults
+      const data = {
+        summary: {
+          totalRevenue: response.data.summary?.totalRevenue || 0,
+          totalTicketsSold: response.data.summary?.totalTicketsSold || 0,
+          uniqueCustomers: response.data.summary?.uniqueCustomers || 0,
+          totalCapacity: response.data.summary?.totalCapacity || 0
+        },
+        ticketTypes: response.data.ticketTypes || [],
+        dailySales: response.data.dailySales || [],
+        recentSales: response.data.recentSales || []
+      };
+      
+      setSalesData(data);
       setError('');
     } catch (error) {
       console.error('Error loading sales data:', error);
@@ -507,11 +521,11 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
                         </thead>
                         <tbody>
                           {salesData.ticketTypes.map(ticket => (
-                            <tr key={ticket.ticket_type_id}>
-                              <td>{ticket.type_name}</td>
+                            <tr key={ticket.id}>
+                              <td>{ticket.name}</td>
                               <td>{formatCurrency(ticket.price)}</td>
-                              <td>{ticket.quantity_sold}</td>
-                              <td>{ticket.quantity_available}</td>
+                              <td>{ticket.sold}</td>
+                              <td>{ticket.available}</td>
                               <td>{formatCurrency(ticket.revenue)}</td>
                               <td>
                                 {salesData.summary.totalRevenue > 0 
