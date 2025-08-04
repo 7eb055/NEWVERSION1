@@ -1785,6 +1785,529 @@ app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== ATTENDEE DASHBOARD ROUTES =====
+
+// GET event sessions/schedule for an event
+app.get('/api/events/:eventId/sessions', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { day } = req.query;
+
+    // Check if event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id, event_name FROM events WHERE event_id = $1',
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Create event_sessions table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS event_sessions (
+          session_id SERIAL PRIMARY KEY,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          start_time TIME NOT NULL,
+          end_time TIME NOT NULL,
+          session_date DATE NOT NULL,
+          location VARCHAR(255),
+          speaker_id INTEGER,
+          session_type VARCHAR(50) DEFAULT 'session',
+          max_attendees INTEGER,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Insert sample sessions if table is empty
+      const sessionCount = await pool.query('SELECT COUNT(*) FROM event_sessions WHERE event_id = $1', [eventId]);
+      if (parseInt(sessionCount.rows[0].count) === 0) {
+        await pool.query(`
+          INSERT INTO event_sessions (event_id, title, description, start_time, end_time, session_date, location, session_type)
+          VALUES 
+          ($1, 'The Future of Artificial Intelligence', 'Explore the latest advancements in AI and machine learning, and how they will transform industries in the coming decade.', '09:00', '10:00', CURRENT_DATE, 'Grand Ballroom A', 'keynote'),
+          ($1, 'Building Scalable Cloud Infrastructure', 'Best practices for designing and implementing cloud solutions that can scale with your business needs.', '10:30', '11:15', CURRENT_DATE, 'Room 203', 'session'),
+          ($1, 'Workshop: Modern Web Development', 'Hands-on session covering the latest tools and frameworks for building responsive, accessible web applications.', '11:30', '13:00', CURRENT_DATE, 'Workshop Room B', 'workshop'),
+          ($1, 'Lunch & Networking', 'Enjoy lunch while connecting with fellow attendees and industry professionals.', '13:30', '14:30', CURRENT_DATE, 'Main Dining Hall', 'networking')
+        `, [eventId]);
+      }
+    } catch (createError) {
+      console.log('Sessions table already exists or creation failed:', createError.message);
+    }
+
+    // Get sessions for the event
+    let query = `
+      SELECT session_id, title, description, start_time, end_time, 
+             session_date, location, session_type, max_attendees
+      FROM event_sessions 
+      WHERE event_id = $1
+    `;
+    let params = [eventId];
+
+    if (day) {
+      query += ' AND session_date = CURRENT_DATE + INTERVAL $2 DAY';
+      params.push(day - 1);
+    }
+
+    query += ' ORDER BY session_date, start_time';
+
+    const sessions = await pool.query(query, params);
+
+    // Format sessions for frontend
+    const formattedSessions = sessions.rows.map(session => ({
+      id: session.session_id,
+      time: session.start_time.substring(0, 5) + (parseInt(session.start_time.substring(0, 2)) >= 12 ? ' PM' : ' AM'),
+      duration: calculateDuration(session.start_time, session.end_time),
+      title: session.title,
+      location: session.location,
+      description: session.description,
+      type: session.session_type,
+      added: false // Will be updated based on user's agenda
+    }));
+
+    res.json(formattedSessions);
+  } catch (error) {
+    console.error('Error fetching event sessions:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET event speakers
+app.get('/api/events/:eventId/speakers', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Check if event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Create event_speakers table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS event_speakers (
+          speaker_id SERIAL PRIMARY KEY,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          title VARCHAR(255),
+          company VARCHAR(255),
+          bio TEXT,
+          profile_image VARCHAR(500),
+          email VARCHAR(255),
+          linkedin VARCHAR(500),
+          twitter VARCHAR(255),
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Insert sample speakers if table is empty
+      const speakerCount = await pool.query('SELECT COUNT(*) FROM event_speakers WHERE event_id = $1', [eventId]);
+      if (parseInt(speakerCount.rows[0].count) === 0) {
+        await pool.query(`
+          INSERT INTO event_speakers (event_id, name, title, company, bio)
+          VALUES 
+          ($1, 'Jennifer Davis', 'AI Research Lead', 'TechFuture', 'Leading AI researcher with 10+ years experience in machine learning and neural networks.'),
+          ($1, 'Michael Rodriguez', 'Chief Technology Officer', 'CloudScale Inc.', 'Veteran cloud architect specializing in scalable infrastructure and DevOps practices.'),
+          ($1, 'Sarah Peterson', 'Senior Developer', 'WebInnovate', 'Full-stack developer passionate about modern web technologies and user experience.')
+        `, [eventId]);
+      }
+    } catch (createError) {
+      console.log('Speakers table already exists or creation failed:', createError.message);
+    }
+
+    const speakers = await pool.query(`
+      SELECT speaker_id, name, title, company, bio, profile_image, email, linkedin, twitter
+      FROM event_speakers 
+      WHERE event_id = $1
+      ORDER BY speaker_id
+    `, [eventId]);
+
+    // Format speakers for frontend
+    const formattedSpeakers = speakers.rows.map(speaker => ({
+      id: speaker.speaker_id,
+      name: speaker.name,
+      title: speaker.title + (speaker.company ? ', ' + speaker.company : ''),
+      initials: speaker.name.split(' ').map(n => n[0]).join('').toUpperCase(),
+      bio: speaker.bio,
+      email: speaker.email,
+      linkedin: speaker.linkedin,
+      twitter: speaker.twitter,
+      profileImage: speaker.profile_image
+    }));
+
+    res.json(formattedSpeakers);
+  } catch (error) {
+    console.error('Error fetching event speakers:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET event resources
+app.get('/api/events/:eventId/resources', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Check if event exists
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1',
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    // Create event_resources table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS event_resources (
+          resource_id SERIAL PRIMARY KEY,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          title VARCHAR(255) NOT NULL,
+          description TEXT,
+          resource_type VARCHAR(50) NOT NULL,
+          file_url VARCHAR(500),
+          file_size VARCHAR(20),
+          download_count INTEGER DEFAULT 0,
+          is_public BOOLEAN DEFAULT true,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Insert sample resources if table is empty
+      const resourceCount = await pool.query('SELECT COUNT(*) FROM event_resources WHERE event_id = $1', [eventId]);
+      if (parseInt(resourceCount.rows[0].count) === 0) {
+        await pool.query(`
+          INSERT INTO event_resources (event_id, title, description, resource_type, file_size)
+          VALUES 
+          ($1, 'Venue Map', 'Interactive map of the conference venue', 'map', '2.4 MB'),
+          ($1, 'Full Schedule', 'Complete event schedule with all sessions', 'file-pdf', '1.1 MB'),
+          ($1, 'Speaker Bios', 'Detailed biographies of all speakers', 'users', '3.2 MB'),
+          ($1, 'Wi-Fi Access', 'Network credentials and connection guide', 'wifi', 'Network: TechForward-Guest')
+        `, [eventId]);
+      }
+    } catch (createError) {
+      console.log('Resources table already exists or creation failed:', createError.message);
+    }
+
+    const resources = await pool.query(`
+      SELECT resource_id, title, description, resource_type, file_url, 
+             file_size, download_count, is_public
+      FROM event_resources 
+      WHERE event_id = $1 AND is_public = true
+      ORDER BY resource_id
+    `, [eventId]);
+
+    // Format resources for frontend
+    const formattedResources = resources.rows.map(resource => ({
+      id: resource.resource_id,
+      title: resource.title,
+      details: resource.file_size || resource.description,
+      icon: resource.resource_type,
+      url: resource.file_url,
+      downloads: resource.download_count
+    }));
+
+    res.json(formattedResources);
+  } catch (error) {
+    console.error('Error fetching event resources:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET user's personal agenda for an event
+app.get('/api/events/:eventId/my-agenda', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Get attendee_id from the user
+    const attendeeQuery = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (attendeeQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an attendee' });
+    }
+
+    const attendeeId = attendeeQuery.rows[0].attendee_id;
+
+    // Create personal_agenda table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS personal_agenda (
+          agenda_id SERIAL PRIMARY KEY,
+          attendee_id INTEGER REFERENCES attendees(attendee_id) ON DELETE CASCADE,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          session_id INTEGER REFERENCES event_sessions(session_id) ON DELETE CASCADE,
+          added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE(attendee_id, session_id)
+        )
+      `);
+    } catch (createError) {
+      console.log('Personal agenda table already exists or creation failed:', createError.message);
+    }
+
+    // Get user's agenda items
+    const agendaItems = await pool.query(`
+      SELECT es.session_id, es.title, es.description, es.start_time, es.end_time,
+             es.session_date, es.location, es.session_type
+      FROM personal_agenda pa
+      JOIN event_sessions es ON pa.session_id = es.session_id
+      WHERE pa.attendee_id = $1 AND pa.event_id = $2
+      ORDER BY es.session_date, es.start_time
+    `, [attendeeId, eventId]);
+
+    // Format agenda items for frontend
+    const formattedItems = agendaItems.rows.map(item => ({
+      id: item.session_id,
+      time: item.start_time.substring(0, 5) + (parseInt(item.start_time.substring(0, 2)) >= 12 ? ' PM' : ' AM'),
+      duration: calculateDuration(item.start_time, item.end_time),
+      title: item.title,
+      location: item.location,
+      description: item.description,
+      added: true
+    }));
+
+    res.json(formattedItems);
+  } catch (error) {
+    console.error('Error fetching personal agenda:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST add session to personal agenda
+app.post('/api/events/:eventId/agenda/add', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { sessionId } = req.body;
+
+    // Get attendee_id from the user
+    const attendeeQuery = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (attendeeQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an attendee' });
+    }
+
+    const attendeeId = attendeeQuery.rows[0].attendee_id;
+
+    // Verify session exists and belongs to this event
+    const sessionCheck = await pool.query(
+      'SELECT title FROM event_sessions WHERE session_id = $1 AND event_id = $2',
+      [sessionId, eventId]
+    );
+
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    // Add to agenda (use ON CONFLICT to handle duplicates)
+    await pool.query(`
+      INSERT INTO personal_agenda (attendee_id, event_id, session_id)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (attendee_id, session_id) DO NOTHING
+    `, [attendeeId, eventId, sessionId]);
+
+    res.json({ 
+      success: true, 
+      message: `"${sessionCheck.rows[0].title}" added to agenda` 
+    });
+  } catch (error) {
+    console.error('Error adding to agenda:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE remove session from personal agenda
+app.delete('/api/events/:eventId/agenda/:sessionId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, sessionId } = req.params;
+
+    // Get attendee_id from the user
+    const attendeeQuery = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (attendeeQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an attendee' });
+    }
+
+    const attendeeId = attendeeQuery.rows[0].attendee_id;
+
+    // Get session title for response
+    const sessionCheck = await pool.query(
+      'SELECT title FROM event_sessions WHERE session_id = $1 AND event_id = $2',
+      [sessionId, eventId]
+    );
+
+    if (sessionCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    // Remove from agenda
+    await pool.query(
+      'DELETE FROM personal_agenda WHERE attendee_id = $1 AND session_id = $2',
+      [attendeeId, sessionId]
+    );
+
+    res.json({ 
+      success: true, 
+      message: `"${sessionCheck.rows[0].title}" removed from agenda` 
+    });
+  } catch (error) {
+    console.error('Error removing from agenda:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET attendee's registered events for dashboard
+app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
+  try {
+    // Get attendee_id from the user
+    const attendeeQuery = await pool.query(
+      'SELECT attendee_id, full_name FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (attendeeQuery.rows.length === 0) {
+      // If user is not in attendees table, create a basic entry
+      const userQuery = await pool.query(
+        'SELECT email FROM users WHERE user_id = $1',
+        [req.user.user_id]
+      );
+      
+      if (userQuery.rows.length === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      // Create attendee record with basic info
+      const newAttendee = await pool.query(
+        'INSERT INTO attendees (user_id, full_name) VALUES ($1, $2) RETURNING attendee_id, full_name',
+        [req.user.user_id, userQuery.rows[0].email.split('@')[0]]
+      );
+      
+      const { attendee_id: attendeeId, full_name: attendeeName } = newAttendee.rows[0];
+      
+      return res.json({
+        attendee: {
+          name: attendeeName,
+          id: attendeeId
+        },
+        registeredEvents: [],
+        upcomingSessions: []
+      });
+    }
+
+    const { attendee_id: attendeeId, full_name: attendeeName } = attendeeQuery.rows[0];
+
+    // Get attendee's registered events
+    const eventsQuery = await pool.query(`
+      SELECT e.event_id, e.event_name, e.event_date, e.status,
+             er.registration_date, er.ticket_quantity,
+             o.full_name as organizer_name, o.company_name
+      FROM eventregistrations er
+      JOIN events e ON er.event_id = e.event_id
+      JOIN organizers o ON e.organizer_id = o.organizer_id
+      WHERE er.attendee_id = $1
+      ORDER BY e.event_date ASC
+    `, [attendeeId]);
+
+    // Get upcoming sessions from agenda
+    const upcomingSessions = await pool.query(`
+      SELECT es.title, es.start_time, es.session_date, es.location, e.event_name
+      FROM personal_agenda pa
+      JOIN event_sessions es ON pa.session_id = es.session_id
+      JOIN events e ON pa.event_id = e.event_id
+      WHERE pa.attendee_id = $1 
+      AND es.session_date >= CURRENT_DATE
+      AND (es.session_date > CURRENT_DATE OR es.start_time > CURRENT_TIME)
+      ORDER BY es.session_date, es.start_time
+      LIMIT 3
+    `, [attendeeId]);
+
+    res.json({
+      attendee: {
+        name: attendeeName,
+        id: attendeeId
+      },
+      registeredEvents: eventsQuery.rows,
+      upcomingSessions: upcomingSessions.rows
+    });
+  } catch (error) {
+    console.error('Error fetching attendee dashboard:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET networking opportunities (other attendees)
+app.get('/api/events/:eventId/networking', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+
+    // Get attendee_id from the user
+    const attendeeQuery = await pool.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (attendeeQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an attendee' });
+    }
+
+    const attendeeId = attendeeQuery.rows[0].attendee_id;
+
+    // Get other attendees registered for the same event
+    const networkingQuery = await pool.query(`
+      SELECT DISTINCT a.attendee_id, a.full_name, u.email,
+             o.company_name as company
+      FROM eventregistrations er1
+      JOIN eventregistrations er2 ON er1.event_id = er2.event_id
+      JOIN attendees a ON er2.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN organizers o ON EXISTS (
+        SELECT 1 FROM organizers org WHERE org.user_id = u.user_id
+      )
+      WHERE er1.attendee_id = $1 
+      AND er1.event_id = $2
+      AND er2.attendee_id != $1
+      ORDER BY a.full_name
+      LIMIT 20
+    `, [attendeeId, eventId]);
+
+    res.json(networkingQuery.rows);
+  } catch (error) {
+    console.error('Error fetching networking data:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Helper function to calculate session duration
+function calculateDuration(startTime, endTime) {
+  const start = new Date(`2000-01-01T${startTime}`);
+  const end = new Date(`2000-01-01T${endTime}`);
+  const diffMs = end - start;
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins >= 60) {
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  }
+  return `${diffMins} min`;
+}
+
 // Basic health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 

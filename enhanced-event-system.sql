@@ -24,7 +24,7 @@ CREATE TABLE Users (
     email VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     role_type VARCHAR(20) NOT NULL CHECK (role_type IN ('attendee', 'organizer')),
-    email_verified BOOLEAN DEFAULT FALSE,
+    is_email_verified BOOLEAN DEFAULT FALSE,
     email_verification_token VARCHAR(255),
     email_verification_token_expires TIMESTAMP,
     email_verified_at TIMESTAMP,
