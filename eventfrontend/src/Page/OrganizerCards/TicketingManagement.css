@@ -45,7 +45,7 @@
 
 .tab-btn:hover {
   background: rgba(102, 126, 234, 0.1);
-  color: #667eea;
+  color: #dfe0e4;
 }
 
 .tab-btn.active {
@@ -427,7 +427,7 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #c89deb 0%, #764ba2 100%);
   color: white;
 }
 
@@ -645,7 +645,7 @@
 }
 
 .section-header h3 i {
-  color: #667eea;
+  color: #9bea66;
   font-size: 1.3rem;
 }
 

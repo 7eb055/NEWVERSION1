@@ -149,18 +149,18 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
       // Transform form data to match backend expectations
       const submissionData = {
         eventId: formData.eventId, // Include eventId for the handler
-        email: formData.attendeeEmail,
-        full_name: formData.attendeeName,
-        phone: formData.attendeePhone,
-        ticket_quantity: parseInt(formData.ticketQuantity),
-        special_requirements: formData.specialRequirements,
+        attendeeName: formData.attendeeName,
+        attendeeEmail: formData.attendeeEmail,
+        attendeePhone: formData.attendeePhone,
+        ticketTypeId: formData.ticketTypeId ? parseInt(formData.ticketTypeId) : null,
+        ticketQuantity: parseInt(formData.ticketQuantity),
+        specialRequirements: formData.specialRequirements,
         company: formData.company,
-        dietary_restrictions: formData.dietaryRestrictions,
-        accessibility_needs: formData.accessibilityNeeds,
+        dietaryRestrictions: formData.dietaryRestrictions,
+        accessibilityNeeds: formData.accessibilityNeeds,
         notes: formData.notes,
-        registration_type: formData.registrationType,
-        payment_status: formData.paymentStatus,
-        ticket_type_id: formData.ticketTypeId ? parseInt(formData.ticketTypeId) : null
+        registrationType: formData.registrationType,
+        paymentStatus: formData.paymentStatus
       };
       
       console.log('🔍 Form data before submission:', formData);

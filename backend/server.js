@@ -69,6 +69,26 @@ const authorizeAdmin = (req, res, next) => {
   }
 };
 
+// Middleware to verify organizer role
+const authorizeOrganizer = async (req, res, next) => {
+  try {
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'Forbidden: Organizers only' });
+    }
+
+    req.organizer = organizerQuery.rows[0];
+    next();
+  } catch (error) {
+    console.error('Error in organizer authorization:', error);
+    return res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
 // Admin Routes
 // GET dashboard statistics
 app.get('/api/admin/dashboard-stats', authenticateToken, authorizeAdmin, async (req, res) => {
@@ -532,6 +552,139 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
 
 // General Event Routes
 // GET all events (public)
+// GET company by ID
+app.get('/api/companies/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get company details
+    const companyQuery = await pool.query(
+      `SELECT * FROM eventcompanies WHERE company_id = $1`,
+      [id]
+    );
+
+    if (companyQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found' });
+    }
+
+    res.json(companyQuery.rows[0]);
+  } catch (error) {
+    console.error('Error fetching company:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// PUT update company
+app.put('/api/companies/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { company_name, company_type, category, address, contact_info, description, services } = req.body;
+    
+    // Validate required fields
+    if (!company_name || !company_type || !category || !contact_info) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    // Get the user's organizer_id
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if company exists and belongs to this organizer
+    const companyCheck = await pool.query(
+      `SELECT company_id FROM eventcompanies 
+       WHERE company_id = $1 AND organizer_id = $2`,
+      [id, organizerId]
+    );
+
+    if (companyCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found or not owned by organizer' });
+    }
+
+    // Update company
+    const result = await pool.query(
+      `UPDATE eventcompanies SET 
+       company_name = $1, company_type = $2, category = $3, 
+       address = $4, contact_info = $5, description = $6, 
+       services = $7, updated_at = NOW()
+       WHERE company_id = $8 AND organizer_id = $9
+       RETURNING *`,
+      [company_name, company_type, category, address, contact_info, description, services, id, organizerId]
+    );
+
+    res.json({
+      message: 'Company updated successfully',
+      company: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error updating company:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE company
+app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get the user's organizer_id
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if company exists and belongs to this organizer
+    const companyCheck = await pool.query(
+      `SELECT company_id FROM eventcompanies 
+       WHERE company_id = $1 AND organizer_id = $2`,
+      [id, organizerId]
+    );
+
+    if (companyCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Company not found or not owned by organizer' });
+    }
+
+    // Delete the company
+    await pool.query(
+      'DELETE FROM eventcompanies WHERE company_id = $1',
+      [id]
+    );
+
+    res.json({ message: 'Company deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting company:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// General Event Routes
+// GET all categories
+app.get('/api/categories', async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT category_id, category_name, description, icon_class, color_code FROM eventcategories ORDER BY category_name'
+    );
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET all events (public)
 app.get('/api/events', async (req, res) => {
   try {
     const { status = 'published', limit = 20, page = 1 } = req.query;
@@ -665,6 +818,213 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
   }
 });
 
+// POST manual event registration by organizer
+app.post('/api/events/:eventId/manual-registration', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const {
+      attendeeName,
+      attendeeEmail,
+      attendeePhone,
+      company,
+      ticketTypeId,
+      ticketQuantity = 1,
+      registrationType = 'manual',
+      paymentStatus = 'paid',
+      specialRequirements,
+      dietaryRestrictions,
+      accessibilityNeeds,
+      notes
+    } = req.body;
+
+    // Validate required fields
+    if (!attendeeName || !attendeeEmail || !ticketTypeId) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Name, email, and ticket type are required' 
+      });
+    }
+
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerQuery.rows[0].organizer_id]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Start transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Create or get user and attendee
+      let userId, attendeeId;
+
+      // Check if user exists
+      const userCheck = await client.query(
+        'SELECT user_id FROM users WHERE email = $1',
+        [attendeeEmail]
+      );
+
+      if (userCheck.rows.length === 0) {
+        // Generate a random temporary password (they can reset it later)
+        const tempPassword = Math.random().toString(36).slice(-8);
+        const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+        // Create new user with the hashed password
+        const userResult = await client.query(
+          'INSERT INTO users (email, password, role_type) VALUES ($1, $2, $3) RETURNING user_id',
+          [attendeeEmail, hashedPassword, 'attendee']
+        );
+        userId = userResult.rows[0].user_id;
+
+        // Create new attendee
+        const attendeeResult = await client.query(
+          `INSERT INTO attendees (
+            user_id, full_name, phone, 
+            dietary_restrictions, accessibility_needs, 
+            created_at
+          ) VALUES ($1, $2, $3, $4, $5, NOW()) 
+          RETURNING attendee_id`,
+          [userId, attendeeName, attendeePhone, dietaryRestrictions, accessibilityNeeds]
+        );
+        attendeeId = attendeeResult.rows[0].attendee_id;
+      } else {
+        // User exists, get or create attendee profile
+        userId = userCheck.rows[0].user_id;
+        const attendeeCheck = await client.query(
+          'SELECT attendee_id FROM attendees WHERE user_id = $1',
+          [userId]
+        );
+
+        if (attendeeCheck.rows.length === 0) {
+          // Create attendee profile for existing user
+          const attendeeResult = await client.query(
+            `INSERT INTO attendees (
+              user_id, full_name, phone, 
+              dietary_restrictions, accessibility_needs, 
+              created_at
+            ) VALUES ($1, $2, $3, $4, $5, NOW()) 
+            RETURNING attendee_id`,
+            [userId, attendeeName, attendeePhone, dietaryRestrictions, accessibilityNeeds]
+          );
+          attendeeId = attendeeResult.rows[0].attendee_id;
+        } else {
+          attendeeId = attendeeCheck.rows[0].attendee_id;
+          // Update existing attendee information
+          await client.query(
+            `UPDATE attendees SET 
+              full_name = COALESCE($1, full_name),
+              phone = COALESCE($2, phone),
+              dietary_restrictions = COALESCE($3, dietary_restrictions),
+              accessibility_needs = COALESCE($4, accessibility_needs),
+              updated_at = NOW()
+            WHERE attendee_id = $5`,
+            [attendeeName, attendeePhone, dietaryRestrictions, accessibilityNeeds, attendeeId]
+          );
+        }
+      }
+
+      // Get ticket price and check availability
+      const ticketResult = await client.query(
+        'SELECT price, quantity_available, quantity_sold FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
+        [ticketTypeId, eventId]
+      );
+
+      if (ticketResult.rows.length === 0) {
+        throw new Error('Invalid ticket type');
+      }
+
+      const ticket = ticketResult.rows[0];
+      const totalAmount = ticket.price * ticketQuantity;
+
+      // Create registration
+      const registrationResult = await client.query(
+        `INSERT INTO eventregistrations (
+          event_id, attendee_id, ticket_type_id, 
+          ticket_quantity, total_amount, payment_status,
+          special_requirements, registration_date, status,
+          registration_type, notes
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), $8, $9, $10)
+        RETURNING registration_id`,
+        [
+          eventId,
+          attendeeId,
+          ticketTypeId,
+          ticketQuantity,
+          totalAmount,
+          paymentStatus,
+          specialRequirements,
+          'confirmed',
+          registrationType,
+          notes
+        ]
+      );
+
+      // Update ticket quantity_sold
+      await client.query(
+        'UPDATE tickettypes SET quantity_sold = COALESCE(quantity_sold, 0) + $1 WHERE ticket_type_id = $2',
+        [ticketQuantity, ticketTypeId]
+      );
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        success: true,
+        message: 'Manual registration successful',
+        data: {
+          registrationId: registrationResult.rows[0].registration_id,
+          attendeeId: attendeeId,
+          userId: userId,
+          totalAmount: totalAmount
+        }
+      });
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error during manual registration:', error);
+    
+    // Provide specific error messages based on the error type
+    let statusCode = 500;
+    let errorMessage = 'Internal server error during registration';
+
+    if (error.code === '23502') { // not-null violation
+      statusCode = 400;
+      errorMessage = 'Required field missing: ' + error.column;
+    } else if (error.code === '23505') { // unique violation
+      statusCode = 409;
+      errorMessage = 'User with this email already exists';
+    } else if (error.code === '23503') { // foreign key violation
+      statusCode = 400;
+      errorMessage = 'Invalid reference: ' + error.detail;
+    }
+
+    res.status(statusCode).json({
+      success: false,
+      message: errorMessage,
+      error: error.message,
+      detail: process.env.NODE_ENV === 'development' ? error.detail : undefined
+    });
+  }
+});
+
 // GET attendee's registrations
 app.get('/api/my-registrations', authenticateToken, async (req, res) => {
   try {
@@ -737,20 +1097,54 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
 });
 
 // GET all companies/organizers
+// Company Routes
+// POST create company
+app.post('/api/companies', authenticateToken, authorizeOrganizer, async (req, res) => {
+  try {
+    const { company_name, company_type, category, address, contact_info, description, services } = req.body;
+    
+    // Validate required fields
+    if (!company_name || !company_type || !category || !contact_info) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    const organizerId = req.organizer.organizer_id;
+
+    // Insert into eventcompanies table
+    const result = await pool.query(
+      `INSERT INTO eventcompanies (
+        company_name, company_type, category, address, 
+        contact_info, description, services, organizer_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
+      [company_name, company_type, category, address, contact_info, description, services, organizerId]
+    );
+
+    res.status(201).json({
+      message: 'Company created successfully',
+      company: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating company:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET companies list
 app.get('/api/companies', authenticateToken, async (req, res) => {
   try {
     const companiesQuery = await pool.query(`
-      SELECT o.organizer_id, o.full_name, o.company_name, o.business_address, 
-             o.phone, o.created_at, u.email,
-             COUNT(e.event_id) as event_count
-      FROM organizers o
-      LEFT JOIN users u ON o.user_id = u.user_id
-      LEFT JOIN events e ON o.organizer_id = e.organizer_id
-      GROUP BY o.organizer_id, u.email
-      ORDER BY o.created_at DESC
+      SELECT 
+        company_id, company_name, company_type, category, 
+        address, contact_info, description, services,
+        created_at, updated_at
+      FROM eventcompanies
+      ORDER BY created_at DESC
     `);
 
-    res.json(companiesQuery.rows);
+    res.json({
+      success: true,
+      companies: companiesQuery.rows
+    });
   } catch (error) {
     console.error('Error fetching companies:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -775,6 +1169,145 @@ app.get('/api/attendees', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching attendees:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST create new attendee
+app.post('/api/attendees', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const {
+      email,
+      full_name,
+      phone,
+      date_of_birth,
+      gender,
+      interests,
+      emergency_contact_name,
+      emergency_contact_phone,
+      dietary_restrictions,
+      accessibility_needs,
+      profile_picture_url,
+      bio,
+      social_media_links,
+      notification_preferences
+    } = req.body;
+
+    // Validate required fields
+    if (!email || !full_name) {
+      return res.status(400).json({ message: 'Email and full name are required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Check if user exists
+    const userCheck = await client.query(
+      'SELECT user_id FROM users WHERE email = $1',
+      [email]
+    );
+
+    let userId;
+    let tempPassword;
+    if (userCheck.rows.length === 0) {
+      // Create new user
+      tempPassword = Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+
+      const userResult = await client.query(
+        'INSERT INTO users (email, password, role_type) VALUES ($1, $2, $3) RETURNING user_id',
+        [email, hashedPassword, 'attendee']
+      );
+      userId = userResult.rows[0].user_id;
+    } else {
+      userId = userCheck.rows[0].user_id;
+      tempPassword = undefined;
+    }
+
+    // Create or update attendee profile
+    const attendeeCheck = await client.query(
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      [userId]
+    );
+
+    let result;
+    if (attendeeCheck.rows.length === 0) {
+      // Create new attendee
+      result = await client.query(
+        `INSERT INTO attendees (
+          user_id, full_name, phone, date_of_birth, gender,
+          interests, emergency_contact_name, emergency_contact_phone,
+          dietary_restrictions, accessibility_needs,
+          profile_picture_url, bio, social_media_links,
+          notification_preferences, created_at
+        ) VALUES ($1, $2, $3, NULLIF($4, '')::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+        RETURNING *`,
+        [
+          userId, full_name, phone, date_of_birth || null, gender,
+          interests, emergency_contact_name, emergency_contact_phone,
+          dietary_restrictions, accessibility_needs,
+          profile_picture_url, bio, social_media_links,
+          notification_preferences
+        ]
+      );
+    } else {
+      // Update existing attendee
+      result = await client.query(
+        `UPDATE attendees SET
+          full_name = $2,
+          phone = $3,
+          date_of_birth = NULLIF($4, '')::date,
+          gender = $5,
+          interests = $6,
+          emergency_contact_name = $7,
+          emergency_contact_phone = $8,
+          dietary_restrictions = $9,
+          accessibility_needs = $10,
+          profile_picture_url = $11,
+          bio = $12,
+          social_media_links = $13,
+          notification_preferences = $14,
+          updated_at = NOW()
+        WHERE user_id = $1
+        RETURNING *`,
+        [
+          userId, full_name, phone, date_of_birth || null, gender,
+          interests, emergency_contact_name, emergency_contact_phone,
+          dietary_restrictions, accessibility_needs,
+          profile_picture_url, bio, social_media_links,
+          notification_preferences
+        ]
+      );
+    }
+
+    await client.query('COMMIT');
+
+    res.status(201).json({
+      success: true,
+      message: attendeeCheck.rows.length === 0 ? 'Attendee created successfully' : 'Attendee updated successfully',
+      data: {
+        attendee: result.rows[0],
+        temporary_password: tempPassword // Now tempPassword is properly defined in scope
+      }
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating/updating attendee:', error);
+    
+    let statusCode = 500;
+    let message = 'Internal server error';
+
+    if (error.code === '23505') { // unique violation
+      statusCode = 400;
+      message = 'Email already exists';
+    }
+
+    res.status(statusCode).json({
+      success: false,
+      message: message,
+      error: error.message
+    });
+  } finally {
+    client.release();
   }
 });
 
@@ -958,19 +1491,110 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
       return res.status(404).json({ message: 'Event not found or not owned by organizer' });
     }
 
-    // Get registrations for this event
-    const registrationsQuery = await pool.query(`
-      SELECT er.registration_id, er.registration_date, er.total_amount, 
-             er.payment_status, er.ticket_quantity,
-             a.full_name, a.phone, u.email
+    const registrationsResult = await pool.query(
+      'SELECT r.*, u.email, u.username FROM registrations r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.event_id = $1',
+      [eventId]
+    );
+
+    return res.json(registrationsResult.rows);
+  } catch (error) {
+    console.error('Error getting registrations:', error);
+    res.status(500).json({ message: 'Error getting registrations', error: error.message });
+  }
+});
+
+// GET detailed event registrations for organizer (including ticket type and attendance info)
+app.get('/api/events/:eventId/registrations-detailed', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Get detailed registrations with user info, ticket type, and attendance status
+    const detailedRegistrationsQuery = `
+      SELECT 
+        er.registration_id,
+        er.event_id,
+        er.attendee_id,
+        er.registration_date,
+        er.payment_status,
+        er.total_amount as amount_paid,
+        er.ticket_quantity,
+        u.email,
+        COALESCE(u.role_type, 'attendee') as user_role,
+        a.full_name,
+        a.phone,
+        tt.type_name as ticket_name,
+        tt.price as ticket_price,
+        tt.description as ticket_description,
+        tt.benefits,
+        EXISTS(
+          SELECT 1 
+          FROM attendancelogs al 
+          WHERE al.registration_id = er.registration_id 
+          AND al.check_out_time IS NULL
+        ) as is_checked_in,
+        (
+          SELECT json_build_object(
+            'check_in_time', MAX(al.check_in_time),
+            'check_in_method', MAX(al.scan_method),
+            'has_active_session', BOOL_OR(al.check_out_time IS NULL)
+          )
+          FROM attendancelogs al
+          WHERE al.registration_id = er.registration_id
+          AND al.check_out_time IS NULL
+        ) as current_attendance
       FROM eventregistrations er
       JOIN attendees a ON er.attendee_id = a.attendee_id
       JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
       WHERE er.event_id = $1
       ORDER BY er.registration_date DESC
-    `, [eventId]);
+    `;
 
-    res.json(registrationsQuery.rows);
+    const registrationsResult = await pool.query(detailedRegistrationsQuery, [eventId]);
+
+    // Get summary statistics
+    const summaryQuery = `
+      SELECT 
+        COUNT(*) as total_registrations,
+        COUNT(CASE WHEN payment_status = 'paid' THEN 1 END) as paid_registrations,
+        SUM(total_amount) as total_revenue,
+        COUNT(CASE WHEN EXISTS(
+          SELECT 1 FROM attendancelogs al 
+          WHERE al.registration_id = er.registration_id 
+          AND al.check_out_time IS NULL
+        ) THEN 1 END) as currently_checked_in
+      FROM eventregistrations er
+      WHERE er.event_id = $1
+    `;
+
+    const summaryResult = await pool.query(summaryQuery, [eventId]);
+
+    return res.json({
+      registrations: registrationsResult.rows,
+      summary: summaryResult.rows[0]
+    });
   } catch (error) {
     console.error('Error fetching event registrations:', error);
     res.status(500).json({ message: 'Internal server error' });
@@ -1257,6 +1881,186 @@ app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, as
 });
 
 // DELETE a ticket type
+app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, ticketTypeId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Delete the ticket type
+    await pool.query('DELETE FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2', [ticketTypeId, eventId]);
+
+    res.json({
+      success: true,
+      message: 'Ticket type deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting ticket type:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET ticket sales data for an event
+app.get('/api/events/:eventId/ticket-sales', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { period = '30' } = req.query; // Default to last 30 days
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Get sales data by ticket type
+    const ticketTypeSalesQuery = await pool.query(`
+      SELECT 
+        tt.ticket_type_id,
+        tt.type_name,
+        tt.price,
+        tt.quantity_available,
+        COUNT(er.registration_id) as tickets_sold,
+        SUM(er.ticket_quantity) as total_quantity_sold,
+        SUM(er.total_amount) as total_revenue,
+        COUNT(DISTINCT er.attendee_id) as unique_buyers
+      FROM tickettypes tt
+      LEFT JOIN eventregistrations er ON tt.ticket_type_id = er.ticket_type_id
+        AND er.registration_date >= NOW() - INTERVAL '${period} days'
+        AND er.payment_status = 'completed'
+      WHERE tt.event_id = $1
+      GROUP BY tt.ticket_type_id, tt.type_name, tt.price, tt.quantity_available
+      ORDER BY tt.price ASC
+    `, [eventId]);
+
+    // Get daily sales data
+    const dailySalesQuery = await pool.query(`
+      SELECT 
+        DATE(er.registration_date) as date,
+        COUNT(er.registration_id) as transactions,
+        SUM(er.ticket_quantity) as tickets_sold,
+        SUM(er.total_amount) as revenue
+      FROM eventregistrations er
+      WHERE er.event_id = $1
+        AND er.registration_date >= NOW() - INTERVAL '${period} days'
+        AND er.payment_status = 'completed'
+      GROUP BY DATE(er.registration_date)
+      ORDER BY date ASC
+    `, [eventId]);
+
+    // Get overall sales summary
+    const salesSummaryQuery = await pool.query(`
+      SELECT 
+        COUNT(er.registration_id) as total_transactions,
+        SUM(er.ticket_quantity) as total_tickets_sold,
+        SUM(er.total_amount) as total_revenue,
+        COUNT(DISTINCT er.attendee_id) as unique_customers,
+        MAX(er.registration_date) as latest_sale,
+        MIN(er.registration_date) as first_sale
+      FROM eventregistrations er
+      WHERE er.event_id = $1
+        AND er.payment_status = 'completed'
+    `, [eventId]);
+
+    // Get recent sales
+    const recentSalesQuery = await pool.query(`
+      SELECT 
+        er.registration_id,
+        er.registration_date,
+        er.ticket_quantity,
+        er.total_amount,
+        a.full_name as attendee_name,
+        tt.type_name as ticket_type
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      LEFT JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
+      WHERE er.event_id = $1
+        AND er.payment_status = 'completed'
+      ORDER BY er.registration_date DESC
+      LIMIT 5
+    `, [eventId]);
+
+    const summary = salesSummaryQuery.rows[0] || {
+      total_transactions: 0,
+      total_tickets_sold: 0,
+      total_revenue: 0,
+      unique_customers: 0
+    };
+
+    res.json({
+      success: true,
+      summary: {
+        totalRevenue: summary.total_revenue || 0,
+        totalTicketsSold: summary.total_tickets_sold || 0,
+        uniqueCustomers: summary.unique_customers || 0,
+      },
+      ticketTypes: ticketTypeSalesQuery.rows.map(type => ({
+        id: type.ticket_type_id,
+        name: type.type_name,
+        price: type.price,
+        available: type.quantity_available,
+        sold: type.total_quantity_sold || 0,
+        revenue: type.total_revenue || 0
+      })),
+      dailySales: dailySalesQuery.rows.map(day => ({
+        date: day.date,
+        tickets: day.tickets_sold || 0,
+        revenue: day.revenue || 0
+      })),
+      recentSales: recentSalesQuery.rows.map(sale => ({
+        id: sale.registration_id,
+        date: sale.registration_date,
+        quantity: sale.ticket_quantity,
+        amount: sale.total_amount,
+        attendee: sale.attendee_name,
+        ticketType: sale.ticket_type
+      }))
+    });
+  } catch (error) {
+    console.error('Error fetching ticket sales:', error);
+    res.status(500).json({ 
+      message: 'Error fetching ticket sales data',
+      error: error.message 
+    });
+  }
+});
+
+// DELETE ticket type route handler
 app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
   try {
     const { eventId, ticketTypeId } = req.params;
