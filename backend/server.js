@@ -977,6 +977,1026 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
   }
 });
 
+// GET ticket types for an event
+app.get('/api/events/:eventId/ticket-types', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Create tickettypes table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS tickettypes (
+            ticket_type_id SERIAL PRIMARY KEY,
+            event_id INTEGER NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+            type_name VARCHAR(100) NOT NULL,
+            price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+            quantity_available INTEGER NOT NULL DEFAULT 0,
+            quantity_sold INTEGER DEFAULT 0,
+            description TEXT,
+            benefits TEXT[],
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      
+      // Check if there are any ticket types for this event
+      const checkTicketTypes = await pool.query(
+        'SELECT COUNT(*) FROM tickettypes WHERE event_id = $1',
+        [eventId]
+      );
+      
+      // If no ticket types exist, create a default one based on event details
+      if (parseInt(checkTicketTypes.rows[0].count) === 0) {
+        const eventDetails = await pool.query(
+          'SELECT ticket_price, max_attendees FROM events WHERE event_id = $1',
+          [eventId]
+        );
+        
+        if (eventDetails.rows.length > 0) {
+          const event = eventDetails.rows[0];
+          await pool.query(`
+            INSERT INTO tickettypes (
+              event_id, type_name, price, quantity_available, 
+              description, benefits
+            ) VALUES (
+              $1, 'General Admission', $2, $3, 
+              'Standard event ticket', ARRAY['Event access', 'Welcome kit']
+            )
+          `, [
+            eventId, 
+            event.ticket_price || 0, 
+            event.max_attendees || 100
+          ]);
+        }
+      }
+    } catch (createError) {
+      console.error('Error ensuring tickettypes table exists:', createError);
+      // Continue execution even if table creation fails
+    }
+
+    // Get all ticket types for this event
+    const ticketTypesQuery = await pool.query(`
+      SELECT 
+        ticket_type_id, event_id, type_name, price, 
+        quantity_available, quantity_sold, description, 
+        benefits, created_at, updated_at
+      FROM tickettypes
+      WHERE event_id = $1
+      ORDER BY price ASC
+    `, [eventId]);
+
+    // Add default values for missing fields expected by the frontend
+    const ticketTypesWithDefaults = ticketTypesQuery.rows.map(ticket => ({
+      ...ticket,
+      is_active: true, // Add is_active = true by default
+      sales_start_date: null, // Add null sales_start_date
+      sales_end_date: null // Add null sales_end_date
+    }));
+
+    res.json({
+      success: true,
+      ticketTypes: ticketTypesWithDefaults,
+      count: ticketTypesWithDefaults.length
+    });
+  } catch (error) {
+    console.error('Error fetching ticket types:', error);
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message,
+      details: error.detail || 'No additional details available'
+    });
+  }
+});
+
+// POST create a new ticket type
+app.post('/api/events/:eventId/ticket-types', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { 
+      type_name, price, quantity_available, description, 
+      benefits, is_active, sales_start_date, sales_end_date 
+    } = req.body;
+    
+    // Validate required fields
+    if (!type_name || price === undefined) {
+      return res.status(400).json({ message: 'Type name and price are required' });
+    }
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Handle benefits array
+    let benefitsArray = null;
+    if (benefits) {
+      if (Array.isArray(benefits)) {
+        benefitsArray = benefits;
+      } else if (typeof benefits === 'string') {
+        // If benefits is a comma-separated string, convert it to an array
+        benefitsArray = benefits.split(',').map(b => b.trim());
+      }
+    }
+
+    // Insert new ticket type
+    const newTicketType = await pool.query(`
+      INSERT INTO tickettypes (
+        event_id, type_name, price, quantity_available, 
+        description, benefits
+      ) VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+    `, [
+      eventId, type_name, price, quantity_available || 0, 
+      description || null, benefitsArray
+    ]);
+
+    // Add default values for missing fields expected by the frontend
+    const ticketTypeWithDefaults = {
+      ...newTicketType.rows[0],
+      is_active: true,
+      sales_start_date: null,
+      sales_end_date: null
+    };
+
+    res.status(201).json({
+      success: true,
+      message: 'Ticket type created successfully',
+      ticketType: ticketTypeWithDefaults
+    });
+  } catch (error) {
+    console.error('Error creating ticket type:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// PUT update an existing ticket type
+app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, ticketTypeId } = req.params;
+    const { 
+      type_name, price, quantity_available, description, 
+      benefits, is_active, sales_start_date, sales_end_date 
+    } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Check if ticket type exists
+    const ticketTypeCheck = await pool.query(
+      'SELECT ticket_type_id FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
+      [ticketTypeId, eventId]
+    );
+
+    if (ticketTypeCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket type not found' });
+    }
+
+    // Handle benefits array
+    let benefitsArray = null;
+    if (benefits) {
+      if (Array.isArray(benefits)) {
+        benefitsArray = benefits;
+      } else if (typeof benefits === 'string') {
+        // If benefits is a comma-separated string, convert it to an array
+        benefitsArray = benefits.split(',').map(b => b.trim());
+      }
+    }
+
+    // Update ticket type
+    const updateResult = await pool.query(`
+      UPDATE tickettypes 
+      SET 
+        type_name = COALESCE($1, type_name),
+        price = COALESCE($2, price),
+        quantity_available = COALESCE($3, quantity_available),
+        description = COALESCE($4, description),
+        benefits = COALESCE($5, benefits),
+        updated_at = NOW()
+      WHERE ticket_type_id = $6 AND event_id = $7
+      RETURNING *
+    `, [
+      type_name, price, quantity_available, description, benefitsArray,
+      ticketTypeId, eventId
+    ]);
+
+    // Add default values for missing fields expected by the frontend
+    const ticketTypeWithDefaults = {
+      ...updateResult.rows[0],
+      is_active: true,
+      sales_start_date: null,
+      sales_end_date: null
+    };
+
+    res.json({
+      success: true,
+      message: 'Ticket type updated successfully',
+      ticketType: ticketTypeWithDefaults
+    });
+  } catch (error) {
+    console.error('Error updating ticket type:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE a ticket type
+app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, ticketTypeId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Check if ticket type exists
+    const ticketTypeCheck = await pool.query(
+      'SELECT ticket_type_id FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
+      [ticketTypeId, eventId]
+    );
+
+    if (ticketTypeCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Ticket type not found' });
+    }
+
+    // Check if there are registrations using this ticket type
+    // If there are, don't allow deletion or mark as inactive instead
+    // This would require a relationship between registration and ticket type
+    
+    // Delete ticket type
+    await pool.query(
+      'DELETE FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
+      [ticketTypeId, eventId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Ticket type deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting ticket type:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Attendance Verification Routes
+// GET attendee listing for event (comprehensive attendee data)
+app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Create attendance_log table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_log (
+          log_id SERIAL PRIMARY KEY,
+          registration_id INTEGER REFERENCES eventregistrations(registration_id) ON DELETE CASCADE,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          check_out_time TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (createError) {
+      console.log('Attendance log table might already exist:', createError.message);
+    }
+
+    // Get comprehensive attendee data with check-in status
+    const attendeesQuery = await pool.query(`
+      SELECT 
+        er.registration_id,
+        er.attendee_id,
+        er.registration_date,
+        er.total_amount,
+        er.payment_status,
+        er.ticket_quantity,
+        a.full_name as attendee_name,
+        a.phone as attendee_phone,
+        u.email as attendee_email,
+        CASE 
+          WHEN aa.check_in_time IS NOT NULL THEN 'checked_in'
+          ELSE 'registered'
+        END as attendance_status,
+        aa.check_in_time,
+        aa.check_out_time,
+        CONCAT(er.registration_id::text, '-', $1::text) as qr_code
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      LEFT JOIN attendance_log aa ON er.registration_id = aa.registration_id
+      WHERE er.event_id = $1::integer
+      ORDER BY er.registration_date DESC
+    `, [eventId]);
+
+    res.json({
+      success: true,
+      attendees: attendeesQuery.rows,
+      total: attendeesQuery.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching attendee listing:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET attendance statistics for event
+app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Create attendance_log table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS attendance_log (
+          log_id SERIAL PRIMARY KEY,
+          registration_id INTEGER REFERENCES eventregistrations(registration_id) ON DELETE CASCADE,
+          event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+          check_in_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          check_out_time TIMESTAMP NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+    } catch (createError) {
+      console.log('Attendance log table might already exist:', createError.message);
+    }
+
+    // Get attendance statistics
+    const statsQuery = await pool.query(`
+      SELECT 
+        COUNT(er.registration_id) as total_registered,
+        COUNT(aa.registration_id) as total_checked_in,
+        COUNT(CASE WHEN aa.check_out_time IS NULL AND aa.check_in_time IS NOT NULL THEN 1 END) as currently_present,
+        ROUND(
+          (COUNT(aa.registration_id)::DECIMAL / NULLIF(COUNT(er.registration_id), 0)) * 100, 
+          2
+        ) as attendance_percentage
+      FROM eventregistrations er
+      LEFT JOIN attendance_log aa ON er.registration_id = aa.registration_id
+      WHERE er.event_id = $1::integer
+    `, [eventId]);
+
+    const stats = statsQuery.rows[0];
+
+    res.json({
+      success: true,
+      stats: {
+        total_registered: parseInt(stats.total_registered || 0),
+        total_checked_in: parseInt(stats.total_checked_in || 0),
+        currently_present: parseInt(stats.currently_present || 0),
+        attendance_percentage: parseFloat(stats.attendance_percentage || 0)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching attendance stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST check-in attendee (QR scan or manual)
+app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id, qr_code } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    let finalRegistrationId = registration_id;
+
+    // If QR code is provided, extract registration_id from it
+    if (qr_code && !registration_id) {
+      const qrParts = qr_code.split('-');
+      if (qrParts.length >= 2) {
+        finalRegistrationId = parseInt(qrParts[0]);
+      }
+    }
+
+    if (!finalRegistrationId) {
+      return res.status(400).json({ message: 'Registration ID or valid QR code required' });
+    }
+
+    // Verify registration exists for this event
+    const registrationCheck = await pool.query(
+      'SELECT registration_id, attendee_id FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+      [finalRegistrationId, eventId]
+    );
+
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found for this event' });
+    }
+
+    // Check if already checked in
+    const existingCheckIn = await pool.query(
+      'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND check_out_time IS NULL',
+      [finalRegistrationId]
+    );
+
+    if (existingCheckIn.rows.length > 0) {
+      return res.status(400).json({ message: 'Attendee is already checked in' });
+    }
+
+    // Create check-in record
+    const checkInResult = await pool.query(`
+      INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+      VALUES ($1, $2, NOW())
+      RETURNING log_id, check_in_time
+    `, [finalRegistrationId, eventId]);
+
+    // Get attendee details for response
+    const attendeeDetails = await pool.query(`
+      SELECT a.full_name, u.email
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [finalRegistrationId]);
+
+    res.json({
+      success: true,
+      message: 'Check-in successful',
+      data: {
+        log_id: checkInResult.rows[0].log_id,
+        registration_id: finalRegistrationId,
+        check_in_time: checkInResult.rows[0].check_in_time,
+        attendee: attendeeDetails.rows[0]
+      }
+    });
+  } catch (error) {
+    console.error('Error checking in attendee:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET attendance history for event
+app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    // Get attendance history with detailed information
+    const historyQuery = await pool.query(`
+      SELECT 
+        al.log_id,
+        al.registration_id,
+        al.check_in_time,
+        al.check_out_time,
+        a.full_name as attendee_name,
+        u.email as attendee_email,
+        a.phone as attendee_phone,
+        er.ticket_quantity
+      FROM attendance_log al
+      JOIN eventregistrations er ON al.registration_id = er.registration_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE al.event_id = $1
+      ORDER BY al.check_in_time DESC
+    `, [eventId]);
+
+    res.json({
+      success: true,
+      history: historyQuery.rows,
+      count: historyQuery.rows.length
+    });
+  } catch (error) {
+    console.error('Error fetching attendance history:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST manual attendance entry
+app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id, full_name, email, phone, ticket_quantity = 1 } = req.body;
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id, max_attendees, ticket_price FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    const event = eventCheck.rows[0];
+
+    // If registration_id is provided, use it for direct check-in (existing attendee)
+    if (registration_id) {
+      // Verify registration exists for this event
+      const registrationCheck = await pool.query(
+        'SELECT registration_id, attendee_id FROM eventregistrations WHERE registration_id = $1 AND event_id = $2',
+        [registration_id, eventId]
+      );
+
+      if (registrationCheck.rows.length === 0) {
+        return res.status(404).json({ message: 'Registration not found for this event' });
+      }
+
+      // Check if already checked in
+      const existingCheckIn = await pool.query(
+        'SELECT log_id FROM attendance_log WHERE registration_id = $1 AND check_out_time IS NULL',
+        [registration_id]
+      );
+
+      if (existingCheckIn.rows.length > 0) {
+        return res.status(400).json({ message: 'Attendee is already checked in' });
+      }
+
+      // Create check-in record
+      const checkInResult = await pool.query(`
+        INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+        VALUES ($1, $2, NOW())
+        RETURNING log_id, check_in_time
+      `, [registration_id, eventId]);
+
+      // Get attendee details for response
+      const attendeeDetails = await pool.query(`
+        SELECT a.full_name, u.email
+        FROM eventregistrations er
+        JOIN attendees a ON er.attendee_id = a.attendee_id
+        JOIN users u ON a.user_id = u.user_id
+        WHERE er.registration_id = $1
+      `, [registration_id]);
+
+      return res.json({
+        success: true,
+        message: 'Check-in successful',
+        data: {
+          log_id: checkInResult.rows[0].log_id,
+          registration_id: registration_id,
+          check_in_time: checkInResult.rows[0].check_in_time,
+          attendee: attendeeDetails.rows[0]
+        }
+      });
+    }
+    
+    // Otherwise, handle new manual attendee registration
+    if (!full_name || !email) {
+      return res.status(400).json({ message: 'Full name and email are required for manual registration' });
+    }
+
+    // Begin transaction for new registration
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Check if a user with this email already exists
+      let userId;
+      let attendeeId;
+
+      const existingUserQuery = await client.query(
+        'SELECT user_id FROM users WHERE email = $1',
+        [email]
+      );
+
+      if (existingUserQuery.rows.length > 0) {
+        // User exists, get their ID
+        userId = existingUserQuery.rows[0].user_id;
+        
+        // Check if they're already an attendee
+        const existingAttendeeQuery = await client.query(
+          'SELECT attendee_id FROM attendees WHERE user_id = $1',
+          [userId]
+        );
+        
+        if (existingAttendeeQuery.rows.length > 0) {
+          attendeeId = existingAttendeeQuery.rows[0].attendee_id;
+        } else {
+          // Create new attendee record for existing user
+          const newAttendeeQuery = await client.query(`
+            INSERT INTO attendees (user_id, full_name, phone, created_at)
+            VALUES ($1, $2, $3, NOW())
+            RETURNING attendee_id
+          `, [userId, full_name, phone || null]);
+          
+          attendeeId = newAttendeeQuery.rows[0].attendee_id;
+        }
+      } else {
+        // Create a new user with a random password (they'll need to reset it)
+        const randomPassword = Math.random().toString(36).slice(-10);
+        const hashedPassword = await bcrypt.hash(randomPassword, 10);
+        
+        const newUserQuery = await client.query(`
+          INSERT INTO users (email, password, role_type, is_email_verified, created_at)
+          VALUES ($1, $2, 'attendee', true, NOW())
+          RETURNING user_id
+        `, [email, hashedPassword]);
+        
+        userId = newUserQuery.rows[0].user_id;
+        
+        // Create attendee record
+        const newAttendeeQuery = await client.query(`
+          INSERT INTO attendees (user_id, full_name, phone, created_at)
+          VALUES ($1, $2, $3, NOW())
+          RETURNING attendee_id
+        `, [userId, full_name, phone || null]);
+        
+        attendeeId = newAttendeeQuery.rows[0].attendee_id;
+      }
+
+      // Check if already registered for this event
+      const existingRegistrationQuery = await client.query(
+        'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
+        [eventId, attendeeId]
+      );
+
+      let registrationId;
+      let isNewRegistration = false;
+      
+      if (existingRegistrationQuery.rows.length > 0) {
+        // Already registered, use existing registration
+        registrationId = existingRegistrationQuery.rows[0].registration_id;
+      } else {
+        // Create new registration
+        isNewRegistration = true;
+        const totalAmount = event.ticket_price * ticket_quantity;
+        
+        const newRegistrationQuery = await client.query(`
+          INSERT INTO eventregistrations (event_id, attendee_id, registration_date, 
+                                         total_amount, payment_status, ticket_quantity)
+          VALUES ($1, $2, NOW(), $3, $4, $5)
+          RETURNING registration_id
+        `, [eventId, attendeeId, totalAmount, 'completed', ticket_quantity]);
+        
+        registrationId = newRegistrationQuery.rows[0].registration_id;
+      }
+
+      // Create check-in record
+      const checkInResult = await client.query(`
+        INSERT INTO attendance_log (registration_id, event_id, check_in_time)
+        VALUES ($1, $2, NOW())
+        RETURNING log_id, check_in_time
+      `, [registrationId, eventId]);
+
+      await client.query('COMMIT');
+
+      res.status(201).json({
+        success: true,
+        message: isNewRegistration ? 'Manual registration and check-in successful' : 'Manual check-in successful',
+        data: {
+          log_id: checkInResult.rows[0].log_id,
+          registration_id: registrationId,
+          attendee_id: attendeeId,
+          user_id: userId,
+          check_in_time: checkInResult.rows[0].check_in_time,
+          attendee: {
+            full_name,
+            email,
+            phone
+          },
+          is_new_registration: isNewRegistration
+        }
+      });
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  } catch (error) {
+    console.error('Error processing manual attendance:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST checkout attendee
+app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { registration_id, log_id, strict_mode = false } = req.body;
+    
+    console.log('Checkout request received:', { eventId, registration_id, log_id, strict_mode });
+    
+    // Get organizer_id from the user
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (organizerQuery.rows.length === 0) {
+      console.log('User is not an organizer:', req.user.user_id);
+      return res.status(403).json({ message: 'User is not an organizer' });
+    }
+
+    const organizerId = organizerQuery.rows[0].organizer_id;
+
+    // Check if event belongs to this organizer
+    const eventCheck = await pool.query(
+      'SELECT event_id FROM events WHERE event_id = $1 AND organizer_id = $2',
+      [eventId, organizerId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      console.log('Event not found or not owned by organizer:', { eventId, organizerId });
+      return res.status(404).json({ message: 'Event not found or not owned by organizer' });
+    }
+
+    if (!registration_id && !log_id) {
+      console.log('No registration_id or log_id provided');
+      return res.status(400).json({ message: 'Registration ID or log ID required' });
+    }
+
+    // Ensure the attendance_log table exists
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS attendance_log (
+        log_id SERIAL PRIMARY KEY,
+        registration_id INTEGER NOT NULL,
+        event_id INTEGER NOT NULL,
+        check_in_time TIMESTAMP DEFAULT NOW(),
+        check_out_time TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    let checkOutQuery;
+    
+    if (log_id) {
+      // If log_id is provided, update that specific attendance log
+      console.log('Checking out by log_id:', log_id);
+      checkOutQuery = await pool.query(`
+        UPDATE attendance_log 
+        SET check_out_time = NOW() 
+        WHERE log_id = $1 AND event_id = $2 AND check_out_time IS NULL
+        RETURNING log_id, registration_id, check_in_time, check_out_time
+      `, [log_id, eventId]);
+    } else {
+      // If only registration_id is provided, update the most recent check-in without a checkout
+      console.log('Checking out by registration_id:', registration_id);
+      
+      // First, check if there's an active check-in (without checkout)
+      const activeCheckIn = await pool.query(`
+        SELECT log_id FROM attendance_log
+        WHERE registration_id = $1 AND event_id = $2 AND check_out_time IS NULL
+        ORDER BY check_in_time DESC LIMIT 1
+      `, [registration_id, eventId]);
+      
+      if (activeCheckIn.rows.length > 0) {
+        // Update the existing record
+        checkOutQuery = await pool.query(`
+          UPDATE attendance_log 
+          SET check_out_time = NOW() 
+          WHERE log_id = $1
+          RETURNING log_id, registration_id, check_in_time, check_out_time
+        `, [activeCheckIn.rows[0].log_id]);
+      } else {
+        // If no active check-in exists, check if there's any record for this registration at all
+        const anyCheckIn = await pool.query(`
+          SELECT log_id FROM attendance_log
+          WHERE registration_id = $1 AND event_id = $2
+          ORDER BY check_in_time DESC LIMIT 1
+        `, [registration_id, eventId]);
+        
+        // If in strict mode, return an error when no active check-in found
+        if (strict_mode === true) {
+          console.log('Strict mode enabled, rejecting checkout with no active check-in');
+          return res.status(400).json({ 
+            success: false, 
+            message: 'No active check-in found for this attendee',
+            code: 'NO_ACTIVE_CHECKIN',
+            data: {
+              registration_id: registration_id,
+              event_id: eventId
+            }
+          });
+        }
+        
+        if (anyCheckIn.rows.length > 0) {
+          // Force checkout on the most recent record
+          console.log('No active check-in found, forcing checkout on most recent record');
+          checkOutQuery = await pool.query(`
+            UPDATE attendance_log 
+            SET check_out_time = NOW() 
+            WHERE log_id = $1
+            RETURNING log_id, registration_id, check_in_time, check_out_time
+          `, [anyCheckIn.rows[0].log_id]);
+        } else {
+          // No check-in records at all, create a new check-in and check-out record
+          console.log('No check-in records found at all, creating new record with immediate checkout');
+          checkOutQuery = await pool.query(`
+            INSERT INTO attendance_log (registration_id, event_id, check_in_time, check_out_time)
+            VALUES ($1, $2, NOW(), NOW())
+            RETURNING log_id, registration_id, check_in_time, check_out_time
+          `, [registration_id, eventId]);
+        }
+      }
+    }
+
+    if (checkOutQuery.rows.length === 0) {
+      console.log('Failed to process check-out for this attendee');
+      return res.status(500).json({ message: 'Failed to process check-out' });
+    }
+
+    console.log('Check-out successful, updating record:', checkOutQuery.rows[0]);
+
+    // Get attendee details for response
+    const attendeeDetails = await pool.query(`
+      SELECT a.full_name, u.email
+      FROM eventregistrations er
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [checkOutQuery.rows[0].registration_id]);
+
+    console.log('Attendee details retrieved:', attendeeDetails.rows[0] || 'No details found');
+
+    // Create response with attendee data (with fallback)
+    const attendeeData = attendeeDetails.rows.length > 0 ? 
+      attendeeDetails.rows[0] : 
+      { full_name: 'Unknown Attendee', email: 'unknown@example.com' };
+
+    // Determine if this was a forced checkout or a regular checkout
+    const wasForced = checkOutQuery.rows[0].check_in_time.toISOString() === checkOutQuery.rows[0].check_out_time.toISOString();
+    const checkoutStatus = wasForced ? 'forced_checkout' : 'normal_checkout';
+
+    res.json({
+      success: true,
+      message: 'Check-out successful',
+      status: checkoutStatus,
+      data: {
+        log_id: checkOutQuery.rows[0].log_id,
+        registration_id: checkOutQuery.rows[0].registration_id,
+        check_in_time: checkOutQuery.rows[0].check_in_time,
+        check_out_time: checkOutQuery.rows[0].check_out_time,
+        attendee: attendeeData
+      }
+    });
+  } catch (error) {
+    console.error('Error checking out attendee:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Authentication Routes
 // Login user
 app.post('/api/auth/login', async (req, res) => {
