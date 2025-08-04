@@ -6,7 +6,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import AuthTokenService from '../services/AuthTokenService';
 import './css/ProtectedRoute.css';
 
-const ProtectedRoute = ({ 
+export const ProtectedRoute = ({ 
   children, 
   requiredRole = null, 
   fallbackRoute = '/login',

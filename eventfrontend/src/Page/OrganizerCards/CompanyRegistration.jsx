@@ -18,6 +18,7 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
   });
 
   const [errors, setErrors] = useState({});
+  const [success, setSuccess] = useState('');
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -83,6 +84,9 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErrors({});
+    setSuccess('');
+    
     if (validateForm()) {
       try {
         const token = AuthTokenService.getToken();
@@ -93,30 +97,31 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
         }
         
         // Create a contact_info object that contains email, phone, contact_person, and website
-        const contactInfo = JSON.stringify({
-          email: formData.email,
-          phone: formData.phone,
-          contact_person: formData.contact_person,
-          website: formData.website
-        });
+        const contactInfo = {
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          contact_person: formData.contact_person.trim(),
+          website: formData.website.trim()
+        };
         
         // Prepare data for backend API
         const companyData = {
-          company_name: formData.company_name,
+          company_name: formData.company_name.trim(),
           company_type: formData.company_type,
-          category: formData.category,
-          address: formData.address,
+          category: formData.category.trim(),
+          address: formData.address.trim() || null,
           contact_info: contactInfo,
-          description: formData.description,
-          services: formData.services
+          description: formData.description.trim() || null,
+          services: formData.services.trim() || null
         };
         
         let response;
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000';
         
         if (editMode && initialData?.company_id) {
           // Update existing company
           response = await axios.put(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies/${initialData.company_id}`,
+            `${baseUrl}/api/companies/${initialData.company_id}`,
             companyData,
             {
               headers: {
@@ -125,10 +130,11 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
               }
             }
           );
+          setSuccess('Company updated successfully!');
         } else {
           // Create new company
           response = await axios.post(
-            `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`,
+            `${baseUrl}/api/companies`,
             companyData,
             {
               headers: {
@@ -137,6 +143,7 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
               }
             }
           );
+          setSuccess('Company registered successfully!');
         }
         
         // Call the parent component's onSubmit with the API response
@@ -150,17 +157,29 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
         }
         
         setErrors({ general: errorMessage });
-      }
+            }
     }
   };
 
   return (
-    <div className="create-event-section">
+    <div className="company-registration">
       <div className="form-container">
         <div className="form-title">
           <i className="fas fa-building"></i>
-          Register Event Company
+          {editMode ? 'Edit Company' : 'Register Event Company'}
         </div>
+
+        {success && (
+          <div className="success-message">
+            <i className="fas fa-check-circle"></i> {success}
+          </div>
+        )}
+        
+        {errors.general && (
+          <div className="error-message">
+            <i className="fas fa-exclamation-circle"></i> {errors.general}
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="event-form">
           <div className="form-grid">
@@ -320,7 +339,7 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
               ) : (
                 <>
                   <i className="fas fa-building"></i>
-                  Register Company
+                  {editMode ? 'Update Company' : 'Register Company'}
                 </>
               )}
             </button>

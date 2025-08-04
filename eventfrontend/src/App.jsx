@@ -10,25 +10,65 @@ import './App.css';
 import Attendee from './Page/Eventdetails';
 import OrganizerDashboard from './Page/OrganizerDashboard';
 import EventListPage from './Page/Eventslist';
+import AttendeeDashboard from './Page/AttendeeDashboard';
+import Profile from './Page/Profile';
+// import ProfileEdit from './Page/ProfileEdit';
+import EmailVerification from './Page/EmailVerification';
+// import EventCreation from './Page/EventCreation';
+// import EventEdit from './Page/EventEdit';
+// import EventRegistration from './Page/EventRegistration';
+import AttendeeList from './component/AttendeeList';
+// import SpeakerDetail from './Page/SpeakerDetail';
+// import ResourceDetail from './Page/ResourceDetail';
+import ProtectedRoute, { 
+  PublicRoute,
+  AdminProtectedRoute,
+  OrganizerProtectedRoute,
+  AttendeeProtectedRoute
+} from './components/ProtectedRoute';
+import Settings from './Page/Settings';
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Home route - default landing page */}
+        {/* Public routes */}
         <Route path="/" element={<Home />} />
-        
-        {/* Authentication routes */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/Attendee" element={<Attendee />} />
         <Route path="/eventslist" element={<EventListPage />} />
+        
+        {/* Authentication routes - protected from authenticated users */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/signup" element={<PublicRoute><SignUp /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
 
-        {/* Dashboard routes */}
-        <Route path="/organizer-dashboard" element={<OrganizerDashboard />} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        {/* Role-specific dashboard routes */}
+        <Route path="/admin-dashboard" element={<AdminProtectedRoute><AdminDashboard /></AdminProtectedRoute>} />
+        <Route path="/organizer-dashboard" element={<OrganizerProtectedRoute><OrganizerDashboard /></OrganizerProtectedRoute>} />
+        <Route path="/attendee-dashboard" element={<AttendeeProtectedRoute><AttendeeDashboard /></AttendeeProtectedRoute>} />
+        
+        {/* Event detail route - protected but accessible by all authenticated users */}
+        <Route path="/events/:eventId" element={<ProtectedRoute><Attendee /></ProtectedRoute>} />
+        
+        {/* Event management routes */}
+        {/* <Route path="/events/create" element={<OrganizerProtectedRoute><EventCreation /></OrganizerProtectedRoute>} /> */}
+        {/* <Route path="/events/:eventId/edit" element={<OrganizerProtectedRoute><EventEdit /></OrganizerProtectedRoute>} /> */}
+        <Route path="/events/:eventId/attendees" element={<OrganizerProtectedRoute><AttendeeList /></OrganizerProtectedRoute>} />
+        {/* <Route path="/events/:eventId/register" element={<AttendeeProtectedRoute><EventRegistration /></AttendeeProtectedRoute>} /> */}
+        
+        {/* Profile and account routes */}
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        {/* <Route path="/profile/edit" element={<ProtectedRoute><ProfileEdit /></ProtectedRoute>} /> */}
+        
+        {/* Email verification routes */}
+        <Route path="/verify-email" element={<EmailVerification />} />
+        <Route path="/verify-email/:token" element={<EmailVerification />} />
+        
+        {/* Speaker and resource detail routes */}
+        {/* <Route path="/speaker/:speakerId" element={<ProtectedRoute><SpeakerDetail /></ProtectedRoute>} />
+        <Route path="/resource/:resourceId" element={<ProtectedRoute><ResourceDetail /></ProtectedRoute>} /> */}
       
+        {/* Settings route */}
+        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
         {/* Redirect any unknown routes to home */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
