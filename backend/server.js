@@ -2634,6 +2634,106 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
   }
 });
 
+// Generate QR Code for registration
+app.post('/api/registrations/:id/generate-qr', authenticateToken, async (req, res) => {
+  try {
+    const registrationId = req.params.id;
+    const QRCode = require('qrcode');
+
+    // Check if registration exists and get details
+    const registrationCheck = await pool.query(
+      `SELECT 
+        r.*,
+        e.event_name, 
+        e.event_date,
+        a.full_name as attendee_name,
+        u.email as attendee_email
+       FROM eventregistrations r
+       JOIN events e ON r.event_id = e.event_id
+       JOIN attendees a ON r.attendee_id = a.attendee_id
+       JOIN users u ON a.user_id = u.user_id
+       WHERE r.registration_id = $1`,
+      [registrationId]
+    );
+
+    if (registrationCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+
+    const registration = registrationCheck.rows[0];
+
+    // Create QR code data object
+    const qrData = {
+      registration_id: registration.registration_id,
+      event_id: registration.event_id,
+      event_name: registration.event_name,
+      attendee_name: registration.attendee_name,
+      attendee_email: registration.attendee_email,
+      event_date: registration.event_date,
+      generated_at: new Date().toISOString()
+    };
+
+    // Generate QR code as base64
+    const qrCodeBase64 = await QRCode.toDataURL(JSON.stringify(qrData));
+
+    // Ensure columns exist with proper type
+    try {
+      await pool.query(`
+        DO $$ 
+        BEGIN 
+          BEGIN
+            ALTER TABLE eventregistrations ALTER COLUMN qr_code TYPE TEXT;
+          EXCEPTION 
+            WHEN undefined_column THEN 
+              ALTER TABLE eventregistrations ADD COLUMN qr_code TEXT;
+          END;
+
+          BEGIN
+            ALTER TABLE eventregistrations ALTER COLUMN qr_data TYPE TEXT;
+          EXCEPTION 
+            WHEN undefined_column THEN 
+              ALTER TABLE eventregistrations ADD COLUMN qr_data TEXT;
+          END;
+
+          BEGIN
+            ALTER TABLE eventregistrations ADD COLUMN qr_generated_at TIMESTAMP;
+          EXCEPTION 
+            WHEN duplicate_column THEN NULL;
+          END;
+        END $$;
+      `);
+    } catch (err) {
+      console.error('Error ensuring columns exist:', err);
+      // Continue anyway as the error might be harmless
+    }
+
+    // Store QR code in database
+    await pool.query(
+      `UPDATE eventregistrations 
+       SET qr_code = $1::text, 
+           qr_generated_at = CURRENT_TIMESTAMP,
+           qr_data = $2::text
+       WHERE registration_id = $3`,
+      [qrCodeBase64, JSON.stringify(qrData), registrationId]
+    );
+
+    res.json({
+      success: true,
+      message: 'QR code generated successfully',
+      data: {
+        qr_code: qrCodeBase64,
+        registration_id: registration.registration_id,
+        event_name: registration.event_name,
+        attendee_name: registration.attendee_name
+      }
+    });
+
+  } catch (error) {
+    console.error('Error generating QR code:', error);
+    res.status(500).json({ message: 'Failed to generate QR code' });
+  }
+});
+
 // POST checkout attendee
 app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (req, res) => {
   try {
@@ -3672,7 +3772,7 @@ app.get('/api/events/:eventId/sessions', async (req, res) => {
     let params = [eventId];
 
     if (day) {
-      query += ' AND session_date = CURRENT_DATE + INTERVAL $2 DAY';
+      query += ' AND session_date = CURRENT_DATE + ($2 || \' days\')::interval';
       params.push(day - 1);
     }
 
@@ -3799,7 +3899,7 @@ app.get('/api/events/:eventId/resources', async (req, res) => {
           description TEXT,
           resource_type VARCHAR(50) NOT NULL,
           file_url VARCHAR(500),
-          file_size VARCHAR(20),
+          file_size VARCHAR(100),
           download_count INTEGER DEFAULT 0,
           is_public BOOLEAN DEFAULT true,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
