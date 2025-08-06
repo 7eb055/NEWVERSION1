@@ -301,6 +301,232 @@ class ApiService {
     }
   }
 
+  // ===== ATTENDEE PROFILE METHODS =====
+  
+  // Get attendee profile (for attendees)
+  async getAttendeeProfile() {
+    try {
+      const response = await this.axiosInstance.get('/api/attendee/profile');
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get attendee profile:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to get attendee profile',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Update attendee profile (for attendees)
+  async updateAttendeeProfile(profileData) {
+    try {
+      const response = await this.axiosInstance.put('/api/attendee/profile', profileData);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to update attendee profile:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to update attendee profile',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // ===== SETTINGS METHODS =====
+  
+  // Get notification settings
+  async getNotificationSettings() {
+    try {
+      const response = await this.axiosInstance.get('/api/settings/notifications');
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get notification settings:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to get notification settings',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Update notification settings
+  async updateNotificationSettings(notificationData) {
+    try {
+      const response = await this.axiosInstance.put('/api/settings/notifications', notificationData);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to update notification settings:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to update notification settings',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Get privacy settings
+  async getPrivacySettings() {
+    try {
+      const response = await this.axiosInstance.get('/api/settings/privacy');
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get privacy settings:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to get privacy settings',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Update privacy settings
+  async updatePrivacySettings(privacyData) {
+    try {
+      const response = await this.axiosInstance.put('/api/settings/privacy', privacyData);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to update privacy settings:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to update privacy settings',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Get security info
+  async getSecurityInfo() {
+    try {
+      const response = await this.axiosInstance.get('/api/settings/security');
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to get security info:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to get security info',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Change password
+  async changePassword(passwordData) {
+    try {
+      const response = await this.axiosInstance.put('/api/settings/change-password', passwordData);
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to change password',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Toggle 2FA
+  async toggle2FA(enabled) {
+    try {
+      const response = await this.axiosInstance.put('/api/settings/two-factor', { enabled });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to toggle 2FA:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to toggle 2FA',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Export user data
+  async exportUserData() {
+    try {
+      const response = await this.axiosInstance.get('/api/settings/export-data');
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to export user data:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to export user data',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
+  // Delete account
+  async deleteAccount(confirmation) {
+    try {
+      const response = await this.axiosInstance.delete('/api/settings/delete-account', {
+        data: { confirmation }
+      });
+      
+      return {
+        success: true,
+        data: response.data
+      };
+    } catch (error) {
+      console.error('Failed to delete account:', error);
+      return {
+        success: false,
+        error: error.response?.data?.message || 'Failed to delete account',
+        status: error.response?.status,
+        details: error.response?.data
+      };
+    }
+  }
+
   // Get API base URL
   getBaseURL() {
     return this.baseURL;

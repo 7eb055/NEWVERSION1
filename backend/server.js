@@ -5,6 +5,11 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 require('dotenv').config();
 
+// Import routes
+const attendeeRoutes = require('./routes/attendee');
+const ticketingRoutes = require('./routes/ticketing');
+const settingsRoutes = require('./routes/settings');
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -47,13 +52,21 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
+  console.log('=== JWT DEBUG ===');
+  console.log('Full auth header:', authHeader);
+  console.log('Extracted token:', token);
+  console.log('Token length:', token ? token.length : 'No token');
+  console.log('================');
+
   if (!token) {
     return res.status(401).json({ message: 'Access token required' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      return res.status(403).json({ message: 'Invalid or expired token' });
+      console.log('JWT verification failed:', err.message);
+      console.log('JWT error details:', err);
+      return res.status(403).json({ message: 'Invalid or expired token', detail: err.message });
     }
     req.user = user;
     next();
@@ -741,80 +754,246 @@ app.get('/api/events/:eventId/details', async (req, res) => {
   }
 });
 
+// GET ticket types for an event (public for attendees)
+app.get('/api/events/:eventId/ticket-types/public', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    
+    // Check if event exists and is published
+    const eventCheck = await pool.query(
+      'SELECT event_id, status FROM events WHERE event_id = $1 AND status = \'published\'',
+      [eventId]
+    );
+
+    if (eventCheck.rows.length === 0) {
+      return res.status(404).json({ message: 'Event not found or not available' });
+    }
+
+    // Create tickettypes table if it doesn't exist
+    try {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS tickettypes (
+            ticket_type_id SERIAL PRIMARY KEY,
+            event_id INTEGER NOT NULL REFERENCES events(event_id) ON DELETE CASCADE,
+            type_name VARCHAR(100) NOT NULL,
+            price DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+            quantity_available INTEGER NOT NULL DEFAULT 0,
+            quantity_sold INTEGER DEFAULT 0,
+            description TEXT,
+            benefits TEXT[],
+            created_at TIMESTAMP DEFAULT NOW(),
+            updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      
+      // Check if there are any ticket types for this event
+      const checkTicketTypes = await pool.query(
+        'SELECT COUNT(*) FROM tickettypes WHERE event_id = $1',
+        [eventId]
+      );
+      
+      // If no ticket types exist, create a default one based on event details
+      if (parseInt(checkTicketTypes.rows[0].count) === 0) {
+        const eventDetails = await pool.query(
+          'SELECT ticket_price, max_attendees FROM events WHERE event_id = $1',
+          [eventId]
+        );
+        
+        if (eventDetails.rows.length > 0) {
+          const event = eventDetails.rows[0];
+          await pool.query(`
+            INSERT INTO tickettypes (
+              event_id, type_name, price, quantity_available, 
+              description, benefits
+            ) VALUES (
+              $1, 'General Admission', $2, $3, 
+              'Standard event ticket', ARRAY['Event access', 'Welcome kit']
+            )
+          `, [
+            eventId, 
+            event.ticket_price || 0, 
+            event.max_attendees || 100
+          ]);
+        }
+      }
+    } catch (createError) {
+      console.error('Error ensuring tickettypes table exists:', createError);
+      // Continue execution even if table creation fails
+    }
+
+    // Get all ticket types for this event
+    const ticketTypesQuery = await pool.query(`
+      SELECT 
+        ticket_type_id, event_id, type_name, price, 
+        quantity_available, quantity_sold, description, 
+        benefits, created_at, updated_at
+      FROM tickettypes
+      WHERE event_id = $1
+      ORDER BY price ASC
+    `, [eventId]);
+
+    // Add default values and calculate available quantity
+    const ticketTypesWithDefaults = ticketTypesQuery.rows.map(ticket => ({
+      ...ticket,
+      is_active: true,
+      sales_start_date: null,
+      sales_end_date: null,
+      available_quantity: (ticket.quantity_available || 0) - (ticket.quantity_sold || 0)
+    }));
+
+    res.json({
+      success: true,
+      ticketTypes: ticketTypesWithDefaults,
+      count: ticketTypesWithDefaults.length
+    });
+  } catch (error) {
+    console.error('Error fetching public ticket types:', error);
+    res.status(500).json({ 
+      message: 'Internal server error', 
+      error: error.message
+    });
+  }
+});
+
 // Attendee Routes
 // POST register for event
 app.post('/api/events/:eventId/register', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
   try {
     const { eventId } = req.params;
-    const { ticket_quantity = 1 } = req.body;
+    const { ticket_type_id, ticket_quantity = 1, payment_method = 'credit_card', payment_status = 'pending' } = req.body;
 
-    // Get attendee_id from the user
-    const attendeeQuery = await pool.query(
+    await client.query('BEGIN');
+
+    // Get attendee_id from the user, or create one if it doesn't exist
+    let attendeeQuery = await client.query(
       'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
+    let attendeeId;
     if (attendeeQuery.rows.length === 0) {
-      return res.status(403).json({ message: 'User is not an attendee' });
+      // Get user info to create attendee record
+      const userQuery = await client.query(
+        'SELECT email FROM users WHERE user_id = $1',
+        [req.user.user_id]
+      );
+      
+      if (userQuery.rows.length === 0) {
+        return res.status(403).json({ message: 'User not found' });
+      }
+      
+      // Create attendee record automatically using email as temporary full_name
+      const email = userQuery.rows[0].email;
+      const tempFullName = email.split('@')[0]; // Use part before @ as name
+      
+      const newAttendee = await client.query(
+        'INSERT INTO attendees (user_id, full_name) VALUES ($1, $2) RETURNING attendee_id',
+        [req.user.user_id, tempFullName]
+      );
+      
+      attendeeId = newAttendee.rows[0].attendee_id;
+    } else {
+      attendeeId = attendeeQuery.rows[0].attendee_id;
     }
 
-    const attendeeId = attendeeQuery.rows[0].attendee_id;
-
-    // Check if event exists and get details
-    const eventQuery = await pool.query(
-      'SELECT event_id, ticket_price, max_attendees, status FROM events WHERE event_id = $1',
+    // Check if event exists and is published
+    const eventQuery = await client.query(
+      'SELECT e.event_id, e.max_attendees, e.status FROM events e WHERE e.event_id = $1 AND e.status = \'published\'',
       [eventId]
     );
 
     if (eventQuery.rows.length === 0) {
-      return res.status(404).json({ message: 'Event not found' });
+      return res.status(404).json({ message: 'Event not found or not available for registration' });
     }
 
     const event = eventQuery.rows[0];
 
-    if (event.status !== 'published') {
-      return res.status(400).json({ message: 'Event is not available for registration' });
-    }
-
-    // Check if already registered
-    const existingRegistration = await pool.query(
-      'SELECT registration_id FROM eventregistrations WHERE event_id = $1 AND attendee_id = $2',
-      [eventId, attendeeId]
+    // Check if ticket type exists and is available
+    const ticketTypeQuery = await client.query(
+      'SELECT ticket_type_id, type_name, price, quantity_available, quantity_sold FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
+      [ticket_type_id, eventId]
     );
 
-    if (existingRegistration.rows.length > 0) {
-      return res.status(400).json({ message: 'Already registered for this event' });
+    if (ticketTypeQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'Invalid ticket type' });
     }
 
-    // Check capacity
-    const currentRegistrations = await pool.query(
-      'SELECT COALESCE(SUM(ticket_quantity), 0) as total_tickets FROM eventregistrations WHERE event_id = $1',
-      [eventId]
-    );
+    const ticketType = ticketTypeQuery.rows[0];
+    const availableTickets = ticketType.quantity_available - (ticketType.quantity_sold || 0);
 
-    const totalTickets = parseInt(currentRegistrations.rows[0].total_tickets) + parseInt(ticket_quantity);
-    if (totalTickets > event.max_attendees) {
-      return res.status(400).json({ message: 'Event is fully booked' });
+    if (ticket_quantity > availableTickets) {
+      return res.status(400).json({ message: 'Not enough tickets available' });
     }
 
     // Calculate total amount
-    const totalAmount = event.ticket_price * ticket_quantity;
+    const totalAmount = ticketType.price * ticket_quantity;
 
-    // Create registration
-    const newRegistration = await pool.query(`
-      INSERT INTO eventregistrations (event_id, attendee_id, registration_date, 
-                                     total_amount, payment_status, ticket_quantity)
-      VALUES ($1, $2, NOW(), $3, $4, $5)
+    // Create registration with QR code
+    const qrCode = `${Date.now()}-${eventId}-${attendeeId}`;
+    const newRegistration = await client.query(`
+      INSERT INTO eventregistrations (
+        event_id, 
+        attendee_id, 
+        ticket_type_id,
+        registration_date,
+        total_amount, 
+        payment_status, 
+        payment_method,
+        ticket_quantity,
+        qr_code
+      )
+      VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7, $8)
       RETURNING *
-    `, [eventId, attendeeId, totalAmount, 'completed', ticket_quantity]);
+    `, [
+        eventId,
+        attendeeId,
+        ticket_type_id,
+        totalAmount,
+        payment_status,
+        payment_method,
+        ticket_quantity,
+        qrCode
+      ]);
+
+    // Update ticket quantity sold
+    await client.query(
+      'UPDATE tickettypes SET quantity_sold = COALESCE(quantity_sold, 0) + $1 WHERE ticket_type_id = $2',
+      [ticket_quantity, ticket_type_id]
+    );
+
+    await client.query('COMMIT');
+
+    // Get full registration details for response
+    const registrationDetails = await client.query(`
+      SELECT 
+        er.*,
+        e.event_name,
+        tt.type_name as ticket_type_name,
+        tt.price as ticket_price,
+        a.full_name as attendee_name,
+        u.email as attendee_email
+      FROM eventregistrations er
+      JOIN events e ON er.event_id = e.event_id
+      JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
+      JOIN attendees a ON er.attendee_id = a.attendee_id
+      JOIN users u ON a.user_id = u.user_id
+      WHERE er.registration_id = $1
+    `, [newRegistration.rows[0].registration_id]);
 
     res.status(201).json({
       message: 'Registration successful',
-      registration: newRegistration.rows[0]
+      registration: registrationDetails.rows[0]
     });
   } catch (error) {
+    await client.query('ROLLBACK');
     console.error('Error registering for event:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ 
+      message: error.message || 'Internal server error',
+      error: error
+    });
+  } finally {
+    client.release();
   }
 });
 
@@ -1040,15 +1219,30 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
 
     const attendeeId = attendeeQuery.rows[0].attendee_id;
 
-    // Get registrations for this attendee
+    // Get registrations for this attendee with enhanced information
     const registrationsQuery = await pool.query(`
       SELECT er.registration_id, er.registration_date, er.total_amount, 
-             er.payment_status, er.ticket_quantity,
-             e.event_name, e.event_date,
-             o.full_name as organizer_name
+             er.payment_status, er.payment_method, er.ticket_quantity, er.qr_code,
+             er.status as registration_status,
+             e.event_name, e.event_date, e.event_start_time, e.event_end_time,
+             e.venue_name, e.venue_address, e.description as event_description,
+             e.image_url as event_image,
+             tt.type_name as ticket_type_name, tt.price as ticket_price,
+             o.full_name as organizer_name, o.company_name,
+             CASE 
+               WHEN al.check_in_time IS NOT NULL THEN true 
+               ELSE false 
+             END as checked_in,
+             CASE 
+               WHEN ef.feedback_id IS NOT NULL THEN true 
+               ELSE false 
+             END as has_feedback
       FROM eventregistrations er
       JOIN events e ON er.event_id = e.event_id
       JOIN organizers o ON e.organizer_id = o.organizer_id
+      LEFT JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
+      LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
+      LEFT JOIN eventfeedback ef ON e.event_id = ef.event_id AND ef.attendee_id = er.attendee_id
       WHERE er.attendee_id = $1
       ORDER BY er.registration_date DESC
     `, [attendeeId]);
@@ -4240,6 +4434,21 @@ app.get('/health', (req, res) => {
     service: 'Event Management System'
   });
 });
+
+// Import public events endpoint
+const publicEventsRouter = require('./endpoints/public-events');
+
+// GET all published events with additional details for attendee dashboard
+app.use('/api/public/events', publicEventsRouter);
+
+// Mount attendee routes
+app.use('/api/attendee', attendeeRoutes);
+
+// Mount ticketing routes
+app.use('/api', ticketingRoutes);
+
+// Mount settings routes
+app.use('/api/settings', settingsRoutes);
 
 // Start server
 app.listen(PORT, () => {

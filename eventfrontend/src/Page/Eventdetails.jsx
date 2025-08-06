@@ -1,385 +1,458 @@
-import React, { useState } from "react";
-import "./css/Eventdetails.css";
-import Header from "../component/header";
-import Footer from "../component/footer";
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import Header from '../component/header';
+import Footer from '../component/footer';
+import TicketPurchase from '../component/TicketPurchase';
+import './css/Eventdetails.css';
 
-function Attendee() {
-  const [activeTab, setActiveTab] = useState('schedule');
-  const [activeDay, setActiveDay] = useState(1);
-  const [agendaItems, setAgendaItems] = useState([]);
-  const [notification, setNotification] = useState(null);
+function EventDetails() {
+  const { eventId } = useParams();
+  const navigate = useNavigate();
+  const [event, setEvent] = useState(null);
+  const [reviews, setReviews] = useState([]);
+  const [otherEvents, setOtherEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [activeTab, setActiveTab] = useState('overview');
+  const [showTicketPurchase, setShowTicketPurchase] = useState(false);
 
-  const tabs = [
-    { id: 'schedule', label: 'Schedule' },
-    { id: 'agenda', label: 'My Agenda' },
-    { id: 'speakers', label: 'Speakers' },
-    { id: 'resources', label: 'Resources' },
-    { id: 'networking', label: 'Networking' }
-  ];
-
-  const days = [
-    { id: 1, name: 'Day 1 - Oct 15' },
-    { id: 2, name: 'Day 2 - Oct 16' },
-    { id: 3, name: 'Day 3 - Oct 17' }
-  ];
-
-  const sessions = [
-    {
-      id: 1,
-      time: '9:00 AM',
-      duration: '60 min',
-      title: 'The Future of Artificial Intelligence',
-      location: 'Grand Ballroom A',
-      description: 'Explore the latest advancements in AI and machine learning, and how they will transform industries in the coming decade.',
-      added: false
-    },
-    {
-      id: 2,
-      time: '10:30 AM',
-      duration: '45 min',
-      title: 'Building Scalable Cloud Infrastructure',
-      location: 'Room 203',
-      description: 'Best practices for designing and implementing cloud solutions that can scale with your business needs.',
-      added: false
-    },
-    {
-      id: 3,
-      time: '11:30 AM',
-      duration: '90 min',
-      title: 'Workshop: Modern Web Development',
-      location: 'Workshop Room B',
-      description: 'Hands-on session covering the latest tools and frameworks for building responsive, accessible web applications.',
-      added: false
-    },
-    {
-      id: 4,
-      time: '1:30 PM',
-      duration: '60 min',
-      title: 'Lunch & Networking',
-      location: 'Main Dining Hall',
-      description: 'Enjoy lunch while connecting with fellow attendees and industry professionals.',
-      added: false
-    }
-  ];
-
-  const speakers = [
-    { id: 1, initials: 'JD', name: 'Jennifer Davis', title: 'AI Research Lead, TechFuture' },
-    { id: 2, initials: 'MR', name: 'Michael Rodriguez', title: 'CTO, CloudScale Inc.' },
-    { id: 3, initials: 'SP', name: 'Sarah Peterson', title: 'Senior Developer, WebInnovate' }
-  ];
-
-  const resources = [
-    { id: 1, icon: 'map', title: 'Venue Map', details: 'PDF • 2.4 MB' },
-    { id: 2, icon: 'file-pdf', title: 'Full Schedule', details: 'PDF • 1.1 MB' },
-    { id: 3, icon: 'users', title: 'Speaker Bios', details: 'PDF • 3.2 MB' },
-    { id: 4, icon: 'wifi', title: 'Wi-Fi Access', details: 'Network: TechForward-Guest' }
-  ];
-
-  const handleAddToAgenda = (session) => {
-    if (session.added) {
-      setAgendaItems(agendaItems.filter(item => item.id !== session.id));
-      session.added = false;
-      setNotification({ message: `"${session.title}" removed from agenda`, type: 'info' });
-    } else {
-      setAgendaItems([...agendaItems, session]);
-      session.added = true;
-      setNotification({ message: `"${session.title}" added to agenda`, type: 'success' });
+  // Function to safely access potentially undefined properties
+  const safeGet = (obj, path, fallback = '') => {
+    if (!obj) return fallback;
+    const keys = path.split('.');
+    let result = obj;
+    
+    for (const key of keys) {
+      if (result === null || result === undefined) return fallback;
+      result = result[key];
     }
     
-    setTimeout(() => setNotification(null), 3000);
+    return result !== null && result !== undefined ? result : fallback;
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'agenda':
-        return (
-          <div className="schedule-section">
-            <div className="section-header">
-              <h2 className="section-title">My Agenda</h2>
-            </div>
-            
-            {agendaItems.length === 0 ? (
-              <div className="empty-agenda">
-                <div className="empty-icon">
-                  <i className="fas fa-calendar-plus"></i>
-                </div>
-                <h3>Your agenda is empty</h3>
-                <p>Add sessions you're interested in to build your personal agenda</p>
-              </div>
+  useEffect(() => {
+    const fetchEventDetails = async () => {
+      try {
+        setLoading(true);
+        // Use import.meta.env instead of process.env for Vite projects
+        const response = await axios.get(`http://localhost:5000/api/public/events/${eventId}`);
+        
+        console.log('Event data received:', response.data);
+        
+        // Handle both response structures
+        const eventData = response.data.event || response.data;
+        
+        if (!eventData) {
+          throw new Error('Event data not found in the response');
+        }
+        
+        setEvent(eventData);
+        setReviews(response.data.reviews || []);
+        setOtherEvents(response.data.otherEvents || []);
+        setError(null);
+      } catch (err) {
+        console.error('Error fetching event details:', err);
+        setError('Failed to load event details. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEventDetails();
+  }, [eventId]);
+
+  const formatDate = (dateString) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' };
+    return new Date(dateString).toLocaleDateString(undefined, options);
+  };
+
+  const formatTime = (timeString) => {
+    if (!timeString) return '';
+    
+    // Parse the time string (assuming format like "14:30:00")
+    const [hours, minutes] = timeString.split(':');
+    
+    // Create a date object with the current date but the specified time
+    const date = new Date();
+    date.setHours(parseInt(hours, 10));
+    date.setMinutes(parseInt(minutes, 10));
+    
+    // Format the time using the browser's locale
+    return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderStarRating = (rating) => {
+    const stars = [];
+    const fullStars = Math.floor(rating);
+    const hasHalfStar = rating % 1 >= 0.5;
+
+    for (let i = 1; i <= 5; i++) {
+      if (i <= fullStars) {
+        stars.push(<i key={i} className="fas fa-star"></i>);
+      } else if (i === fullStars + 1 && hasHalfStar) {
+        stars.push(<i key={i} className="fas fa-star-half-alt"></i>);
+      } else {
+        stars.push(<i key={i} className="far fa-star"></i>);
+      }
+    }
+
+    return <div className="star-rating">{stars}</div>;
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading event details...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <h2>Error</h2>
+        <p>{error}</p>
+        <button onClick={() => navigate(-1)} className="btn-primary">
+          Go Back
+        </button>
+      </div>
+    );
+  }
+
+  if (!event) {
+    return (
+      <div className="error-container">
+        <h2>Event Not Found</h2>
+        <p>The event you're looking for doesn't exist or has been removed.</p>
+        <button onClick={() => navigate('/attendee-dashboard')} className="btn-primary">
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <Header />
+      <div className="event-details-container">
+        <div className="event-details-header">
+          <div className="event-image-container">
+            {safeGet(event, 'image_url') ? (
+              <img src={safeGet(event, 'image_url')} alt={safeGet(event, 'event_name')} className="event-image" />
             ) : (
-              <div className="schedule-list">
-                {agendaItems.map(session => (
-                  <SessionItem 
-                    key={session.id} 
-                    session={session} 
-                    onAddToAgenda={handleAddToAgenda} 
-                  />
-                ))}
+              <div className="event-image-placeholder">
+                <i className="fas fa-calendar-alt"></i>
               </div>
             )}
           </div>
-        );
-      case 'speakers':
-        return (
-          <div className="speakers-section">
-            <div className="section-header">
-              <h2 className="section-title">Featured Speakers</h2>
-            </div>
+          
+          <div className="event-header-content">
+            <h1 className="event-title">{safeGet(event, 'event_name', 'Event')}</h1>
             
-            <div className="speakers-grid">
-              {speakers.map(speaker => (
-                <div className="speaker-card" key={speaker.id}>
-                  <div className="speaker-avatar">{speaker.initials}</div>
-                  <h3>{speaker.name}</h3>
-                  <p>{speaker.title}</p>
-                  <button className="btn btn-outline">
-                    <i className="fas fa-user-plus"></i> Connect
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'resources':
-        return (
-          <div className="resources-section">
-            <div className="section-header">
-              <h2 className="section-title">Event Resources</h2>
-            </div>
-            
-            <div className="resources-grid">
-              {resources.map(resource => (
-                <div className="resource-card" key={resource.id}>
-                  <div className="resource-icon">
-                    <i className={`fas fa-${resource.icon}`}></i>
-                  </div>
-                  <h3>{resource.title}</h3>
-                  <p>{resource.details}</p>
-                  <button className="btn btn-outline">
-                    <i className="fas fa-download"></i> Download
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'networking':
-        return (
-          <div className="networking-section">
-            <div className="section-header">
-              <h2 className="section-title">Networking Hub</h2>
-            </div>
-            
-            <div className="networking-content">
-              <div className="networking-card">
-                <h3>Connect with Attendees</h3>
-                <p>Browse the attendee directory and connect with other participants</p>
-                <button className="btn btn-primary">
-                  <i className="fas fa-user-friends"></i> Browse Attendees
-                </button>
+            <div className="event-meta">
+              <div className="event-meta-item">
+                <i className="far fa-calendar"></i>
+                <span>{formatDate(safeGet(event, 'event_date', new Date()))}</span>
               </div>
               
-              <div className="networking-card">
-                <h3>Discussion Groups</h3>
-                <p>Join topic-based groups to continue conversations after sessions</p>
-                <button className="btn btn-primary">
-                  <i className="fas fa-comments"></i> View Groups
-                </button>
+              <div className="event-meta-item">
+                <i className="far fa-clock"></i>
+                <span>{safeGet(event, 'event_time') ? formatTime(safeGet(event, 'event_time')) : 'Time not specified'} {safeGet(event, 'end_time') ? `- ${formatTime(safeGet(event, 'end_time'))}` : ''}</span>
+              </div>
+              
+              <div className="event-meta-item">
+                <i className="fas fa-map-marker-alt"></i>
+                <span>{event.venue_name ? `${event.venue_name}${event.venue_address ? ', ' + event.venue_address : ''}` : 'Location not specified'}</span>
+              </div>
+              
+              {event.category && (
+                <div className="event-meta-item">
+                  <i className="fas fa-tag"></i>
+                  <span>{event.category}</span>
+                </div>
+              )}
+              
+              {event.average_rating > 0 && (
+                <div className="event-meta-item">
+                  {renderStarRating(event.average_rating)}
+                  <span>({event.review_count} reviews)</span>
+                </div>
+              )}
+            </div>
+            
+            <div className="event-actions">
+              <button className="btn-register" onClick={() => setShowTicketPurchase(true)}>Register Now</button>
+              <div className="event-price">
+                {event.ticket_price > 0 ? `$${parseFloat(event.ticket_price).toFixed(2)}` : 'Free'}
               </div>
             </div>
           </div>
-        );
-      default:
-        return (
-          <div className="schedule-section">
-            <div className="section-header">
-              <h2 className="section-title">Event Schedule</h2>
-              <div>
-                <button className="btn btn-outline">
-                  <i className="fas fa-download"></i> Export Schedule
-                </button>
-              </div>
-            </div>
-            
-            <div className="day-selector">
-              {days.map(day => (
-                <button
-                  key={day.id}
-                  className={`day-btn ${activeDay === day.id ? 'active' : ''}`}
-                  onClick={() => setActiveDay(day.id)}
-                >
-                  {day.name}
-                </button>
-              ))}
-            </div>
-            
-            <div className="schedule-list">
-              {sessions.map(session => (
-                <SessionItem 
-                  key={session.id} 
-                  session={session} 
-                  onAddToAgenda={handleAddToAgenda} 
-                />
-              ))}
-            </div>
-          </div>
-        );
-    }
-  };
-
-  return (
-    <div className="detailContainer">
-      <Header/>
-      {/* Attendee header below main header */}
-      <div className="attendee-header" style={{marginTop: '20px', marginBottom: '20px', background: '#f8f9ff', borderRadius: '10px', padding: '15px 25px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-          <i className="fas fa-user-friends" style={{fontSize: '1.5rem', color: '#4a6cf7'}}></i>
-          <span style={{fontWeight: '600', fontSize: '1.1rem'}}>Attendee: Sarah Johnson</span>
         </div>
-      </div>
-      <div className="eventdetail">
-        <header>
-          <div className="container">
-            <div className="header-content">
-              <div className="event-title">
-                <h1>TechForward Conference 2023</h1>
-                <p>Shaping the future of technology together</p>
-                <div className="event-meta">
-                  <div className="meta-item">
-                    <i className="fas fa-calendar"></i>
-                    <span>October 15-17, 2023</span>
+        
+        <div className="event-tabs">
+          <button 
+            className={`tab-button ${activeTab === 'overview' ? 'active' : ''}`}
+            onClick={() => setActiveTab('overview')}
+          >
+            Overview
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'details' ? 'active' : ''}`}
+            onClick={() => setActiveTab('details')}
+          >
+            Details
+          </button>
+          <button 
+            className={`tab-button ${activeTab === 'organizer' ? 'active' : ''}`}
+            onClick={() => setActiveTab('organizer')}
+          >
+            Organizer
+          </button>
+          {reviews.length > 0 && (
+            <button 
+              className={`tab-button ${activeTab === 'reviews' ? 'active' : ''}`}
+              onClick={() => setActiveTab('reviews')}
+            >
+              Reviews ({reviews.length})
+            </button>
+          )}
+        </div>
+        
+        <div className="event-content">
+          {activeTab === 'overview' && (
+            <div className="event-overview">
+              <h2>About This Event</h2>
+              <div className="event-description">
+                <p>{event.description}</p>
+              </div>
+              
+              {event.tags && (
+                <div className="event-tags">
+                  <h3>Tags</h3>
+                  <div className="tags-container">
+                    {event.tags.split(',').map((tag, index) => (
+                      <span key={index} className="tag">{tag.trim()}</span>
+                    ))}
                   </div>
-                  <div className="meta-item">
-                    <i className="fas fa-map-marker-alt"></i>
-                    <span>NATIONAL THEATRE</span>
+                </div>
+              )}
+              
+              <div className="event-registration-info">
+                <h3>Registration Information</h3>
+                <div className="registration-items">
+                  <div className="registration-item">
+                    <i className="far fa-calendar-check"></i>
+                    <div>
+                      <strong>Registration Deadline</strong>
+                      <p>{event.registration_deadline ? formatDate(event.registration_deadline) : 'No deadline'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="registration-item">
+                    <i className="fas fa-users"></i>
+                    <div>
+                      <strong>Capacity</strong>
+                      <p>{event.max_attendees || 'Unlimited'}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="registration-item">
+                    <i className="fas fa-ticket-alt"></i>
+                    <div>
+                      <strong>Tickets Per Person</strong>
+                      <p>Maximum {event.max_tickets_per_person} per registration</p>
+                    </div>
+                  </div>
+                  
+                  <div className="registration-item">
+                    <i className="fas fa-user-check"></i>
+                    <div>
+                      <strong>Approval Required</strong>
+                      <p>{event.requires_approval ? 'Yes' : 'No'}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-              <div className="event-status">
-                <div className="status-badge">
-                  <span className="badge">Active</span>
+              
+              {otherEvents.length > 0 && (
+                <div className="other-events">
+                  <h3>More Events by {event.organizer_name}</h3>
+                  <div className="other-events-container">
+                    {otherEvents.map(otherEvent => (
+                      <div key={otherEvent.event_id} className="other-event-card" onClick={() => navigate(`/events/${otherEvent.event_id}`)}>
+                        <div className="other-event-image">
+                          {otherEvent.image_url ? (
+                            <img src={otherEvent.image_url} alt={otherEvent.event_name} />
+                          ) : (
+                            <div className="other-event-image-placeholder">
+                              <i className="fas fa-calendar-alt"></i>
+                            </div>
+                          )}
+                        </div>
+                        <div className="other-event-content">
+                          <h4>{otherEvent.event_name}</h4>
+                          <p><i className="far fa-calendar"></i> {formatDate(otherEvent.event_date)}</p>
+                          <p><i className="fas fa-map-marker-alt"></i> {otherEvent.venue_name}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </header>
-        <div className="container">
-          {notification && (
-            <div className={`notification ${notification.type}`}>
-              {notification.message}
-              <button onClick={() => setNotification(null)}>
-                <i className="fas fa-times"></i>
-              </button>
+              )}
             </div>
           )}
-      
-          <div className="nav-tabs">
-            {tabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
+          
+          {activeTab === 'details' && (
+            <div className="event-details-tab">
+              <h2>Event Details</h2>
+              
+              <div className="details-section">
+                <h3>Refund Policy</h3>
+                <p>{event.refund_policy || 'No refund policy specified.'}</p>
               </div>
-            ))}
-          </div>
-      
-          <div className="content-grid">
-            {renderContent()}
-      
-            <div className="sidebar">
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-microphone"></i> Featured Speakers
-                </h3>
-                <div className="speaker-list">
-                  {speakers.slice(0, 3).map(speaker => (
-                    <div className="speaker" key={speaker.id}>
-                      <div className="speaker-avatar">{speaker.initials}</div>
-                      <div className="speaker-info">
-                        <h4>{speaker.name}</h4>
-                        <p>{speaker.title}</p>
-                      </div>
+              
+              <div className="details-section">
+                <h3>Terms and Conditions</h3>
+                <p>{event.terms_and_conditions || 'No terms and conditions specified.'}</p>
+              </div>
+              
+              <div className="details-section">
+                <h3>Attendee Count</h3>
+                <p><i className="fas fa-user-friends"></i> {event.attendee_count} people registered</p>
+              </div>
+              
+              <div className="location-section">
+                <h3>Location</h3>
+                <div className="venue-details">
+                  <div className="venue-info">
+                    <h4>{event.venue_name}</h4>
+                    <p>{event.venue_address}</p>
+                  </div>
+                  <div className="venue-map">
+                    {/* In a real application, you would use a map component here */}
+                    <div className="map-placeholder">
+                      <i className="fas fa-map-marked-alt"></i>
+                      <p>Map view would display here</p>
                     </div>
-                  ))}
-                </div>
-              </div>
-      
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-folder-open"></i> Event Resources
-                </h3>
-                <div className="resources-list">
-                  {resources.slice(0, 3).map(resource => (
-                    <div className="resource" key={resource.id}>
-                      <div className="resource-icon">
-                        <i className={`fas fa-${resource.icon}`}></i>
-                      </div>
-                      <div className="resource-info">
-                        <h4>{resource.title}</h4>
-                        <p>{resource.details}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-      
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-bell"></i> Next Session
-                </h3>
-                <div className="upcoming-session">
-                  <h4><i className="fas fa-clock"></i> Starting in 45 minutes</h4>
-                  <p><strong>The Future of Artificial Intelligence</strong></p>
-                  <p>9:00 AM - Grand Ballroom A</p>
-                  <button className="btn btn-primary" style={{ marginTop: '15px', width: '100%' }}>
-                    <i className="fas fa-calendar-plus"></i> Add Reminder
-                  </button>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+          
+          {activeTab === 'organizer' && (
+            <div className="organizer-details">
+              <h2>About the Organizer</h2>
+              
+              <div className="organizer-profile">
+                <div className="organizer-header">
+                  <div className="organizer-avatar">
+                    <i className="fas fa-user-tie"></i>
+                  </div>
+                  <div className="organizer-info">
+                    <h3>{event.organizer_name}</h3>
+                    <p>Event Organizer</p>
+                  </div>
+                </div>
+                
+                <div className="organizer-bio">
+                  <p>{event.organizer_bio || 'No organizer bio available.'}</p>
+                </div>
+                
+                <div className="organizer-contact">
+                  <h4>Contact Information</h4>
+                  <div className="contact-details">
+                    {event.contact_phone && (
+                      <div className="contact-item">
+                        <i className="fas fa-phone"></i>
+                        <span>{event.contact_phone}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              {event.sponsoring_company && (
+                <div className="company-details">
+                  <h3>Associated Company</h3>
+                  
+                  <div className="company-card">
+                    <div className="company-logo">
+                      <div className="company-logo-placeholder">
+                        <i className="fas fa-building"></i>
+                      </div>
+                    </div>
+                    <div className="company-info">
+                      <h4>{event.sponsoring_company}</h4>
+                      <p>{event.company_address || 'No address available'}</p>
+                      <p>{event.contact_info || 'No contact information available.'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          
+          {activeTab === 'reviews' && (
+            <div className="reviews-section">
+              <h2>Attendee Reviews</h2>
+              
+              <div className="reviews-overview">
+                <div className="average-rating">
+                  <div className="rating-number">{event.average_rating.toFixed(1)}</div>
+                  {renderStarRating(event.average_rating)}
+                  <div className="rating-count">{event.review_count} reviews</div>
+                </div>
+              </div>
+              
+              <div className="reviews-list">
+                {reviews.length > 0 ? (
+                  reviews.map(review => (
+                    <div key={review.feedback_id} className="review-card">
+                      <div className="review-header">
+                        <div className="reviewer-info">
+                          <div className="reviewer-avatar">
+                            <i className="fas fa-user"></i>
+                          </div>
+                          <div>
+                            <div className="reviewer-name">{review.attendee_name}</div>
+                            <div className="review-date">
+                              {new Date(review.created_at).toLocaleDateString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="review-rating">
+                          {renderStarRating(review.rating)}
+                        </div>
+                      </div>
+                      <div className="review-content">
+                        <p>{review.comment}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="no-reviews">
+                    <i className="far fa-comment-dots"></i>
+                    <p>No reviews yet for this event.</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
-      
-        <Footer/>
       </div>
-    </div>
+      <Footer />
+      {showTicketPurchase && (
+        <TicketPurchase 
+          eventId={eventId} 
+          eventName={safeGet(event, 'event_name', 'Event')}
+          onClose={() => setShowTicketPurchase(false)}
+        />
+      )}
+    </>
   );
 }
 
-// Session Item Component
-function SessionItem({ session, onAddToAgenda }) {
-  return (
-    <div className="schedule-item">
-      <div className="time-block">
-        <div className="time">{session.time}</div>
-        <div className="duration">{session.duration}</div>
-      </div>
-      <div className="session-info">
-        <h3 className="session-title">{session.title}</h3>
-        <div className="session-location">
-          <i className="fas fa-map-marker-alt"></i>
-          <span>{session.location}</span>
-        </div>
-        <p className="session-description">{session.description}</p>
-        <div className="session-actions">
-          <button 
-            className={`btn ${session.added ? 'btn-added' : 'btn-primary'}`}
-            onClick={() => onAddToAgenda(session)}
-          >
-            <i className={session.added ? "fas fa-check" : "fas fa-plus"}></i> 
-            {session.added ? 'Added to Agenda' : 'Add to My Agenda'}
-          </button>
-          <button className="btn btn-outline">
-            <i className="fas fa-info-circle"></i> Details
-          </button>
-        </div>
-      </div>
-     
-    </div>
-
-  );
-}
-
-export default Attendee;
+export default EventDetails;

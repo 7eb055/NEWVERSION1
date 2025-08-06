@@ -1,29 +1,82 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "./css/Eventdetails.css";
 import Header from "../component/header";
 import Footer from "../component/footer";
+import EventCard from '../component/AttendeeCards/EventCard';
+import TicketPurchaseCard from '../component/AttendeeCards/TicketPurchaseCard';
+import FeedbackCard from '../component/AttendeeCards/FeedbackCard';
+import ProfileCard from '../component/AttendeeCards/ProfileCard';
+import NotificationsCard from '../component/AttendeeCards/NotificationsCard';
+import MyTicketsCard from '../component/AttendeeCards/MyTicketsCard';
+import AuthTokenService from '../services/AuthTokenService';
 
 function Attendee() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('schedule');
-  const [activeDay, setActiveDay] = useState(1);
-  const [agendaItems, setAgendaItems] = useState([]);
-  const [notification, setNotification] = useState(null);
+  const [activeTab, setActiveTab] = useState('events');
   const [loading, setLoading] = useState(true);
-  const [eventData, setEventData] = useState(null);
-  const [sessions, setSessions] = useState([]);
-  const [speakers, setSpeakers] = useState([]);
-  const [resources, setResources] = useState([]);
-  const [attendeeData, setAttendeeData] = useState(null);
-  const [networkingData, setNetworkingData] = useState([]);
-
-  // Get event ID from URL params or use default for demo
-  const eventId = new URLSearchParams(window.location.search).get('eventId') || '1';
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState('');
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 20,
+    totalPages: 0
+  });
+  const [userProfile, setUserProfile] = useState({
+    user_id: null,
+    email: '',
+    first_name: '',
+    last_name: '',
+    full_name: '',
+    phone: '',
+    date_of_birth: '',
+    gender: '',
+    interests: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    dietary_restrictions: '',
+    accessibility_needs: '',
+    profile_picture_url: '',
+    bio: '',
+    social_media_links: {},
+    notification_preferences: {
+      email: true,
+      sms: false,
+      event_updates: true,
+      promotions: false
+    },
+    registration_count: 0,
+    attendance_count: 0,
+    feedback_count: 0
+  });
+  const [events, setEvents] = useState([]);
+  const [myTickets, setMyTickets] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [notificationStats, setNotificationStats] = useState({
+    total: 0,
+    unread: 0,
+    reminders: 0,
+    confirmations: 0,
+    system_notifications: 0
+  });
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showTicketPurchase, setShowTicketPurchase] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
+  const [feedbackEventId, setFeedbackEventId] = useState(null);
+  const [ticketTypes, setTicketTypes] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
 
   // Helper function to get auth token
   const getAuthToken = () => {
-    return localStorage.getItem('token');
+    const token = AuthTokenService.getToken();
+    console.log('=== TOKEN DEBUG ===');
+    console.log('AuthTokenService token:', token ? 'Found' : 'Not found');
+    console.log('localStorage token:', localStorage.getItem('token') ? 'Found' : 'Not found');
+    console.log('localStorage authToken:', localStorage.getItem('authToken') ? 'Found' : 'Not found');
+    console.log('All localStorage keys:', Object.keys(localStorage));
+    console.log('==================');
+    return token;
   };
 
   // Helper function to make API calls with auth
@@ -43,178 +96,489 @@ function Attendee() {
     });
   };
 
-  // Fetch event details
-  const fetchEventDetails = useCallback(async () => {
+  // Fetch available events
+  const fetchEvents = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/events/${eventId}/details`);
+      // Construct URL with search parameters
+      let url = new URL('http://localhost:5000/api/public/events');
+      
+      // Add search parameters if they exist
+      if (searchTerm) url.searchParams.append('search', searchTerm);
+      if (selectedCategory) url.searchParams.append('category', selectedCategory);
+      
+      // Add pagination parameters
+      url.searchParams.append('page', pagination.page);
+      url.searchParams.append('limit', pagination.limit);
+      
+      // Using our new public events endpoint with search params
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
-        setEventData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching event details:', error);
-    }
-  }, [eventId]);
-
-  // Fetch attendee dashboard data
-  const fetchAttendeeData = useCallback(async () => {
-    try {
-      const response = await makeAuthenticatedRequest('/api/attendee/dashboard');
-      if (response.ok) {
-        const data = await response.json();
-        setAttendeeData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching attendee data:', error);
-    }
-  }, []);
-
-  // Fetch event sessions
-  const fetchSessions = useCallback(async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/events/${eventId}/sessions?day=${activeDay}`);
-      if (response.ok) {
-        const data = await response.json();
-        // Check which sessions are in user's agenda
-        const agendaResponse = await makeAuthenticatedRequest(`/api/events/${eventId}/my-agenda`);
-        let agendaSessionIds = [];
-        if (agendaResponse.ok) {
-          const agendaData = await agendaResponse.json();
-          agendaSessionIds = agendaData.map(item => item.id);
-          setAgendaItems(agendaData);
+        // Update the state with the events data from the response
+        setEvents(data.events || []);
+        // Update pagination state
+        if (data.pagination) {
+          setPagination(data.pagination);
         }
+      } else {
+        console.error('Failed to fetch events');
+      }
+    } catch (error) {
+      console.error('Error fetching events:', error);
+    }
+  };
+
+  // Fetch user's tickets from backend
+  const fetchMyTickets = async () => {
+    try {
+      console.log('Fetching tickets...');
+      const token = getAuthToken();
+      console.log('Token for tickets request:', token ? 'Token exists' : 'No token found');
+      
+      const response = await makeAuthenticatedRequest('/api/attendee/tickets');
+      
+      if (response.ok) {
+        const tickets = await response.json();
+        console.log('Tickets received:', tickets);
+        console.log('QR Code debugging:');
         
-        // Mark sessions as added if they're in agenda
-        const sessionsWithAgenda = data.map(session => ({
-          ...session,
-          added: agendaSessionIds.includes(session.id)
+        // Transform the data to match the expected format
+        const transformedTickets = tickets.map(ticket => {
+          console.log(`Ticket ${ticket.registration_id}: QR Code present:`, !!ticket.qr_code, 'Length:', ticket.qr_code?.length);
+          if (ticket.qr_code) {
+            console.log(`QR Code preview for ticket ${ticket.registration_id}:`, ticket.qr_code.substring(0, 50) + '...');
+          }
+          
+          return {
+            registration_id: ticket.registration_id,
+            id: ticket.registration_id, // For compatibility with existing handlers
+            event_id: ticket.event_id,
+            event_name: ticket.event_name,
+            event_date: ticket.event_date,
+            event_start_time: ticket.event_time, // Map event_time to event_start_time
+            event_location: ticket.venue_name || ticket.venue_address,
+            venue_name: ticket.venue_name,
+            ticket_quantity: ticket.ticket_quantity,
+            ticket_type: ticket.ticket_type_name || 'General',
+            ticket_number: `TKT-${ticket.registration_id}`,
+            attendee_name: userProfile?.full_name || 'Guest',
+            status: ticket.status || 'confirmed',
+            payment_status: ticket.payment_status,
+            total_amount: ticket.total_amount,
+            qr_code: ticket.qr_code,
+            checked_in: ticket.checked_in || ticket.check_in_status || false,
+            has_feedback: ticket.has_feedback || false
+          };
+        });
+        
+        console.log('Final transformed tickets with QR codes:', transformedTickets.map(t => ({
+          id: t.id,
+          hasQR: !!t.qr_code,
+          qrLength: t.qr_code?.length
+        })));
+        
+        setMyTickets(transformedTickets);
+      } else {
+        console.error('Failed to fetch tickets. Status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        setMyTickets([]);
+      }
+    } catch (error) {
+      console.error('Error fetching tickets:', error);
+      setMyTickets([]);
+    }
+  };
+
+  // Fetch user profile from backend
+  const fetchUserProfile = async () => {
+    try {
+      console.log('Fetching user profile...');
+      const token = getAuthToken();
+      console.log('Token for profile request:', token ? 'Token exists' : 'No token found');
+      
+      const response = await makeAuthenticatedRequest('/api/attendee/profile');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Profile data received:', data);
+        if (data.success && data.profile) {
+          setUserProfile(data.profile);
+        } else {
+          console.error('Invalid profile response format');
+        }
+      } else {
+        const errorData = await response.json();
+        console.error('Failed to fetch profile:', errorData);
+      }
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  };
+
+  // Fetch notifications from backend
+  const fetchNotifications = async () => {
+    try {
+      console.log('Fetching notifications...');
+      const token = getAuthToken();
+      console.log('Token for notifications request:', token ? 'Token exists' : 'No token found');
+      
+      const response = await makeAuthenticatedRequest('/api/attendee/notifications?page=1&limit=20');
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Notifications response:', data);
+        
+        // Transform notifications to match expected format
+        const transformedNotifications = data.notifications.map(notification => ({
+          id: notification.notification_id,
+          type: notification.type,
+          title: notification.title,
+          message: notification.message,
+          read: notification.is_read,
+          timestamp: notification.created_at,
+          event_id: notification.event_id,
+          event_name: notification.event_name
         }));
-        setSessions(sessionsWithAgenda);
+        
+        setNotifications(transformedNotifications);
+        console.log(`Loaded ${transformedNotifications.length} notifications`);
+      } else {
+        console.error('Failed to fetch notifications. Status:', response.status);
+        const errorText = await response.text();
+        console.error('Error response:', errorText);
+        setNotifications([]);
       }
     } catch (error) {
-      console.error('Error fetching sessions:', error);
+      console.error('Error fetching notifications:', error);
+      setNotifications([]);
     }
-  }, [eventId, activeDay]);
+  };
 
-  // Fetch speakers
-  const fetchSpeakers = useCallback(async () => {
+  // Fetch notification statistics
+  const fetchNotificationStats = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/events/${eventId}/speakers`);
+      const response = await makeAuthenticatedRequest('/api/attendee/notifications/stats');
+      
       if (response.ok) {
-        const data = await response.json();
-        setSpeakers(data);
+        const stats = await response.json();
+        console.log('Notification stats:', stats);
+        setNotificationStats({
+          total: parseInt(stats.total) || 0,
+          unread: parseInt(stats.unread) || 0,
+          reminders: parseInt(stats.reminders) || 0,
+          confirmations: parseInt(stats.confirmations) || 0,
+          system_notifications: parseInt(stats.system_notifications) || 0
+        });
+      } else {
+        console.error('Failed to fetch notification stats');
       }
     } catch (error) {
-      console.error('Error fetching speakers:', error);
+      console.error('Error fetching notification stats:', error);
     }
-  }, [eventId]);
+  };
 
-  // Fetch resources
-  const fetchResources = useCallback(async () => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/events/${eventId}/resources`);
-      if (response.ok) {
-        const data = await response.json();
-        setResources(data);
-      }
-    } catch (error) {
-      console.error('Error fetching resources:', error);
-    }
-  }, [eventId]);
-
-  // Fetch networking data
-  const fetchNetworkingData = useCallback(async () => {
-    try {
-      const response = await makeAuthenticatedRequest(`/api/events/${eventId}/networking`);
-      if (response.ok) {
-        const data = await response.json();
-        setNetworkingData(data);
-      }
-    } catch (error) {
-      console.error('Error fetching networking data:', error);
-    }
-  }, [eventId]);
-
-  // Load all data on component mount
+  // Load data on component mount
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      
+      // First test authentication
+      try {
+        console.log('Testing authentication...');
+        const authResponse = await makeAuthenticatedRequest('/api/attendee/test-auth');
+        if (authResponse.ok) {
+          const authData = await authResponse.json();
+          console.log('Authentication test successful:', authData);
+        } else {
+          console.error('Authentication test failed:', authResponse.status);
+          const errorText = await authResponse.text();
+          console.error('Auth error:', errorText);
+        }
+      } catch (error) {
+        console.error('Auth test error:', error);
+      }
+      
       await Promise.all([
-        fetchEventDetails(),
-        fetchAttendeeData(),
-        fetchSessions(),
-        fetchSpeakers(),
-        fetchResources(),
-        fetchNetworkingData()
+        fetchEvents(),
+        fetchMyTickets(),
+        fetchNotifications(),
+        fetchNotificationStats(),
+        fetchUserProfile()
       ]);
       setLoading(false);
     };
 
     loadData();
-  }, [eventId, fetchEventDetails, fetchAttendeeData, fetchSessions, fetchSpeakers, fetchResources, fetchNetworkingData]);
+  }, [searchTerm, selectedCategory, pagination.page]); // Re-fetch when search term, category, or page changes
 
-  // Reload sessions when day changes
-  useEffect(() => {
-    if (!loading) {
-      fetchSessions();
-    }
-  }, [activeDay, loading, fetchSessions]);
+  // Handle page change
+  const handlePageChange = (newPage) => {
+    setPagination(prev => ({
+      ...prev,
+      page: newPage
+    }));
+    // The useEffect will trigger a new fetchEvents call
+  };
 
-  const tabs = [
-    { id: 'schedule', label: 'Schedule' },
-    { id: 'agenda', label: 'My Agenda' },
-    { id: 'speakers', label: 'Speakers' },
-    { id: 'resources', label: 'Resources' },
-    { id: 'networking', label: 'Networking' }
-  ];
-
-  const days = [
-    { id: 1, name: 'Day 1 - Oct 15' },
-    { id: 2, name: 'Day 2 - Oct 16' },
-    { id: 3, name: 'Day 3 - Oct 17' }
-  ];
-
-  // Handle adding/removing sessions from agenda
-  const handleAddToAgenda = async (session) => {
+  // Handle register for event click  
+  const handleRegisterClick = async (event) => {
+    setSelectedEvent(event);
+    setLoadingTickets(true);
+    
     try {
-      if (session.added) {
-        // Remove from agenda
-        const response = await makeAuthenticatedRequest(`/api/events/${eventId}/agenda/${session.id}`, {
-          method: 'DELETE'
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          // Update local state
-          setAgendaItems(agendaItems.filter(item => item.id !== session.id));
-          setSessions(sessions.map(s => 
-            s.id === session.id ? { ...s, added: false } : s
-          ));
-          setNotification({ message: data.message, type: 'info' });
-        }
+      // Fetch ticket types for the selected event
+      const response = await fetch(`http://localhost:5000/api/events/${event.event_id}/ticket-types/public`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTicketTypes(data.ticketTypes || []);
       } else {
-        // Add to agenda
-        const response = await makeAuthenticatedRequest(`/api/events/${eventId}/agenda/add`, {
-          method: 'POST',
-          body: JSON.stringify({ sessionId: session.id })
-        });
-        
-        if (response.ok) {
-          const data = await response.json();
-          // Update local state
-          setAgendaItems([...agendaItems, { ...session, added: true }]);
-          setSessions(sessions.map(s => 
-            s.id === session.id ? { ...s, added: true } : s
-          ));
-          setNotification({ message: data.message, type: 'success' });
-        }
+        console.error('Failed to fetch ticket types');
+        setTicketTypes([]);
       }
     } catch (error) {
-      console.error('Error updating agenda:', error);
-      setNotification({ message: 'Error updating agenda. Please try again.', type: 'error' });
+      console.error('Error fetching ticket types:', error);
+      setTicketTypes([]);
+    } finally {
+      setLoadingTickets(false);
+      setShowTicketPurchase(true);
     }
-    
-    setTimeout(() => setNotification(null), 3000);
+  };
+
+  // Handle purchase ticket submission
+  const handlePurchaseTicket = async (registrationData) => {
+    try {
+      // The TicketPurchaseCard already handles the API call
+      // Just show success message and close the modal
+      alert('Ticket purchased successfully!');
+      setShowTicketPurchase(false);
+      
+      // Refresh tickets, notifications, and stats from the backend to get the latest data
+      await Promise.all([
+        fetchMyTickets(),
+        fetchNotifications(),
+        fetchNotificationStats()
+      ]);
+    } catch (error) {
+      console.error('Error handling ticket purchase:', error);
+      alert('An error occurred while processing your ticket purchase');
+    }
+  };
+
+  // Handle view QR code
+  const handleViewQRCode = (ticketId) => {
+    const ticket = myTickets.find(t => t.id === ticketId);
+    if (ticket && ticket.qr_code) {
+      // Create a modal or popup to display the QR code
+      const modal = document.createElement('div');
+      modal.style.position = 'fixed';
+      modal.style.top = '0';
+      modal.style.left = '0';
+      modal.style.width = '100%';
+      modal.style.height = '100%';
+      modal.style.backgroundColor = 'rgba(0,0,0,0.8)';
+      modal.style.display = 'flex';
+      modal.style.justifyContent = 'center';
+      modal.style.alignItems = 'center';
+      modal.style.zIndex = '1000';
+      
+      const content = document.createElement('div');
+      content.style.backgroundColor = 'white';
+      content.style.padding = '20px';
+      content.style.borderRadius = '8px';
+      content.style.textAlign = 'center';
+      
+      const title = document.createElement('h3');
+      title.textContent = `Ticket for ${ticket.event_name}`;
+      
+      const qrImage = document.createElement('img');
+      qrImage.src = ticket.qr_code;
+      qrImage.alt = 'QR Code';
+      qrImage.width = 250;
+      qrImage.height = 250;
+      
+      const closeButton = document.createElement('button');
+      closeButton.textContent = 'Close';
+      closeButton.style.marginTop = '15px';
+      closeButton.style.padding = '8px 16px';
+      closeButton.style.backgroundColor = '#f0f0f0';
+      closeButton.style.border = 'none';
+      closeButton.style.borderRadius = '4px';
+      closeButton.style.cursor = 'pointer';
+      closeButton.onclick = () => document.body.removeChild(modal);
+      
+      content.appendChild(title);
+      content.appendChild(qrImage);
+      content.appendChild(closeButton);
+      modal.appendChild(content);
+      
+      document.body.appendChild(modal);
+    }
+  };
+
+  // Handle download ticket
+  const handleDownloadTicket = (ticketId) => {
+    alert('Ticket download functionality will be implemented soon');
+  };
+
+  // Handle cancel ticket
+  const handleCancelTicket = async (ticketId) => {
+    if (window.confirm('Are you sure you want to cancel this ticket? This cannot be undone.')) {
+      try {
+        const response = await makeAuthenticatedRequest(`/api/attendee/tickets/${ticketId}`, {
+          method: 'DELETE'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          alert(data.message || 'Ticket cancelled successfully');
+          // Refresh tickets from backend to get updated data
+          await fetchMyTickets();
+        } else {
+          const errorData = await response.json();
+          alert(errorData.message || 'Failed to cancel ticket');
+        }
+      } catch (error) {
+        console.error('Error cancelling ticket:', error);
+        alert('An error occurred while cancelling the ticket');
+      }
+    }
+  };
+
+  // Handle leave feedback
+  const handleLeaveFeedback = (eventId) => {
+    setFeedbackEventId(eventId);
+    setShowFeedback(true);
+  };
+
+  // Handle feedback submission
+  const handleSubmitFeedback = async (feedbackData) => {
+    try {
+      const response = await makeAuthenticatedRequest('/api/attendee/feedback', {
+        method: 'POST',
+        body: JSON.stringify({
+          eventId: feedbackEventId,
+          ...feedbackData
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        alert(data.message || 'Feedback submitted successfully!');
+        setShowFeedback(false);
+        // Update local state instead of API call
+        // This would normally show the feedback has been submitted for this event
+        alert('Thank you for your feedback!');
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to submit feedback');
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      alert('An error occurred while submitting feedback');
+    }
+  };
+  // Handle profile update
+  const handleUpdateProfile = async (profileData) => {
+    try {
+      console.log('Updating profile with data:', profileData);
+      const response = await makeAuthenticatedRequest('/api/attendee/profile', {
+        method: 'PUT',
+        body: JSON.stringify(profileData)
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Profile update response:', data);
+        alert(data.message || 'Profile updated successfully!');
+        
+        // Refresh the profile data from backend
+        await fetchUserProfile();
+      } else {
+        const errorData = await response.json();
+        alert(errorData.message || 'Failed to update profile');
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      alert('An error occurred while updating your profile');
+    }
+  };
+
+  // Handle notification actions
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      const response = await makeAuthenticatedRequest(`/api/attendee/notifications/${notificationId}/read`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        console.log(`Marked notification ${notificationId} as read`);
+        // Update local state
+        setNotifications(prev => 
+          prev.map(notif => 
+            notif.id === notificationId ? { ...notif, read: true } : notif
+          )
+        );
+        // Update stats
+        setNotificationStats(prev => ({
+          ...prev,
+          unread: Math.max(0, prev.unread - 1)
+        }));
+      } else {
+        console.error('Failed to mark notification as read');
+      }
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      const response = await makeAuthenticatedRequest('/api/attendee/notifications/mark-all-read', {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        console.log('Marked all notifications as read');
+        // Update local state
+        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
+        // Update stats
+        setNotificationStats(prev => ({
+          ...prev,
+          unread: 0
+        }));
+      } else {
+        console.error('Failed to mark all notifications as read');
+      }
+    } catch (error) {
+      console.error('Error marking all notifications as read:', error);
+    }
+  };
+
+  const handleDeleteNotification = async (notificationId) => {
+    try {
+      const response = await makeAuthenticatedRequest(`/api/attendee/notifications/${notificationId}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        console.log(`Deleted notification ${notificationId}`);
+        // Update local state
+        const wasUnread = notifications.find(n => n.id === notificationId)?.read === false;
+        setNotifications(prev => prev.filter(notif => notif.id !== notificationId));
+        // Update stats
+        setNotificationStats(prev => ({
+          ...prev,
+          total: Math.max(0, prev.total - 1),
+          unread: wasUnread ? Math.max(0, prev.unread - 1) : prev.unread
+        }));
+      } else {
+        console.error('Failed to delete notification');
+      }
+    } catch (error) {
+      console.error('Error deleting notification:', error);
+    }
   };
 
   // Show loading state
@@ -230,419 +594,192 @@ function Attendee() {
           fontSize: '1.2rem'
         }}>
           <i className="fas fa-spinner fa-spin" style={{marginRight: '10px'}}></i>
-          Loading event data...
+          Loading dashboard...
         </div>
+        <Footer/>
       </div>
     );
   }
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'agenda':
-        return (
-          <div className="schedule-section">
-            <div className="section-header">
-              <h2 className="section-title">My Agenda</h2>
-            </div>
-            
-            {agendaItems.length === 0 ? (
-              <div className="empty-agenda">
-                <div className="empty-icon">
-                  <i className="fas fa-calendar-plus"></i>
-                </div>
-                <h3>Your agenda is empty</h3>
-                <p>Add sessions you're interested in to build your personal agenda</p>
-              </div>
-            ) : (
-              <div className="schedule-list">
-                {agendaItems.map(session => (
-                  <SessionItem 
-                    key={session.id} 
-                    session={session} 
-                    onAddToAgenda={handleAddToAgenda} 
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      case 'speakers':
-        return (
-          <div className="speakers-section">
-            <div className="section-header">
-              <h2 className="section-title">Featured Speakers</h2>
-            </div>
-            
-            <div className="speakers-grid">
-              {speakers.map(speaker => (
-                <div className="speaker-card" key={speaker.id}>
-                  <div className="speaker-avatar">{speaker.initials}</div>
-                  <h3>{speaker.name}</h3>
-                  <p>{speaker.title}</p>
-                  <div className="speaker-actions">
-                    <button 
-                      className="btn btn-outline"
-                      onClick={() => navigate(`/speaker/${speaker.id}`)}
-                    >
-                      <i className="fas fa-user"></i> View Profile
-                    </button>
-                    <button 
-                      className="btn btn-outline"
-                      onClick={() => {
-                        setNotification({
-                          message: 'Connect request sent to speaker',
-                          type: 'success'
-                        });
-                        setTimeout(() => setNotification(null), 3000);
-                      }}
-                    >
-                      <i className="fas fa-user-plus"></i> Connect
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'resources':
-        return (
-          <div className="resources-section">
-            <div className="section-header">
-              <h2 className="section-title">Event Resources</h2>
-            </div>
-            
-            <div className="resources-grid">
-              {resources.map(resource => (
-                <div className="resource-card" key={resource.id}>
-                  <div className="resource-icon">
-                    <i className={`fas fa-${resource.icon}`}></i>
-                  </div>
-                  <h3>{resource.title}</h3>
-                  <p>{resource.details}</p>
-                  <div className="resource-actions">
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => {
-                        setNotification({
-                          message: `Downloading ${resource.title}...`,
-                          type: 'info'
-                        });
-                        setTimeout(() => {
-                          setNotification({
-                            message: `${resource.title} downloaded successfully!`,
-                            type: 'success'
-                          });
-                          setTimeout(() => setNotification(null), 3000);
-                        }, 2000);
-                      }}
-                    >
-                      <i className="fas fa-download"></i> Download
-                    </button>
-                    <button 
-                      className="btn btn-outline"
-                      onClick={() => navigate(`/resource/${resource.id}`)}
-                    >
-                      <i className="fas fa-info-circle"></i> Details
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      case 'networking':
-        return (
-          <div className="networking-section">
-            <div className="section-header">
-              <h2 className="section-title">Networking Hub</h2>
-            </div>
-            
-            <div className="networking-content">
-              <div className="networking-card">
-                <h3>Connect with Attendees</h3>
-                <p>Browse the attendee directory and connect with other participants</p>
-                {networkingData.length > 0 && (
-                  <div className="attendee-list" style={{marginTop: '15px', marginBottom: '15px'}}>
-                    <h4>Other Attendees ({networkingData.length})</h4>
-                    <div className="attendee-grid" style={{display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px', maxHeight: '200px', overflowY: 'auto'}}>
-                      {networkingData.slice(0, 6).map(attendee => (
-                        <div 
-                          key={attendee.attendee_id} 
-                          className="attendee-card" 
-                          style={{
-                            padding: '10px', 
-                            border: '1px solid #e0e0e0', 
-                            borderRadius: '8px',
-                            textAlign: 'center',
-                            cursor: 'pointer'
-                          }}
-                          onClick={() => navigate(`/attendee/${attendee.attendee_id}/profile`)}
-                        >
-                          <div style={{
-                            width: '40px',
-                            height: '40px',
-                            borderRadius: '50%',
-                            background: '#4a6cf7',
-                            color: 'white',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            margin: '0 auto 8px',
-                            fontSize: '14px',
-                            fontWeight: 'bold'
-                          }}>
-                            {attendee.full_name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                          </div>
-                          <div style={{fontSize: '14px', fontWeight: '600'}}>{attendee.full_name}</div>
-                          {attendee.company && (
-                            <div style={{fontSize: '12px', color: '#666'}}>{attendee.company}</div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => navigate(`/events/${eventId}/attendees`)}
-                >
-                  <i className="fas fa-user-friends"></i> Browse All Attendees
-                </button>
-              </div>
-              
-              <div className="networking-card">
-                <h3>Discussion Groups</h3>
-                <p>Join topic-based groups to continue conversations after sessions</p>
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => navigate(`/events/${eventId}/groups`)}
-                >
-                  <i className="fas fa-comments"></i> View Groups
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      default:
-        return (
-          <div className="schedule-section">
-            <div className="section-header">
-              <h2 className="section-title">Event Schedule</h2>
-              <div>
-                <button className="btn btn-outline">
-                  <i className="fas fa-download"></i> Export Schedule
-                </button>
-              </div>
-            </div>
-            
-            <div className="day-selector">
-              {days.map(day => (
-                <button
-                  key={day.id}
-                  className={`day-btn ${activeDay === day.id ? 'active' : ''}`}
-                  onClick={() => setActiveDay(day.id)}
-                >
-                  {day.name}
-                </button>
-              ))}
-            </div>
-            
-            <div className="schedule-list">
-              {sessions.map(session => (
-                <SessionItem 
-                  key={session.id} 
-                  session={session} 
-                  onAddToAgenda={handleAddToAgenda} 
-                />
-              ))}
-            </div>
-          </div>
-        );
-    }
-  };
-
   return (
     <div className="detailContainer">
       <Header/>
-      {/* Attendee header below main header */}
-      <div className="attendee-header" style={{marginTop: '20px', marginBottom: '20px', background: '#f8f9ff', borderRadius: '10px', padding: '15px 25px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)'}}>
-        <div style={{display: 'flex', alignItems: 'center', gap: '15px'}}>
-          <i className="fas fa-user-friends" style={{fontSize: '1.5rem', color: '#4a6cf7'}}></i>
-          <span style={{fontWeight: '600', fontSize: '1.1rem'}}>
-            Attendee: {attendeeData?.attendee?.name || 'Loading...'}
-          </span>
+      
+      <div className="attendee-dashboard">
+        <div className="dashboard-header">
+          <h1 className="dashboard-title">Attendee Dashboard</h1>
+          <p className="dashboard-subtitle">
+            Welcome back, {userProfile?.first_name || 'Guest'}! Manage your events, tickets, and profile.
+          </p>
         </div>
-      </div>
-      <div className="eventdetail">
-        <header>
-          <div className="container">
-            <div className="header-content">
-              <div className="event-title">
-                <h1>{eventData?.event_name || 'Loading Event...'}</h1>
-                <p>{eventData?.event_name ? 'Shaping the future of technology together' : 'Loading event details...'}</p>
-                <div className="event-meta">
-                  <div className="meta-item">
-                    <i className="fas fa-calendar"></i>
-                    <span>{eventData?.event_date ? new Date(eventData.event_date).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    }) : 'Loading date...'}</span>
-                  </div>
-                  <div className="meta-item">
-                    <i className="fas fa-map-marker-alt"></i>
-                    <span>NATIONAL THEATRE</span>
-                  </div>
-                  <div className="meta-item">
-                    <i className="fas fa-users"></i>
-                    <span>{eventData?.registration_count || 0} registered</span>
-                  </div>
-                </div>
-              </div>
-              <div className="event-status">
-                <div className="status-badge">
-                  <span className="badge">{eventData?.status || 'Loading...'}</span>
-                </div>
-              </div>
-            </div>
+        
+        <div className="dashboard-tabs">
+          <div 
+            className={`dashboard-tab ${activeTab === 'events' ? 'active' : ''}`}
+            onClick={() => setActiveTab('events')}
+          >
+            Events
           </div>
-        </header>
-        <div className="container">
-          {notification && (
-            <div className={`notification ${notification.type}`}>
-              {notification.message}
-              <button onClick={() => setNotification(null)}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-          )}
-      
-          <div className="nav-tabs">
-            {tabs.map(tab => (
-              <div
-                key={tab.id}
-                className={`tab ${activeTab === tab.id ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab.id)}
-              >
-                {tab.label}
-              </div>
-            ))}
+          <div 
+            className={`dashboard-tab ${activeTab === 'tickets' ? 'active' : ''}`}
+            onClick={() => setActiveTab('tickets')}
+          >
+            My Tickets
           </div>
-      
-          <div className="content-grid">
-            {renderContent()}
-      
-            <div className="sidebar">
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-microphone"></i> Featured Speakers
-                </h3>
-                <div className="speaker-list">
-                  {speakers.slice(0, 3).map(speaker => (
-                    <div className="speaker" key={speaker.id}>
-                      <div className="speaker-avatar">{speaker.initials}</div>
-                      <div className="speaker-info">
-                        <h4>{speaker.name}</h4>
-                        <p>{speaker.title}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-      
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-folder-open"></i> Event Resources
-                </h3>
-                <div className="resources-list">
-                  {resources.slice(0, 3).map(resource => (
-                    <div className="resource" key={resource.id}>
-                      <div className="resource-icon">
-                        <i className={`fas fa-${resource.icon}`}></i>
-                      </div>
-                      <div className="resource-info">
-                        <h4>{resource.title}</h4>
-                        <p>{resource.details}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-      
-              <div className="card">
-                <h3 className="card-header">
-                  <i className="fas fa-bell"></i> Next Session
-                </h3>
-                <div className="upcoming-session">
-                  {attendeeData?.upcomingSessions && attendeeData.upcomingSessions.length > 0 ? (
-                    <>
-                      <h4><i className="fas fa-clock"></i> Coming up next</h4>
-                      <p><strong>{attendeeData.upcomingSessions[0].title}</strong></p>
-                      <p>{attendeeData.upcomingSessions[0].start_time} - {attendeeData.upcomingSessions[0].location}</p>
-                      <p style={{fontSize: '0.9rem', color: '#666'}}>
-                        Event: {attendeeData.upcomingSessions[0].event_name}
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <h4><i className="fas fa-clock"></i> No upcoming sessions</h4>
-                      <p>Add sessions to your agenda to see what's coming up next</p>
-                    </>
-                  )}
-                  <button 
-                    className="btn btn-primary" 
-                    style={{ marginTop: '15px', width: '100%' }}
-                    onClick={() => {
-                      setActiveTab('agenda');
-                      // Scroll to agenda section
-                      document.querySelector('.content-grid').scrollIntoView({ behavior: 'smooth' });
-                    }}
-                  >
-                    <i className="fas fa-calendar-plus"></i> View Full Agenda
+          <div 
+            className={`dashboard-tab ${activeTab === 'notifications' ? 'active' : ''}`}
+            onClick={() => setActiveTab('notifications')}
+          >
+            Notifications
+            {notificationStats.unread > 0 && (
+              <span style={{
+                background: '#e74c3c',
+                color: 'white',
+                borderRadius: '50%',
+                padding: '2px 6px',
+                fontSize: '0.7rem',
+                marginLeft: '5px'
+              }}>
+                {notificationStats.unread}
+              </span>
+            )}
+          </div>
+          <div 
+            className={`dashboard-tab ${activeTab === 'profile' ? 'active' : ''}`}
+            onClick={() => setActiveTab('profile')}
+          >
+            My Profile
+          </div>
+        </div>
+        
+        {/* Conditional rendering based on active tab */}
+        {activeTab === 'events' && !showTicketPurchase && !showFeedback && (
+          <div className="dashboard-section">
+            <div className="section-header">
+              <h2 className="section-title">Available Events</h2>
+              <div className="search-filters">
+                <div className="search-bar">
+                  <input
+                    type="text"
+                    placeholder="Search events..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  <button onClick={fetchEvents}>
+                    <i className="fas fa-search"></i>
                   </button>
                 </div>
+                <div className="category-filter">
+                  <select 
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                  >
+                    <option value="">All Categories</option>
+                    <option value="Conference">Conference</option>
+                    <option value="Workshop">Workshop</option>
+                    <option value="Seminar">Seminar</option>
+                    <option value="Networking">Networking</option>
+                    <option value="Concert">Concert</option>
+                    <option value="Festival">Festival</option>
+                    <option value="Exhibition">Exhibition</option>
+                    <option value="Sports">Sports</option>
+                  </select>
+                </div>
               </div>
             </div>
+            
+            <div className="dashboard-content">
+              {loading ? (
+                <div className="loading-spinner">Loading events...</div>
+              ) : events?.length > 0 ? (
+                events.map(event => (
+                  <EventCard 
+                    key={event.event_id}
+                    event={event}
+                    onRegister={() => handleRegisterClick(event)}
+                    onViewDetails={() => navigate(`/event/${event.event_id}`)}
+                  />
+                ))
+              ) : (
+                <div className="empty-state">
+                  <i className="fas fa-calendar-times"></i>
+                  <h3>No events available</h3>
+                  <p>Check back soon for upcoming events</p>
+                </div>
+              )}
+              
+              {/* Add pagination controls */}
+              {events?.length > 0 && pagination.totalPages > 1 && (
+                <div className="pagination-controls">
+                  <button 
+                    onClick={() => handlePageChange(pagination.page - 1)}
+                    disabled={pagination.page === 1}
+                  >
+                    Previous
+                  </button>
+                  <div className="page-info">
+                    Page {pagination.page} of {pagination.totalPages}
+                  </div>
+                  <button 
+                    onClick={() => handlePageChange(pagination.page + 1)}
+                    disabled={pagination.page >= pagination.totalPages}
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
+        
+        {activeTab === 'events' && showTicketPurchase && (
+          <TicketPurchaseCard 
+            event={selectedEvent}
+            ticketTypes={ticketTypes}
+            loading={loadingTickets}
+            onPurchase={handlePurchaseTicket}
+            onCancel={() => setShowTicketPurchase(false)}
+          />
+        )}
+        
+        {activeTab === 'events' && showFeedback && (
+          <FeedbackCard 
+            eventId={feedbackEventId}
+            eventName={events.find(e => e.id === feedbackEventId)?.name || 'Event'}
+            onSubmit={handleSubmitFeedback}
+            onCancel={() => setShowFeedback(false)}
+          />
+        )}
+        
+        {activeTab === 'tickets' && (
+          <MyTicketsCard 
+            tickets={myTickets}
+            onViewQRCode={handleViewQRCode}
+            onDownloadTicket={handleDownloadTicket}
+            onCancelTicket={handleCancelTicket}
+            onLeaveFeedback={handleLeaveFeedback}
+          />
+        )}
+        
+        {activeTab === 'notifications' && (
+          <NotificationsCard 
+            notifications={notifications}
+            onMarkAsRead={handleMarkAsRead}
+            onMarkAllAsRead={handleMarkAllAsRead}
+            onDeleteNotification={handleDeleteNotification}
+          />
+        )}
+        
+        {activeTab === 'profile' && (
+          <ProfileCard 
+            profile={userProfile}
+            onUpdateProfile={handleUpdateProfile}
+          />
+        )}
+      </div>
       
-        <Footer/>
-      </div>
+      <Footer/>
     </div>
-  );
-}
-
-// Session Item Component
-function SessionItem({ session, onAddToAgenda }) {
-  return (
-    <div className="schedule-item">
-      <div className="time-block">
-        <div className="time">{session.time}</div>
-        <div className="duration">{session.duration}</div>
-      </div>
-      <div className="session-info">
-        <h3 className="session-title">{session.title}</h3>
-        <div className="session-location">
-          <i className="fas fa-map-marker-alt"></i>
-          <span>{session.location}</span>
-        </div>
-        <p className="session-description">{session.description}</p>
-        <div className="session-actions">
-          <button 
-            className={`btn ${session.added ? 'btn-added' : 'btn-primary'}`}
-            onClick={() => onAddToAgenda(session)}
-          >
-            <i className={session.added ? "fas fa-check" : "fas fa-plus"}></i> 
-            {session.added ? 'Added to Agenda' : 'Add to My Agenda'}
-          </button>
-          <button className="btn btn-outline">
-            <i className="fas fa-info-circle"></i> Details
-          </button>
-        </div>
-      </div>
-     
-    </div>
-
   );
 }
 

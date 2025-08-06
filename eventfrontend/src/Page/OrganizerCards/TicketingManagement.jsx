@@ -440,9 +440,9 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
                             <ul>
                               {(Array.isArray(ticket.benefits) 
                                 ? ticket.benefits 
-                                : ticket.benefits.split(/[,;\n]/).map(b => b.trim()).filter(b => b.length > 0)
+                                : (typeof ticket.benefits === 'string' ? ticket.benefits.split(/[,;\n]/).map(b => b.trim()).filter(b => b.length > 0) : [])
                               ).map((benefit, index) => (
-                                <li key={index}>{benefit.trim()}</li>
+                                <li key={index}>{typeof benefit === 'string' ? benefit.trim() : benefit}</li>
                               ))}
                             </ul>
                           </div>
