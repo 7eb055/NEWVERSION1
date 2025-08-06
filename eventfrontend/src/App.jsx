@@ -7,10 +7,10 @@ import SignUp from './Page/SignUp';
 import ForgotPassword from './Page/ForgotPassword';
 import AdminDashboard from './Page/AdminDashboard';
 import './App.css';
-import Attendee from './Page/Eventdetails';
 import OrganizerDashboard from './Page/OrganizerDashboard';
 import EventListPage from './Page/Eventslist';
 import AttendeeDashboard from './Page/AttendeeDashboard';
+import EventDetails from './Page/EventDetails';
 import Profile from './Page/Profile';
 // import ProfileEdit from './Page/ProfileEdit';
 import EmailVerification from './Page/EmailVerification';
@@ -46,8 +46,8 @@ function App() {
         <Route path="/organizer-dashboard" element={<OrganizerProtectedRoute><OrganizerDashboard /></OrganizerProtectedRoute>} />
         <Route path="/attendee-dashboard" element={<AttendeeProtectedRoute><AttendeeDashboard /></AttendeeProtectedRoute>} />
         
-        {/* Event detail route - protected but accessible by all authenticated users */}
-        <Route path="/events/:eventId" element={<ProtectedRoute><Attendee /></ProtectedRoute>} />
+        {/* Event detail route - accessible by all */}
+        <Route path="/events/:eventId" element={<EventDetails />} />
         
         {/* Event management routes */}
         {/* <Route path="/events/create" element={<OrganizerProtectedRoute><EventCreation /></OrganizerProtectedRoute>} /> */}
