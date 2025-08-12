@@ -96,8 +96,8 @@ const EventList = ({
               )}
               
               <div className="event-detail">
-                <i className="fas fa-dollar-sign"></i>
-                <span>{event.ticket_price > 0 ? `$${event.ticket_price}` : 'Free'}</span>
+                <i className="fas fa-coins"></i>
+                <span>{event.ticket_price > 0 ? `GH₵${event.ticket_price}` : 'Free'}</span>
               </div>
             </div>
             

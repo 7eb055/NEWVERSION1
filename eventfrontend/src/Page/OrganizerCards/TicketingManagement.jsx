@@ -221,10 +221,11 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
   };
 
   const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount || 0);
+    const number = Number(amount || 0);
+    return `GH₵${number.toLocaleString('en-GH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    })}`;
   };
 
   const formatDate = (dateString) => {

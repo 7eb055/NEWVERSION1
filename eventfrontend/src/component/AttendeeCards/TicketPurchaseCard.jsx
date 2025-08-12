@@ -65,7 +65,10 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
   const formatCurrency = (amount) => {
     // Make sure amount is a valid number
     const validAmount = Number(amount) || 0;
-    return validAmount.toFixed(2);
+    return new Intl.NumberFormat('en-GH', {
+      style: 'currency',
+      currency: 'GHS'
+    }).format(validAmount);
   };
   
   return (
@@ -112,7 +115,7 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
                     </div>
                   </div>
                   <div className="ticket-type-price">
-                    ${formatCurrency(ticket.price)}
+                    {formatCurrency(ticket.price)}
                   </div>
                 </div>
               ))}
@@ -183,11 +186,11 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
               <h4>Order Summary</h4>
               <div className="summary-item">
                 <span>{selectedTicket.type_name} x {quantity}</span>
-                <span>${formatCurrency((selectedTicket.price || 0) * quantity)}</span>
+                <span>{formatCurrency((selectedTicket.price || 0) * quantity)}</span>
               </div>
               <div className="summary-total">
                 <span>Total</span>
-                <span>${formatCurrency((selectedTicket.price || 0) * quantity)}</span>
+                <span>{formatCurrency((selectedTicket.price || 0) * quantity)}</span>
               </div>
             </div>
             

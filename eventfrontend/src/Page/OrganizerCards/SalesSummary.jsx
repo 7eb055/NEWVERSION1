@@ -16,11 +16,11 @@ const SalesSummary = ({ salesData, events }) => {
         <div className="sales-card global-income">
           <div className="sales-card-header">
             <div className="sales-icon">
-              <i className="fas fa-dollar-sign"></i>
+              <i className="fas fa-coins"></i>
             </div>
             <div className="sales-info">
               <h3>Total Revenue</h3>
-              <p className="sales-amount">${formatters.formatCurrency(salesData.totalIncome, 2)}</p>
+              <p className="sales-amount">{formatters.formatGhanaCurrency(salesData.totalIncome, 2)}</p>
             </div>
           </div>
           <div className="sales-details">
@@ -88,12 +88,12 @@ const SalesSummary = ({ salesData, events }) => {
                         <span className="event-name">{eventSale.eventName}</span>
                       </div>
                     </td>
-                    <td className="price-cell">${formatters.formatCurrency(eventSale.ticketPrice)}</td>
+                    <td className="price-cell">{formatters.formatGhanaCurrency(eventSale.ticketPrice)}</td>
                     <td className="tickets-cell">
                       <span className="tickets-count">{eventSale.ticketsSold}</span>
                     </td>
                     <td className="revenue-cell">
-                      <span className="revenue-amount">${formatters.formatCurrency(eventSale.revenue)}</span>
+                      <span className="revenue-amount">{formatters.formatGhanaCurrency(eventSale.revenue)}</span>
                     </td>
                     <td className="status-cell">
                       <span className={`status-badge ${eventSale.ticketsSold > 100 ? 'high-sales' : eventSale.ticketsSold > 50 ? 'medium-sales' : 'low-sales'}`}>

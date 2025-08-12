@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AuthTokenService from '../services/AuthTokenService';
 import apiService from '../services/ApiService';
+import Header from '../component/header';
 import './css/Profile.css';
 
 const Profile = () => {
@@ -148,6 +149,7 @@ const Profile = () => {
 
   return (
     <div className="profile-container">
+      <Header />
       {error && (
         <div className="error-message">
           <i className="fas fa-exclamation-circle"></i>

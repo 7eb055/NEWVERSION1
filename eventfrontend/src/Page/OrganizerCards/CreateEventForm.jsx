@@ -485,8 +485,8 @@ const CreateEventForm = ({
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="ticket_price" className="form-label">
-                    <i className="fas fa-dollar-sign"></i>
-                    Ticket Price ($) *
+                    <i className="fas fa-coins"></i>
+                    Ticket Price (GH₵) *
                   </label>
                   <input
                     type="number"

@@ -101,13 +101,14 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
     try {
       setLoading(true);
       
-      // Make real API call to purchase ticket
       const token = getAuthToken();
-      const response = await axios.post(`http://localhost:5000/api/events/${eventId}/register`, {
+      if (!token) return;
+
+      // Initialize payment with Paystack
+      const paymentResponse = await axios.post(`http://localhost:5000/api/payments/initialize`, {
+        event_id: eventId,
         ticket_type_id: selectedTicket.ticket_type_id,
-        ticket_quantity: quantity,
-        payment_method: 'credit_card',
-        payment_status: 'completed'
+        ticket_quantity: quantity
       }, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -115,40 +116,91 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
         }
       });
       
-      if (response.data && response.data.registration) {
-        const registrationData = response.data.registration;
+      if (paymentResponse.data && paymentResponse.data.success) {
+        const { authorization_url, reference, amount } = paymentResponse.data.data;
         
-        // Format the response data for display
-        const purchaseResponse = {
-          registration_id: registrationData.registration_id,
-          event_id: registrationData.event_id,
-          event_name: registrationData.event_name || eventName,
-          ticket_type: registrationData.ticket_type_name || selectedTicket.type_name,
-          quantity: registrationData.ticket_quantity || quantity,
-          total_amount: registrationData.total_amount,
-          payment_status: registrationData.payment_status,
-          qr_code: registrationData.qr_code,
-          created_at: registrationData.registration_date
-        };
-        
-        setPurchaseData(purchaseResponse);
-        setPurchaseStep('success');
-        setLoading(false);
-        
-        // Show success notification
-        setNotification({
-          type: 'success',
-          message: 'Ticket purchased successfully! Your registration has been confirmed.'
-        });
-        
-        console.log('Ticket purchase successful:', purchaseResponse);
+        // Open Paystack payment popup or redirect
+        const paymentWindow = window.open(
+          authorization_url,
+          'paystack_payment',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+
+        // Listen for payment completion
+        const checkPaymentStatus = setInterval(async () => {
+          if (paymentWindow.closed) {
+            clearInterval(checkPaymentStatus);
+            setLoading(false);
+            
+            // Check payment status
+            try {
+              const statusResponse = await axios.get(
+                `http://localhost:5000/api/payments/status/${reference}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${token}`
+                  }
+                }
+              );
+              
+              if (statusResponse.data.success && statusResponse.data.data.status === 'success') {
+                // Payment successful - show success page
+                const purchaseResponse = {
+                  registration_id: statusResponse.data.data.registration_id,
+                  event_id: eventId,
+                  event_name: statusResponse.data.data.event_name || eventName,
+                  ticket_type: statusResponse.data.data.ticket_type || selectedTicket.type_name,
+                  quantity: statusResponse.data.data.quantity || quantity,
+                  total_amount: statusResponse.data.data.amount,
+                  payment_status: 'success',
+                  qr_code: statusResponse.data.data.qr_code,
+                  created_at: statusResponse.data.data.paid_at
+                };
+                
+                setPurchaseData(purchaseResponse);
+                setPurchaseStep('success');
+                
+                setNotification({
+                  type: 'success',
+                  message: 'Payment successful! Your ticket has been purchased.'
+                });
+              } else {
+                // Payment failed or cancelled
+                setNotification({
+                  type: 'error',
+                  message: 'Payment was not completed. Please try again.'
+                });
+              }
+            } catch (error) {
+              console.error('Error checking payment status:', error);
+              setNotification({
+                type: 'error',
+                message: 'Unable to verify payment status. Please contact support.'
+              });
+            }
+          }
+        }, 1000);
+
+        // Timeout after 5 minutes
+        setTimeout(() => {
+          if (!paymentWindow.closed) {
+            clearInterval(checkPaymentStatus);
+            paymentWindow.close();
+            setLoading(false);
+            setNotification({
+              type: 'error',
+              message: 'Payment session timed out. Please try again.'
+            });
+          }
+        }, 300000); // 5 minutes
+
       } else {
-        throw new Error('Invalid response from server');
+        throw new Error('Failed to initialize payment');
       }
       
     } catch (err) {
-      console.error('Error purchasing ticket:', err);
-      let errorMessage = 'Failed to purchase ticket. Please try again.';
+      console.error('Error initiating payment:', err);
+      let errorMessage = 'Failed to initiate payment. Please try again.';
       
       if (err.response?.status === 403) {
         errorMessage = 'Access denied. Please make sure you are logged in properly.';
@@ -247,7 +299,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
                   >
                     <div className="ticket-type-header">
                       <h4>{ticket.type_name}</h4>
-                      <span className="ticket-price">${(Number(ticket.price) || 0).toFixed(2)}</span>
+                      <span className="ticket-price">GH₵{(Number(ticket.price) || 0).toFixed(2)}</span>
                     </div>
                     
                     <div className="ticket-type-description">
@@ -343,21 +395,27 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
                   
                   <div className="order-item">
                     <span>Price per Ticket:</span>
-                    <span>${(Number(selectedTicket.price) || 0).toFixed(2)}</span>
+                    <span>GH₵{(Number(selectedTicket.price) || 0).toFixed(2)}</span>
                   </div>
                   
                   <div className="order-item total">
                     <span>Total:</span>
-                    <span>${((Number(selectedTicket.price) || 0) * quantity).toFixed(2)}</span>
+                    <span>GH₵{((Number(selectedTicket.price) || 0) * quantity).toFixed(2)}</span>
                   </div>
                 </div>
                 
                 <div className="payment-info">
                   <h4>Payment Information</h4>
                   <p className="payment-note">
-                    Note: This is a demo application. No actual payment will be processed.
-                    Your ticket will be marked as "paid" automatically.
+                    Payment will be processed securely through Paystack. 
+                    We accept credit/debit cards, bank transfers, and mobile money payments.
+                    You will be redirected to Paystack's secure payment page.
                   </p>
+                  <div className="payment-methods">
+                    <small>
+                      <i className="fas fa-shield-alt"></i> Secure payment powered by Paystack
+                    </small>
+                  </div>
                 </div>
                 
                 <div className="purchase-actions">
@@ -400,7 +458,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
                   
                   <div className="ticket-detail-item">
                     <span>Total Paid:</span>
-                    <span>${(Number(purchaseData.total_amount) || 0).toFixed(2)}</span>
+                    <span>GH₵{(Number(purchaseData.total_amount) || 0).toFixed(2)}</span>
                   </div>
                   
                   <div className="ticket-detail-item">
@@ -424,8 +482,8 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
                 </div>
                 
                 <div className="email-notification">
-                  <i className="fas fa-envelope"></i>
-                  <p>A confirmation email has been sent to your registered email address.</p>
+                  <i className="fas fa-check-circle"></i>
+                  <p>Your payment has been processed successfully via Paystack. Keep this ticket for event entry.</p>
                 </div>
                 
                 <div className="success-actions">

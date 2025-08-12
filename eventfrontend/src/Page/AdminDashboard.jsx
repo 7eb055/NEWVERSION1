@@ -595,7 +595,7 @@ const AdminDashboard = () => {
                   </span>
                 </td>
                 <td>{new Date(event.event_date).toLocaleDateString()}</td>
-                <td>${event.ticket_price || '0.00'}</td>
+                <td>GH₵{event.ticket_price || '0.00'}</td>
                 <td>{event.registration_count || 0}</td>
                 <td>
                   <div className="action-buttons">

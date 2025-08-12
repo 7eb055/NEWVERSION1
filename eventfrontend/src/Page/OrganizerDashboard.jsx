@@ -477,11 +477,11 @@ const OrganizerDashboard = () => {
       console.error('Error loading vendors:', error);
       // Set mock data for demonstration
       setVendors([
-        { id: 1, name: 'Elite Catering Services', category: 'Catering', rating: 4.8, price: '$25/person' },
-        { id: 2, name: 'SoundWave Audio', category: 'Audio/Visual', rating: 4.9, price: '$500/event' },
-        { id: 3, name: 'Perfect Photos', category: 'Photography', rating: 4.7, price: '$800/event' },
-        { id: 4, name: 'Bloom Decorations', category: 'Decoration', rating: 4.6, price: '$300/event' },
-        { id: 5, name: 'Secure Events', category: 'Security', rating: 4.8, price: '$50/hour' }
+        { id: 1, name: 'Elite Catering Services', category: 'Catering', rating: 4.8, price: 'GH₵25/person' },
+        { id: 2, name: 'SoundWave Audio', category: 'Audio/Visual', rating: 4.9, price: 'GH₵500/event' },
+        { id: 3, name: 'Perfect Photos', category: 'Photography', rating: 4.7, price: 'GH₵800/event' },
+        { id: 4, name: 'Bloom Decorations', category: 'Decoration', rating: 4.6, price: 'GH₵300/event' },
+        { id: 5, name: 'Secure Events', category: 'Security', rating: 4.8, price: 'GH₵50/hour' }
       ]);
     }
   };
@@ -1532,7 +1532,7 @@ const OrganizerDashboard = () => {
                 </div>
                 <div className="detail-group">
                   <label>Ticket Price:</label>
-                  <span>{selectedEvent.ticket_price > 0 ? `$${selectedEvent.ticket_price}` : 'Free'}</span>
+                  <span>{selectedEvent.ticket_price > 0 ? `GH₵${selectedEvent.ticket_price}` : 'Free'}</span>
                 </div>
                 <div className="detail-group full-width">
                   <label>Description:</label>

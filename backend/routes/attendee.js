@@ -1216,6 +1216,12 @@ router.post('/purchase-ticket', authenticateToken, async (req, res) => {
     // Commit transaction
     await client.query('COMMIT');
     
+    // Email notifications temporarily disabled
+    console.log('Email notifications are currently disabled');
+    // TODO: Re-enable email notifications when needed:
+    // - Ticket confirmation email
+    // - Payment confirmation email
+    
     res.status(201).json({
       message: 'Ticket purchased successfully',
       registration: {
@@ -1486,6 +1492,50 @@ router.delete('/tickets/:registrationId', authenticateToken, async (req, res) =>
     res.status(500).json({ message: 'Error cancelling ticket' });
   } finally {
     client.release();
+  }
+});
+
+// ===== EMAIL NOTIFICATION ENDPOINTS (TEMPORARILY DISABLED) =====
+
+// Send event reminder emails (Admin/Organizer endpoint) - DISABLED
+router.post('/send-event-reminder/:eventId', authenticateToken, async (req, res) => {
+  try {
+    res.status(503).json({ 
+      message: 'Email notifications are temporarily disabled',
+      status: 'disabled',
+      note: 'This feature will be re-enabled in a future update'
+    });
+  } catch (error) {
+    console.error('Error in disabled endpoint:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Send event update notification - DISABLED
+router.post('/send-event-update/:eventId', authenticateToken, async (req, res) => {
+  try {
+    res.status(503).json({ 
+      message: 'Email notifications are temporarily disabled',
+      status: 'disabled',
+      note: 'This feature will be re-enabled in a future update'
+    });
+  } catch (error) {
+    console.error('Error in disabled endpoint:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Test email functionality - DISABLED
+router.post('/test-email', authenticateToken, async (req, res) => {
+  try {
+    res.status(503).json({ 
+      message: 'Email notifications are temporarily disabled',
+      status: 'disabled',
+      note: 'This feature will be re-enabled in a future update'
+    });
+  } catch (error) {
+    console.error('Error in disabled endpoint:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 });
 

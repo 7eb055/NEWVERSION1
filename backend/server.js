@@ -9,6 +9,11 @@ require('dotenv').config();
 const attendeeRoutes = require('./routes/attendee');
 const ticketingRoutes = require('./routes/ticketing');
 const settingsRoutes = require('./routes/settings');
+const adminRoutes = require('./routes/admin');
+const paymentRoutes = require('./routes/payments');
+
+// Import services
+// const NotificationScheduler = require('./services/NotificationScheduler'); // Disabled
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -21,6 +26,9 @@ const pool = new Pool({
   user: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
 });
+
+// Initialize notification scheduler - DISABLED
+// const notificationScheduler = new NotificationScheduler();
 
 // Test database connection
 pool.connect((err, client, release) => {
@@ -4450,11 +4458,42 @@ app.use('/api', ticketingRoutes);
 // Mount settings routes
 app.use('/api/settings', settingsRoutes);
 
+// Mount admin routes
+app.use('/api/admin', adminRoutes);
+
+// Mount payment routes
+app.use('/api/payments', paymentRoutes);
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Email notification scheduler is temporarily disabled
+  console.log('📧 Email notification scheduler is disabled');
+  console.log('💡 To re-enable: uncomment notification scheduler code in server.js');
+  
+  // Commented out notification scheduler
+  // if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NOTIFICATIONS === 'true') {
+  //   notificationScheduler.start();
+  //   console.log('📧 Email notification scheduler started');
+  // } else {
+  //   console.log('📧 Email notification scheduler disabled (set ENABLE_NOTIFICATIONS=true to enable)');
+  // }
+});
+
+// Graceful shutdown (notification scheduler disabled)
+process.on('SIGTERM', () => {
+  console.log('🛑 SIGTERM received, shutting down gracefully...');
+  // notificationScheduler.stop(); // Disabled
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('🛑 SIGINT received, shutting down gracefully...');
+  // notificationScheduler.stop(); // Disabled
+  process.exit(0);
 });
 
 module.exports = app;

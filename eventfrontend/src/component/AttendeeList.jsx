@@ -138,9 +138,9 @@ const AttendeeList = ({ eventId, organizerId, viewType = 'event' }) => {
             </div>
             <div className="stat-card">
               <h4>Revenue</h4>
-              <p>Total: ${formatters.formatCurrency(stats.revenue.total)}</p>
-              <p>Collected: ${formatters.formatCurrency(stats.revenue.collected)}</p>
-              <p>Pending: ${formatters.formatCurrency(stats.revenue.pending)}</p>
+              <p>Total: {formatters.formatGhanaCurrency(stats.revenue.total)}</p>
+              <p>Collected: {formatters.formatGhanaCurrency(stats.revenue.collected)}</p>
+              <p>Pending: {formatters.formatGhanaCurrency(stats.revenue.pending)}</p>
             </div>
             <div className="stat-card">
               <h4>Capacity</h4>
@@ -245,7 +245,7 @@ const AttendeeList = ({ eventId, organizerId, viewType = 'event' }) => {
                       {attendee.payment_status}
                     </span>
                   </td>
-                  <td>${formatters.formatCurrency(attendee.total_amount)}</td>
+                  <td>{formatters.formatGhanaCurrency(attendee.total_amount)}</td>
                   <td>
                     <span className={`status-badge ${attendee.check_in_status ? 'checked-in' : 'not-checked-in'}`}>
                       {attendee.check_in_status ? 'Checked In' : 'Not Checked In'}

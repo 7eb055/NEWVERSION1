@@ -39,7 +39,7 @@ DIGITAL TICKET RECEIPT
 ======================
 
 Event: ${ticketData.eventName || 'Tech Conference 2025'}
-Ticket: ${ticketData.tierName} - $${ticketData.price}
+Ticket: ${ticketData.tierName} - GH₵${ticketData.price}
 Attendee: ${ticketData.attendeeName}
 Email: ${ticketData.attendeeEmail}
 Purchase Date: ${new Date(ticketData.purchaseDate).toLocaleDateString()}
@@ -134,7 +134,7 @@ Generated: ${new Date().toLocaleString()}
                 </div>
                 <div className="detail-item">
                   <label>Price:</label>
-                  <span>${ticketData.price}</span>
+                  <span>GH₵{ticketData.price}</span>
                 </div>
                 <div className="detail-item">
                   <label>Attendee:</label>

@@ -35,6 +35,334 @@ class EmailService {
     }
   }
 
+  // ===== EMAIL TEMPLATE GENERATORS =====
+
+  // Generate ticket confirmation email HTML
+  generateTicketConfirmationHTML(userName, ticketData) {
+    return `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #ffffff;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 28px;">🎫 Ticket Confirmed!</h1>
+          <h2 style="margin: 10px 0 0 0; font-size: 20px; font-weight: 300;">Your registration is complete</h2>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding: 40px 30px; background: #f8f9fa;">
+          <h3 style="color: #333; margin-top: 0;">Hello ${userName}!</h3>
+          
+          <p style="color: #555; line-height: 1.6; font-size: 16px;">
+            Great news! Your ticket purchase for <strong>${ticketData.eventName}</strong> has been confirmed.
+          </p>
+          
+          <!-- Event Details -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border-left: 4px solid #10b981;">
+            <h4 style="color: #10b981; margin: 0 0 15px 0; font-size: 18px;">📅 Event Details</h4>
+            <table style="width: 100%; font-size: 14px;">
+              <tr><td style="padding: 5px 0; color: #666; width: 30%;"><strong>Event:</strong></td><td style="padding: 5px 0; color: #333;">${ticketData.eventName}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Date:</strong></td><td style="padding: 5px 0; color: #333;">${ticketData.eventDate}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Time:</strong></td><td style="padding: 5px 0; color: #333;">${ticketData.eventTime || 'TBA'}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Venue:</strong></td><td style="padding: 5px 0; color: #333;">${ticketData.venue || 'TBA'}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Tickets:</strong></td><td style="padding: 5px 0; color: #333;">${ticketData.quantity} × ${ticketData.ticketType}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Total:</strong></td><td style="padding: 5px 0; color: #10b981; font-weight: bold;">GH₵${ticketData.totalAmount}</td></tr>
+            </table>
+          </div>
+          
+          <!-- QR Code Section -->
+          ${ticketData.qrCode ? `
+            <div style="text-align: center; margin: 25px 0; padding: 20px; background: white; border-radius: 12px;">
+              <h4 style="color: #333; margin: 0 0 15px 0;">📱 Your Check-in QR Code</h4>
+              <div style="display: inline-block; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <p style="font-family: monospace; font-size: 12px; color: #666; margin: 0;">${ticketData.qrCode}</p>
+              </div>
+              <p style="font-size: 14px; color: #666; margin: 10px 0 0 0;">Present this QR code at the event for check-in</p>
+            </div>
+          ` : ''}
+          
+          <!-- Action Button -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${this.frontendUrl}/attendee-dashboard" 
+               style="display: inline-block; 
+                      background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                      color: white; 
+                      padding: 15px 35px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold;
+                      font-size: 16px;
+                      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);">
+              🎫 View My Tickets
+            </a>
+          </div>
+          
+          <!-- Important Notes -->
+          <div style="border-left: 4px solid #f59e0b; padding: 15px; background: #fffbeb; border-radius: 0 8px 8px 0; margin: 20px 0;">
+            <p style="color: #92400e; margin: 0; font-size: 14px;">
+              <strong>📋 Important:</strong> Please arrive at least 15 minutes before the event starts. Bring a valid ID along with your ticket.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 20px; text-align: center; background: #343a40; color: #adb5bd;">
+          <p style="margin: 0; font-size: 14px;">
+            &copy; ${new Date().getFullYear()} Event Management System. All rights reserved.
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 12px;">
+            Questions? Contact us at <a href="mailto:support@eventmanagement.com" style="color: #10b981;">support@eventmanagement.com</a>
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Generate event reminder email HTML
+  generateEventReminderHTML(userName, eventData, daysUntilEvent) {
+    const urgencyColor = daysUntilEvent <= 1 ? '#ef4444' : daysUntilEvent <= 3 ? '#f59e0b' : '#10b981';
+    const urgencyText = daysUntilEvent <= 1 ? 'Tomorrow!' : daysUntilEvent <= 3 ? 'Very Soon!' : 'Coming Up!';
+    
+    return `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #ffffff;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}dd 100%); color: white; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 28px;">⏰ Event Reminder</h1>
+          <h2 style="margin: 10px 0 0 0; font-size: 20px; font-weight: 300;">${urgencyText}</h2>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding: 40px 30px; background: #f8f9fa;">
+          <h3 style="color: #333; margin-top: 0;">Hello ${userName}!</h3>
+          
+          <p style="color: #555; line-height: 1.6; font-size: 16px;">
+            This is a friendly reminder that <strong>${eventData.eventName}</strong> is 
+            ${daysUntilEvent === 1 ? 'tomorrow' : `in ${daysUntilEvent} days`}!
+          </p>
+          
+          <!-- Countdown -->
+          <div style="text-align: center; margin: 25px 0; padding: 20px; background: white; border-radius: 12px; border: 2px solid ${urgencyColor};">
+            <h2 style="color: ${urgencyColor}; margin: 0; font-size: 36px;">${daysUntilEvent}</h2>
+            <p style="color: #666; margin: 5px 0 0 0; font-size: 18px; font-weight: bold;">
+              Day${daysUntilEvent !== 1 ? 's' : ''} to go!
+            </p>
+          </div>
+          
+          <!-- Event Details -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border-left: 4px solid ${urgencyColor};">
+            <h4 style="color: ${urgencyColor}; margin: 0 0 15px 0; font-size: 18px;">📅 Event Details</h4>
+            <table style="width: 100%; font-size: 14px;">
+              <tr><td style="padding: 5px 0; color: #666; width: 30%;"><strong>Event:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventName}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Date:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventDate}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Time:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventTime || 'TBA'}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Venue:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.venue || 'TBA'}</td></tr>
+            </table>
+          </div>
+          
+          <!-- Action Buttons -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${this.frontendUrl}/events/${eventData.eventId}" 
+               style="display: inline-block; 
+                      background: linear-gradient(135deg, ${urgencyColor} 0%, ${urgencyColor}dd 100%); 
+                      color: white; 
+                      padding: 15px 35px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold;
+                      font-size: 16px;
+                      margin: 0 10px;
+                      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);">
+              📍 Event Details
+            </a>
+            <a href="${this.frontendUrl}/attendee-dashboard" 
+               style="display: inline-block; 
+                      background: #6b7280; 
+                      color: white; 
+                      padding: 15px 35px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold;
+                      font-size: 16px;
+                      margin: 0 10px;
+                      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);">
+              🎫 My Tickets
+            </a>
+          </div>
+          
+          <!-- Preparation Tips -->
+          <div style="border-left: 4px solid #3b82f6; padding: 15px; background: #eff6ff; border-radius: 0 8px 8px 0; margin: 20px 0;">
+            <h4 style="color: #1d4ed8; margin: 0 0 10px 0;">💡 Preparation Tips:</h4>
+            <ul style="color: #1e40af; margin: 0; padding-left: 20px; font-size: 14px;">
+              <li>Arrive 15 minutes early for check-in</li>
+              <li>Bring a valid ID and your ticket QR code</li>
+              <li>Check for any event updates or changes</li>
+              <li>Plan your transportation and parking</li>
+            </ul>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 20px; text-align: center; background: #343a40; color: #adb5bd;">
+          <p style="margin: 0; font-size: 14px;">
+            &copy; ${new Date().getFullYear()} Event Management System. All rights reserved.
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 12px;">
+            Don't want reminders? <a href="${this.frontendUrl}/settings" style="color: #10b981;">Update your preferences</a>
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Generate event update email HTML
+  generateEventUpdateHTML(userName, eventData, updateMessage) {
+    return `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #ffffff;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); color: white; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 28px;">📢 Event Update</h1>
+          <h2 style="margin: 10px 0 0 0; font-size: 20px; font-weight: 300;">Important Information</h2>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding: 40px 30px; background: #f8f9fa;">
+          <h3 style="color: #333; margin-top: 0;">Hello ${userName}!</h3>
+          
+          <p style="color: #555; line-height: 1.6; font-size: 16px;">
+            There's an important update regarding <strong>${eventData.eventName}</strong> that you're registered for.
+          </p>
+          
+          <!-- Update Message -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border-left: 4px solid #3b82f6;">
+            <h4 style="color: #3b82f6; margin: 0 0 15px 0; font-size: 18px;">📝 Update Details</h4>
+            <div style="background: #eff6ff; padding: 20px; border-radius: 8px; border: 1px solid #bfdbfe;">
+              <p style="color: #1e40af; margin: 0; line-height: 1.6; font-size: 15px;">${updateMessage}</p>
+            </div>
+          </div>
+          
+          <!-- Event Details -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #e5e7eb;">
+            <h4 style="color: #374151; margin: 0 0 15px 0; font-size: 18px;">📅 Event Information</h4>
+            <table style="width: 100%; font-size: 14px;">
+              <tr><td style="padding: 5px 0; color: #666; width: 30%;"><strong>Event:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventName}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Date:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventDate}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Time:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.eventTime || 'TBA'}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Venue:</strong></td><td style="padding: 5px 0; color: #333;">${eventData.venue || 'TBA'}</td></tr>
+            </table>
+          </div>
+          
+          <!-- Action Button -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${this.frontendUrl}/events/${eventData.eventId}" 
+               style="display: inline-block; 
+                      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); 
+                      color: white; 
+                      padding: 15px 35px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold;
+                      font-size: 16px;
+                      box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);">
+              📍 View Event Details
+            </a>
+          </div>
+          
+          <!-- Contact Info -->
+          <div style="border-left: 4px solid #10b981; padding: 15px; background: #f0fdf4; border-radius: 0 8px 8px 0; margin: 20px 0;">
+            <p style="color: #065f46; margin: 0; font-size: 14px;">
+              <strong>📞 Questions?</strong> Contact the event organizer or our support team for assistance.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 20px; text-align: center; background: #343a40; color: #adb5bd;">
+          <p style="margin: 0; font-size: 14px;">
+            &copy; ${new Date().getFullYear()} Event Management System. All rights reserved.
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 12px;">
+            Questions? Contact us at <a href="mailto:support@eventmanagement.com" style="color: #3b82f6;">support@eventmanagement.com</a>
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
+  // Generate payment confirmation email HTML
+  generatePaymentConfirmationHTML(userName, paymentData) {
+    return `
+      <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif; background: #ffffff;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white; padding: 30px; text-align: center;">
+          <h1 style="margin: 0; font-size: 28px;">💳 Payment Confirmed</h1>
+          <h2 style="margin: 10px 0 0 0; font-size: 20px; font-weight: 300;">Transaction Successful</h2>
+        </div>
+        
+        <!-- Body -->
+        <div style="padding: 40px 30px; background: #f8f9fa;">
+          <h3 style="color: #333; margin-top: 0;">Hello ${userName}!</h3>
+          
+          <p style="color: #555; line-height: 1.6; font-size: 16px;">
+            Your payment for <strong>${paymentData.eventName}</strong> has been successfully processed.
+          </p>
+          
+          <!-- Payment Details -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border-left: 4px solid #059669;">
+            <h4 style="color: #059669; margin: 0 0 15px 0; font-size: 18px;">💰 Payment Details</h4>
+            <table style="width: 100%; font-size: 14px;">
+              <tr><td style="padding: 5px 0; color: #666; width: 40%;"><strong>Transaction ID:</strong></td><td style="padding: 5px 0; color: #333; font-family: monospace;">${paymentData.transactionId}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Amount:</strong></td><td style="padding: 5px 0; color: #059669; font-weight: bold; font-size: 16px;">GH₵${paymentData.amount}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Payment Method:</strong></td><td style="padding: 5px 0; color: #333;">${paymentData.paymentMethod}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Date:</strong></td><td style="padding: 5px 0; color: #333;">${paymentData.paymentDate}</td></tr>
+              <tr><td style="padding: 5px 0; color: #666;"><strong>Status:</strong></td><td style="padding: 5px 0; color: #059669; font-weight: bold;">✅ Confirmed</td></tr>
+            </table>
+          </div>
+          
+          <!-- Receipt Section -->
+          <div style="background: white; border-radius: 12px; padding: 25px; margin: 25px 0; border: 1px solid #e5e7eb;">
+            <h4 style="color: #374151; margin: 0 0 15px 0; font-size: 18px;">🧾 Receipt Summary</h4>
+            <table style="width: 100%; font-size: 14px; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e5e7eb;"><td style="padding: 10px 0; color: #666;"><strong>Item</strong></td><td style="padding: 10px 0; color: #666; text-align: center;"><strong>Qty</strong></td><td style="padding: 10px 0; color: #666; text-align: right;"><strong>Amount</strong></td></tr>
+              <tr><td style="padding: 10px 0; color: #333;">${paymentData.eventName}</td><td style="padding: 10px 0; color: #333; text-align: center;">${paymentData.quantity}</td><td style="padding: 10px 0; color: #333; text-align: right;">GH₵${paymentData.amount}</td></tr>
+              <tr style="border-top: 2px solid #059669; font-weight: bold;"><td style="padding: 10px 0; color: #059669;">Total</td><td style="padding: 10px 0; color: #059669; text-align: center;">${paymentData.quantity}</td><td style="padding: 10px 0; color: #059669; text-align: right; font-size: 16px;">GH₵${paymentData.amount}</td></tr>
+            </table>
+          </div>
+          
+          <!-- Action Button -->
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${this.frontendUrl}/attendee-dashboard" 
+               style="display: inline-block; 
+                      background: linear-gradient(135deg, #059669 0%, #047857 100%); 
+                      color: white; 
+                      padding: 15px 35px; 
+                      text-decoration: none; 
+                      border-radius: 25px; 
+                      font-weight: bold;
+                      font-size: 16px;
+                      box-shadow: 0 4px 15px rgba(5, 150, 105, 0.3);">
+              🎫 View My Tickets
+            </a>
+          </div>
+          
+          <!-- Important Note -->
+          <div style="border-left: 4px solid #f59e0b; padding: 15px; background: #fffbeb; border-radius: 0 8px 8px 0; margin: 20px 0;">
+            <p style="color: #92400e; margin: 0; font-size: 14px;">
+              <strong>📋 Note:</strong> Keep this email as your payment receipt. You can also access your tickets anytime from your dashboard.
+            </p>
+          </div>
+        </div>
+        
+        <!-- Footer -->
+        <div style="padding: 20px; text-align: center; background: #343a40; color: #adb5bd;">
+          <p style="margin: 0; font-size: 14px;">
+            &copy; ${new Date().getFullYear()} Event Management System. All rights reserved.
+          </p>
+          <p style="margin: 10px 0 0 0; font-size: 12px;">
+            Need help? Contact us at <a href="mailto:support@eventmanagement.com" style="color: #059669;">support@eventmanagement.com</a>
+          </p>
+        </div>
+      </div>
+    `;
+  }
+
   // Generate verification email template
   generateVerificationEmailHTML(username, verificationUrl) {
     return `
@@ -325,6 +653,104 @@ Event Management System Team
   // Utility method for delays
   async delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  // ===== NOTIFICATION EMAIL TEMPLATES =====
+  
+  // Send ticket confirmation email
+  async sendTicketConfirmationEmail(email, userName, ticketData) {
+    console.log('📧 Sending ticket confirmation email to:', email);
+    
+    const mailOptions = {
+      from: {
+        name: 'Event Management System',
+        address: process.env.EMAIL_USER
+      },
+      to: email,
+      subject: `🎫 Ticket Confirmation - ${ticketData.eventName}`,
+      html: this.generateTicketConfirmationHTML(userName, ticketData)
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Ticket confirmation email sent successfully:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending ticket confirmation email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Send event reminder email
+  async sendEventReminderEmail(email, userName, eventData, daysUntilEvent) {
+    console.log('📧 Sending event reminder email to:', email);
+    
+    const mailOptions = {
+      from: {
+        name: 'Event Management System',
+        address: process.env.EMAIL_USER
+      },
+      to: email,
+      subject: `⏰ Reminder: ${eventData.eventName} in ${daysUntilEvent} day${daysUntilEvent !== 1 ? 's' : ''}`,
+      html: this.generateEventReminderHTML(userName, eventData, daysUntilEvent)
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Event reminder email sent successfully:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending event reminder email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Send event update notification
+  async sendEventUpdateEmail(email, userName, eventData, updateMessage) {
+    console.log('📧 Sending event update email to:', email);
+    
+    const mailOptions = {
+      from: {
+        name: 'Event Management System',
+        address: process.env.EMAIL_USER
+      },
+      to: email,
+      subject: `📢 Update: ${eventData.eventName}`,
+      html: this.generateEventUpdateHTML(userName, eventData, updateMessage)
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Event update email sent successfully:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending event update email:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
+  // Send payment confirmation email
+  async sendPaymentConfirmationEmail(email, userName, paymentData) {
+    console.log('📧 Sending payment confirmation email to:', email);
+    
+    const mailOptions = {
+      from: {
+        name: 'Event Management System',
+        address: process.env.EMAIL_USER
+      },
+      to: email,
+      subject: `💳 Payment Confirmed - ${paymentData.eventName}`,
+      html: this.generatePaymentConfirmationHTML(userName, paymentData)
+    };
+
+    try {
+      const result = await this.transporter.sendMail(mailOptions);
+      console.log('✅ Payment confirmation email sent successfully:', result.messageId);
+      return { success: true, messageId: result.messageId };
+    } catch (error) {
+      console.error('❌ Error sending payment confirmation email:', error);
+      return { success: false, error: error.message };
+    }
   }
 
   // Send welcome email after successful verification

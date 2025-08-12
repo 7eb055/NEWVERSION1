@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import AuthTokenService from '../services/AuthTokenService';
 import apiService from '../services/ApiService';
+import Header from '../component/header';
 import './css/Settings.css';
 
 const Settings = () => {
@@ -241,6 +242,7 @@ const Settings = () => {
 
   return (
     <div className="settings-container">
+      <Header />
       <div className="settings-header">
         <h1>Account Settings</h1>
         <p>Manage your account preferences and security settings</p>

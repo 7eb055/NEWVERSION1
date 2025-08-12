@@ -84,6 +84,42 @@ const Header = () => {
     return user.primary_role || (user.roles && user.roles[0]?.role) || 'attendee';
   };
 
+  const getDashboardRoute = () => {
+    return AuthTokenService.getDashboardRoute();
+  };
+
+  const getRoleSpecificLinks = () => {
+    const userRole = getUserRole();
+    
+    const commonLinks = [
+      { to: "/", icon: "fas fa-home", text: "Home" },
+      { to: "/eventslist", icon: "fas fa-calendar", text: "Events" }
+    ];
+
+    const roleLinks = {
+      admin: [
+        { to: "/admin-dashboard", icon: "fas fa-tachometer-alt", text: "Dashboard" },
+        { to: "/admin-dashboard", icon: "fas fa-users-cog", text: "User Management" },
+        { to: "/admin-dashboard", icon: "fas fa-chart-bar", text: "Analytics" },
+        { to: "/admin-dashboard", icon: "fas fa-cog", text: "System Settings" }
+      ],
+      organizer: [
+        { to: "/organizer-dashboard", icon: "fas fa-tachometer-alt", text: "Dashboard" },
+        { to: "/organizer-dashboard", icon: "fas fa-plus-circle", text: "Create Event" },
+        { to: "/organizer-dashboard", icon: "fas fa-calendar-check", text: "My Events" },
+        { to: "/organizer-dashboard", icon: "fas fa-users", text: "Attendees" },
+        { to: "/organizer-dashboard", icon: "fas fa-chart-line", text: "Analytics" }
+      ],
+      attendee: [
+        { to: "/attendee-dashboard", icon: "fas fa-tachometer-alt", text: "Dashboard" },
+        { to: "/attendee-dashboard", icon: "fas fa-ticket-alt", text: "My Tickets" },
+        { to: "/attendee-dashboard", icon: "fas fa-bell", text: "Notifications" }
+      ]
+    };
+
+    return [...commonLinks, ...(roleLinks[userRole] || roleLinks.attendee)];
+  };
+
   // Hide auth buttons on eventdetails page
   const hideAuth = location.pathname === '/eventdetails';
 
@@ -97,30 +133,35 @@ const Header = () => {
         <i className={isMenuOpen ? 'fas fa-times' : 'fas fa-bars'}></i>
       </button>
       <nav className={isMenuOpen ? 'active' : ''}>
-        <Link to="/" className="nav-link">
-          <i className="fas fa-home"></i>
-          Home
-        </Link>
-        <a href="#" className="nav-link">
-          <i className="fas fa-info-circle"></i>
-          About Event
-        </a>
-        <a href="#" className="nav-link">
-          <i className="fas fa-microphone"></i>
-          Speakers
-        </a>
-        <a href="#" className="nav-link">
-          <i className="fas fa-clock"></i>
-          Schedule
-        </a>
-        <a href="#" className="nav-link">
-          <i className="fas fa-calendar"></i>
-          Events
-        </a>
-        <a href="#" className="nav-link">
-          <i className="fas fa-file-alt"></i>
-          Pages
-        </a>
+        {isAuthenticated ? (
+          // Show role-specific navigation for authenticated users
+          getRoleSpecificLinks().map((link, index) => (
+            <Link key={index} to={link.to} className="nav-link">
+              <i className={link.icon}></i>
+              {link.text}
+            </Link>
+          ))
+        ) : (
+          // Show default navigation for non-authenticated users
+          <>
+            <Link to="/" className="nav-link">
+              <i className="fas fa-home"></i>
+              Home
+            </Link>
+            <Link to="/eventslist" className="nav-link">
+              <i className="fas fa-calendar"></i>
+              Events
+            </Link>
+            <a href="#about" className="nav-link">
+              <i className="fas fa-info-circle"></i>
+              About
+            </a>
+            <a href="#contact" className="nav-link">
+              <i className="fas fa-envelope"></i>
+              Contact
+            </a>
+          </>
+        )}
       </nav>
       {!hideAuth && (
         <div className="auth-section">
@@ -161,7 +202,7 @@ const Header = () => {
                       <i className="fas fa-user-edit"></i>
                       My Profile
                     </Link>
-                    <Link to="/dashboard" className="dropdown-item" onClick={() => setIsProfileDropdownOpen(false)}>
+                    <Link to={getDashboardRoute()} className="dropdown-item" onClick={() => setIsProfileDropdownOpen(false)}>
                       <i className="fas fa-tachometer-alt"></i>
                       Dashboard
                     </Link>

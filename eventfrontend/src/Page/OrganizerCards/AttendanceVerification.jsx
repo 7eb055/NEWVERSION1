@@ -620,8 +620,8 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                       <p><i className="fas fa-phone"></i> {attendee.attendee_phone || 'N/A'}</p>
                       <p><i className="fas fa-ticket-alt"></i> {attendee.ticket_type || 'Standard'}</p>
                       <p><i className="fas fa-qrcode"></i> {attendee.qr_code || 'N/A'}</p>
-                      <p><i className="fas fa-money-bill"></i> Payment: {attendee.payment_status || 'N/A'}</p>
-                      <p><i className="fas fa-dollar-sign"></i> Amount: ${formatCurrency(attendee.total_amount)}</p>
+                      <p><i className="fas fa-credit-card"></i> Payment: {attendee.payment_status || 'N/A'}</p>
+                      <p><i className="fas fa-coins"></i> Amount: GH₵{formatCurrency(attendee.total_amount)}</p>
                       {attendee.special_requirements && (
                         <p><i className="fas fa-info-circle"></i> Special: {attendee.special_requirements}</p>
                       )}
@@ -714,8 +714,8 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
                             <span className="stat-label">Total Registered</span>
                           </div>
                           <div className="stat-item revenue">
-                            <i className="fas fa-dollar-sign"></i>
-                            <span className="stat-number">${formatCurrency(attendanceStats[selectedEvent]?.revenue?.collected || 0)}</span>
+                            <i className="fas fa-coins"></i>
+                            <span className="stat-number">GH₵{formatCurrency(attendanceStats[selectedEvent]?.revenue?.collected || 0)}</span>
                             <span className="stat-label">Revenue Collected</span>
                           </div>
                         </>

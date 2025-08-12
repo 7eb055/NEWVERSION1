@@ -264,7 +264,7 @@ const BrowseEvents = () => {
                       <div className="event-price">
                         <span className="price-label">Price:</span>
                         <span className="price-value">
-                          {event.ticket_price > 0 ? `$${event.ticket_price}` : 'Free'}
+                          {event.ticket_price > 0 ? `GH₵${event.ticket_price}` : 'Free'}
                         </span>
                       </div>
                       

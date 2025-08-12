@@ -185,7 +185,7 @@ function EventDetails() {
             <div className="event-actions">
               <button className="btn-register" onClick={() => setShowTicketPurchase(true)}>Register Now</button>
               <div className="event-price">
-                {event.ticket_price > 0 ? `$${parseFloat(event.ticket_price).toFixed(2)}` : 'Free'}
+                {event.ticket_price > 0 ? `GH₵${parseFloat(event.ticket_price).toFixed(2)}` : 'Free'}
               </div>
             </div>
           </div>

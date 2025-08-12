@@ -1,119 +1,178 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom';
 import "./css/Eventslist.css";
 import Header from "../component/header";
 import Footer from "../component/footer";
+import TicketPurchaseCard from '../component/AttendeeCards/TicketPurchaseCard';
+import AuthTokenService from '../services/AuthTokenService';
 
 function EventListPage() {
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      name: "TechForward Conference 2023",
-      date: "Oct 15-17, 2023",
-      location: "San Francisco Convention Center",
-      description: "The premier event for technology innovators and industry leaders shaping the future of tech.",
-      category: "Technology",
-      attendees: 1200,
-      status: "Active"
-    },
-    {
-      id: 2,
-      name: "Global Marketing Summit",
-      date: "Nov 5-7, 2023",
-      location: "Chicago, IL",
-      description: "Learn cutting-edge marketing strategies from top industry experts and thought leaders.",
-      category: "Marketing",
-      attendees: 850,
-      status: "Upcoming"
-    },
-    {
-      id: 3,
-      name: "Healthcare Innovation Forum",
-      date: "Dec 3-5, 2023",
-      location: "Boston, MA",
-      description: "Exploring breakthroughs in medical technology and healthcare delivery systems.",
-      category: "Healthcare",
-      attendees: 650,
-      status: "Upcoming"
-    },
-    {
-      id: 4,
-      name: "Sustainable Energy Expo",
-      date: "Sep 20-22, 2023",
-      location: "Denver, CO",
-      description: "Showcasing renewable energy solutions and sustainable practices for a greener future.",
-      category: "Environment",
-      attendees: 950,
-      status: "Active"
-    },
-    {
-      id: 5,
-      name: "Creative Design Conference",
-      date: "Aug 10-12, 2023",
-      location: "Portland, OR",
-      description: "Celebrating design innovation across digital, print, and experiential mediums.",
-      category: "Design",
-      attendees: 550,
-      status: "Completed"
-    },
-    {
-      id: 6,
-      name: "Future of Finance Symposium",
-      date: "Jan 15-17, 2024",
-      location: "New York, NY",
-      description: "Exploring fintech innovations, blockchain, and the evolving financial landscape.",
-      category: "Finance",
-      attendees: 700,
-      status: "Upcoming"
-    }
-  ]);
+  const navigate = useNavigate();
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  const [filteredEvents, setFilteredEvents] = useState(events);
+  const [filteredEvents, setFilteredEvents] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   
-  // Categories for filtering
-  const categories = ["All", "Technology", "Marketing", "Healthcare", "Environment", "Finance", "Design"];
-  const statuses = ["All", "Active", "Upcoming", "Completed"];
+  // New state for ticket purchase functionality
+  const [selectedEvent, setSelectedEvent] = useState(null);
+  const [showTicketPurchase, setShowTicketPurchase] = useState(false);
+  const [ticketTypes, setTicketTypes] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
   
+  // Categories for filtering
+  const categories = ["All", "Technology", "Business", "Music", "Sports", "Arts", "Health"];
+  const statuses = ["All", "published", "draft", "cancelled"];
+
+  // Fetch events from backend
+  useEffect(() => {
+    fetchEvents();
+  }, []);
+
+  const fetchEvents = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:5000/api/events');
+      if (!response.ok) {
+        throw new Error('Failed to fetch events');
+      }
+      const data = await response.json();
+      console.log('Fetched events:', data); // Debug log
+      setEvents(data);
+      setFilteredEvents(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching events:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Format date function
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
   // Filter events based on search and filters
-  const filterEvents = () => {
-    return events.filter(event => {
-      const matchesSearch = event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           event.description.toLowerCase().includes(searchTerm.toLowerCase());
+  useEffect(() => {
+    let filtered = events.filter(event => {
+      const matchesSearch = event.event_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           event.description?.toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesCategory = categoryFilter === "All" || event.category === categoryFilter;
       const matchesStatus = statusFilter === "All" || event.status === statusFilter;
       
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  };
+    setFilteredEvents(filtered);
+  }, [events, searchTerm, categoryFilter, statusFilter]);
   
   // Handle search input
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    setFilteredEvents(filterEvents());
   };
   
   // Handle category filter
   const handleCategoryFilter = (category) => {
     setCategoryFilter(category);
-    setFilteredEvents(filterEvents());
   };
   
   // Handle status filter
   const handleStatusFilter = (status) => {
     setStatusFilter(status);
-    setFilteredEvents(filterEvents());
   };
   
   // Sort events by date
   const sortEventsByDate = () => {
-    const sorted = [...filteredEvents].sort((a, b) => {
-      // Simple date comparison for demo purposes
-      return new Date(a.date.split("-")[0]) - new Date(b.date.split("-")[0]);
-    });
+    const sorted = [...filteredEvents].sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
     setFilteredEvents(sorted);
+  };
+
+  // Helper function to get auth token
+  const getAuthToken = () => {
+    const token = AuthTokenService.getToken();
+    return token;
+  };
+
+  // Helper function to make API calls with auth
+  const makeAuthenticatedRequest = async (url, options = {}) => {
+    const token = getAuthToken();
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      ...(token && { 'Authorization': `Bearer ${token}` })
+    };
+
+    return fetch(`http://localhost:5000${url}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers
+      }
+    });
+  };
+
+  // Handle view details click
+  const handleViewDetails = (event) => {
+    navigate(`/event/${event.event_id}`);
+  };
+
+  // Handle register for event click  
+  const handleRegisterClick = async (event) => {
+    // Check if user is authenticated
+    const token = getAuthToken();
+    if (!token) {
+      alert('Please log in to register for events');
+      navigate('/login');
+      return;
+    }
+
+    setSelectedEvent(event);
+    setLoadingTickets(true);
+    
+    try {
+      // Fetch ticket types for the selected event
+      const response = await fetch(`http://localhost:5000/api/events/${event.event_id}/ticket-types/public`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTicketTypes(data.ticketTypes || []);
+      } else {
+        console.error('Failed to fetch ticket types');
+        setTicketTypes([]);
+      }
+    } catch (error) {
+      console.error('Error fetching ticket types:', error);
+      setTicketTypes([]);
+    } finally {
+      setLoadingTickets(false);
+      setShowTicketPurchase(true);
+    }
+  };
+
+  // Handle purchase ticket submission
+  const handlePurchaseTicket = async (registrationData) => {
+    try {
+      // The TicketPurchaseCard already handles the API call
+      // Just show success message and close the modal
+      alert('Ticket purchased successfully!');
+      setShowTicketPurchase(false);
+      
+      // Optionally refresh events or show success message
+      console.log('Ticket purchase completed:', registrationData);
+    } catch (error) {
+      console.error('Error handling ticket purchase:', error);
+      alert('An error occurred while processing your ticket purchase');
+    }
   };
 
   return (
@@ -177,54 +236,147 @@ function EventListPage() {
         </div>
         
         {/* Event Cards */}
-        <div className="events-grid">
-          {filteredEvents.length > 0 ? (
-            filteredEvents.map(event => (
-              <div className="event-card" key={event.id}>
-                <div className={`event-status ${event.status.toLowerCase()}`}>
-                  {event.status}
+        {loading ? (
+          <div className="loading-state">
+            <div className="loading-spinner">
+              <i className="fas fa-spinner"></i>
+            </div>
+            <p>Loading events...</p>
+          </div>
+        ) : error ? (
+          <div className="error-state">
+            <div className="error-icon">
+              <i className="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>Error Loading Events</h3>
+            <p>{error}</p>
+            <button className="btn btn-primary" onClick={fetchEvents}>
+              <i className="fas fa-refresh"></i> Try Again
+            </button>
+          </div>
+        ) : filteredEvents.length > 0 ? (
+          <div className="events-grid">
+            {filteredEvents.map(event => {
+              console.log('Rendering event:', event); // Debug log
+              return (
+              <div className="event-card" key={event.event_id}>
+                {/* Event Status */}
+                <div className={`event-status status-${event.status ? event.status.toLowerCase() : 'default'}`}>
+                  {event.status || 'N/A'}
                 </div>
-                <div className="event-content">
-                  <h2>{event.name}</h2>
-                  <div className="event-meta">
-                    <div className="meta-item">
-                      <i className="fas fa-calendar"></i>
-                      <span>{event.date}</span>
-                    </div>
-                    <div className="meta-item">
-                      <i className="fas fa-map-marker-alt"></i>
-                      <span>{event.location}</span>
-                    </div>
-                    <div className="meta-item">
-                      <i className="fas fa-users"></i>
-                      <span>{event.attendees} attendees</span>
-                    </div>
-                    <div className="meta-item">
-                      <i className="fas fa-tag"></i>
-                      <span>{event.category}</span>
-                    </div>
+                
+                {/* Event Image Section */}
+                <div className="event-image-container">
+                  {event.image_url ? (
+                    <img 
+                      src={event.image_url} 
+                      alt={event.event_name}
+                      className="event-image"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                  ) : null}
+                  <div 
+                    className="event-image-placeholder" 
+                    style={{ display: event.image_url ? 'none' : 'flex' }}
+                  >
+                    <i className="fas fa-image"></i>
+                    <span>No Image</span>
                   </div>
-                  <p className="event-description">{event.description}</p>
+                  <div className="event-image-overlay">
+                    {event.category && (
+                      <span className={`event-category ${event.category.toLowerCase()}`}>
+                        {event.category}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Event Content Section */}
+                <div className="event-content">
+                  <div className="event-header">
+                    <h2 className="event-title">{event.event_name}</h2>
+                  </div>
+                  
+                  <div className="event-details">
+                    <div className="event-detail">
+                      <i className="fas fa-calendar"></i>
+                      <span>{formatDate(event.event_date)}</span>
+                    </div>
+                    
+                    <div className="event-detail">
+                      <i className="fas fa-map-marker-alt"></i>
+                      <span>{event.venue_name || event.venue_address || 'TBD'}</span>
+                    </div>
+                    
+                    {event.max_attendees && (
+                      <div className="event-detail">
+                        <i className="fas fa-users"></i>
+                        <span>Max: {event.max_attendees} attendees</span>
+                      </div>
+                    )}
+                    
+                    <div className="event-detail">
+                      <i className="fas fa-coins"></i>
+                      <span>{event.ticket_price > 0 ? `GH₵${event.ticket_price}` : 'Free'}</span>
+                    </div>
+                    
+                    {event.category && (
+                      <div className="event-detail">
+                        <i className="fas fa-tag"></i>
+                        <span>{event.category}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="event-description">
+                    <p>{event.description || 'No description available'}</p>
+                  </div>
+                  
                   <div className="event-actions">
-                    <button className="btn btn-primary">
-                      <i className="fas fa-info-circle"></i> View Details
+                    <button 
+                      className="action-btn view-btn"
+                      onClick={() => handleViewDetails(event)}
+                    >
+                      <i className="fas fa-eye"></i>
+                      View Details
                     </button>
-                    <button className="btn btn-outline">
-                      <i className="fas fa-ticket-alt"></i> Register
+                    <button 
+                      className="action-btn register-btn"
+                      onClick={() => handleRegisterClick(event)}
+                    >
+                      <i className="fas fa-ticket-alt"></i>
+                      Register
                     </button>
                   </div>
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="no-results">
+              );
+            })}
+          </div>
+        ) : (
+          <div className="no-results">
+            <div className="no-results-icon">
               <i className="fas fa-calendar-times"></i>
-              <h3>No events match your search criteria</h3>
-              <p>Try adjusting your filters or search term</p>
             </div>
-          )}
-        </div>
+            <h3>No events found</h3>
+            <p>No events match your search criteria. Try adjusting your filters or search term.</p>
+          </div>
+        )}
       </div>
+      
+      {/* Ticket Purchase Modal */}
+      {showTicketPurchase && (
+        <TicketPurchaseCard 
+          event={selectedEvent}
+          ticketTypes={ticketTypes}
+          loading={loadingTickets}
+          onPurchase={handlePurchaseTicket}
+          onCancel={() => setShowTicketPurchase(false)}
+        />
+      )}
       
       {/* Footer */}
       {/* <footer> */}

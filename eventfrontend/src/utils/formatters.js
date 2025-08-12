@@ -6,13 +6,13 @@
  * 
  * @param {any} value - The value to format
  * @param {number} decimals - Number of decimal places (default: 2)
- * @param {boolean} withPrefix - Whether to add dollar sign prefix (default: false)
- * @return {string} - Formatted number
+ * @param {boolean} withPrefix - Whether to add currency symbol prefix (default: false)
+ * @return {string} - Formatted number with Ghanaian Cedis currency symbol
  */
 export const formatCurrency = (value, decimals = 2, withPrefix = false) => {
   // Handle null, undefined, empty string
   if (value === null || value === undefined || value === '') {
-    return withPrefix ? '$0.00' : '0.00';
+    return withPrefix ? 'GH₵0.00' : '0.00';
   }
   
   // Convert to number (handles string numbers like "123.45")
@@ -20,13 +20,38 @@ export const formatCurrency = (value, decimals = 2, withPrefix = false) => {
   
   // Check if it's a valid number
   if (isNaN(number)) {
-    return withPrefix ? '$0.00' : '0.00';
+    return withPrefix ? 'GH₵0.00' : '0.00';
   }
   
-  // Format to fixed decimals
-  const formatted = number.toFixed(decimals);
+  // Format to fixed decimals with thousand separators
+  const formatted = number.toLocaleString('en-GH', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  });
   
-  return withPrefix ? `$${formatted}` : formatted;
+  return withPrefix ? `GH₵${formatted}` : formatted;
+};
+
+/**
+ * Format currency specifically for Ghanaian Cedis with proper localization
+ * @param {any} value - The value to format
+ * @param {number} decimals - Number of decimal places (default: 2)
+ * @return {string} - Formatted currency with GH₵ symbol
+ */
+export const formatGhanaCurrency = (value, decimals = 2) => {
+  if (value === null || value === undefined || value === '') {
+    return 'GH₵0.00';
+  }
+  
+  const number = Number(value);
+  if (isNaN(number)) {
+    return 'GH₵0.00';
+  }
+  
+  return `GH₵${number.toLocaleString('en-GH', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  })}`;
 };
 
 /**
@@ -81,9 +106,14 @@ const formatters = {
   },
   
   /**
-   * Format a number as currency
+   * Format a number as currency (Ghanaian Cedis)
    */
   formatCurrency,
+  
+  /**
+   * Format currency specifically for Ghana
+   */
+  formatGhanaCurrency,
   
   /**
    * Convert to number safely
