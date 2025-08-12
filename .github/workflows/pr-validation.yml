@@ -1,0 +1,64 @@
+name: Pull Request Validation
+
+on:
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  validate-pr:
+    name: Validate Pull Request
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd backend && npm ci
+          cd ../eventfrontend && npm ci
+
+      - name: Check code formatting (Backend)
+        run: |
+          cd backend
+          npm run format:check
+
+      - name: Check code formatting (Frontend)
+        run: |
+          cd eventfrontend
+          npm run format:check
+
+      - name: Type checking (Frontend)
+        run: |
+          cd eventfrontend
+          npm run type-check
+
+      - name: Build check
+        run: |
+          cd eventfrontend
+          npm run build
+
+  pr-size-check:
+    name: PR Size Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR size
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (pr.additions + pr.deletions > 500) {
+              core.setFailed('PR is too large. Consider breaking it into smaller PRs.');
+            }
+
+  auto-assign-reviewers:
+    name: Auto-assign Reviewers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto-assign reviewers
+        uses: kentaro-m/auto-assign-action@v1.2.5

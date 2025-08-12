@@ -11,6 +11,11 @@ yarn-error.log*
 .env.test.local
 .env.production.local
 
+# Testing
+coverage/
+.nyc_output/
+junit.xml
+
 # Build outputs
 build/
 dist/
@@ -67,3 +72,13 @@ pids
 
 # Serverless directories
 .serverless
+
+# Database dumps
+*.dump
+*.sql.gz
+
+# Docker volumes
+docker-data/
+
+# Git filter-branch backup
+.git/refs/original/
