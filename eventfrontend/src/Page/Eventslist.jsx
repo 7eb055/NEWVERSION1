@@ -35,7 +35,7 @@ function EventListPage() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5000/api/events');
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events`);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }
@@ -112,7 +112,7 @@ function EventListPage() {
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
 
-    return fetch(`http://localhost:5000${url}`, {
+    return fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`, {
       ...options,
       headers: {
         ...defaultHeaders,
@@ -141,7 +141,7 @@ function EventListPage() {
     
     try {
       // Fetch ticket types for the selected event
-      const response = await fetch(`http://localhost:5000/api/events/${event.event_id}/ticket-types/public`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/ticket-types/public`);
       
       if (response.ok) {
         const data = await response.json();
@@ -267,12 +267,13 @@ function EventListPage() {
                 
                 {/* Event Image Section */}
                 <div className="event-image-container">
-                  {event.image_url ? (
+                  {(event.image_url || event.image_filename) ? (
                     <img 
-                      src={event.image_url} 
+                      src={event.image_url || `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}`} 
                       alt={event.event_name}
                       className="event-image"
                       onError={(e) => {
+                        // If image fails to load, hide it and show placeholder
                         e.target.style.display = 'none';
                         e.target.nextElementSibling.style.display = 'flex';
                       }}
@@ -280,7 +281,7 @@ function EventListPage() {
                   ) : null}
                   <div 
                     className="event-image-placeholder" 
-                    style={{ display: event.image_url ? 'none' : 'flex' }}
+                    style={{ display: (event.image_url || event.image_filename) ? 'none' : 'flex' }}
                   >
                     <i className="fas fa-image"></i>
                     <span>No Image</span>

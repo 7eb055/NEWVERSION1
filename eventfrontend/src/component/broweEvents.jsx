@@ -145,75 +145,89 @@ const BrowseEvents = () => {
 
   return (
     <section className="browse-events-section">
-      <div className="container">
-        {/* Header */}
-        <div className="section-header animate-fade-in">
-          <span className="section-badge">EVENT SCHEDULE</span>
-          <h2 className="section-title">Available Events</h2>
-          <p className="section-subtitle">
-            Discover and register for upcoming events from various organizers
-          </p>
-        </div>
-
-        {/* Day Selector */}
-        {eventDates.length > 0 && (
-          <div className="day-selector animate-slide-up">
-            <div
-              className={`day-card ${selectedDate === null ? 'active' : ''}`}
-              onClick={() => setSelectedDate(null)}
-            >
-              <div className="day-header">
-                <span className="day-label">All Events</span>
+      <div className="main-container">
+        {/* Modern Header with Stats */}
+        <div className="hero-header">
+          <div className="header-content">
+            <div className="header-left">
+              <span className="event-badge">
+                <span className="badge-icon">🎉</span>
+                DISCOVER EVENTS
+              </span>
+              <h1 className="main-title">
+                Upcoming Events
+                <span className="title-accent">Near You</span>
+              </h1>
+              <p className="main-subtitle">
+                Join thousands of people discovering amazing events, workshops, and experiences
+              </p>
+            </div>
+            <div className="header-stats">
+              <div className="stat-card">
+                <div className="stat-number">{events.length}</div>
+                <div className="stat-label">Total Events</div>
               </div>
-              <div className="day-content">
-                <span className="day-date">All</span>
-                <div className="day-month-year">
-                  <span className="day-month">DAYS</span>
-                  <span className="event-count">{events.length}</span>
-                </div>
+              <div className="stat-card">
+                <div className="stat-number">{eventDates.length}</div>
+                <div className="stat-label">Event Days</div>
+              </div>
+              <div className="stat-card">
+                <div className="stat-number">{filteredEvents.length}</div>
+                <div className="stat-label">Available Now</div>
               </div>
             </div>
-            
-            {eventDates.slice(0, 5).map((eventDate, index) => (
-              <div
+          </div>
+        </div>
+
+        {/* Filters and Date Selector */}
+        <div className="controls-section">
+          {/* Quick Filters */}
+          <div className="quick-filters">
+            <button 
+              className={`filter-chip ${selectedDate === null ? 'active' : ''}`}
+              onClick={() => setSelectedDate(null)}
+            >
+              <span className="chip-icon">📋</span>
+              All Events ({events.length})
+            </button>
+            {eventDates.slice(0, 4).map((eventDate, index) => (
+              <button
                 key={eventDate.dateString}
-                className={`day-card ${selectedDate === eventDate.dateString ? 'active' : ''}`}
+                className={`filter-chip ${selectedDate === eventDate.dateString ? 'active' : ''}`}
                 onClick={() => setSelectedDate(eventDate.dateString)}
               >
-                <div className="day-header">
-                  <span className="day-label">{eventDate.label}</span>
-                </div>
-                <div className="day-content">
-                  <span className="day-date">{eventDate.day.toString().padStart(2, '0')}</span>
-                  <div className="day-month-year">
-                    <span className="day-month">{eventDate.month}</span>
-                    <span className="day-year">{eventDate.year}</span>
-                  </div>
-                  {eventDate.eventsCount > 0 && (
-                    <div className="event-count-badge">{eventDate.eventsCount}</div>
-                  )}
-                </div>
-              </div>
+                <span className="chip-icon">📅</span>
+                {eventDate.month} {eventDate.day} ({eventDate.eventsCount})
+              </button>
             ))}
           </div>
-        )}
 
-        {/* Events List */}
-        <div className="events-list">
+          {/* View Toggle */}
+          <div className="view-controls">
+            <div className="results-count">
+              Showing {filteredEvents.length} of {events.length} events
+            </div>
+          </div>
+        </div>
+
+        {/* Events Grid */}
+        <div className="events-grid">
           {filteredEvents.length === 0 ? (
-            <div className="no-events">
-              <h3>No Events Available</h3>
-              <p>
+            <div className="empty-state">
+              <div className="empty-icon">🎪</div>
+              <h3 className="empty-title">No Events Found</h3>
+              <p className="empty-description">
                 {selectedDate 
-                  ? 'No events scheduled for the selected date.' 
-                  : 'No published events available at the moment.'
+                  ? 'No events scheduled for the selected date. Try viewing all events.' 
+                  : 'No published events available right now. Check back soon for exciting new events!'
                 }
               </p>
               {selectedDate && (
                 <button 
                   onClick={() => setSelectedDate(null)} 
-                  className="view-all-btn"
+                  className="empty-action-btn"
                 >
+                  <span className="btn-icon">👀</span>
                   View All Events
                 </button>
               )}
@@ -223,90 +237,113 @@ const BrowseEvents = () => {
               const formattedDate = formatEventDate(event.event_date);
               const availableTickets = getAvailableTickets(event);
               const isRegistering = registering[event.event_id];
+              const isSoldOut = availableTickets <= 0;
+              const isLowCapacity = availableTickets <= 10 && availableTickets > 0;
               
               return (
                 <div 
                   key={event.event_id} 
-                  className={`event-card animate-fade-in-up`}
-                  style={{ animationDelay: `${index * 0.2}s` }}
+                  className={`event-card-modern ${isSoldOut ? 'sold-out' : ''}`}
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <div className="event-image">
+                  {/* Event Image Header */}
+                  <div className="event-image-container">
                     <img 
-                      src={defaultEventImage} 
+                      src={event.image_url || (event.image_filename ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}` : defaultEventImage)} 
                       alt={event.event_name}
+                      className="event-image"
                       onError={(e) => {
                         e.target.src = defaultEventImage;
                       }}
                     />
-                    <div className="event-status-badge">
-                      {event.status === 'published' ? 'Available' : event.status}
+                    <div className="image-overlay">
+                      {isSoldOut && <div className="status-badge sold-out-badge">SOLD OUT</div>}
+                      {isLowCapacity && <div className="status-badge low-stock-badge">Few Tickets Left</div>}
+                      {!isSoldOut && !isLowCapacity && <div className="status-badge available-badge">Available</div>}
+                    </div>
+                    <div className="event-price-tag">
+                      {event.ticket_price > 0 ? `GH₵${event.ticket_price}` : 'FREE'}
                     </div>
                   </div>
-                  <div className="event-content">
-                    <div className="event-meta">
-                      <div className="event-time">
-                        <span className="time-icon">🕐</span>
-                        {formattedDate.time}
+
+                  {/* Event Content */}
+                  <div className="event-card-content">
+                    {/* Date and Time */}
+                    <div className="event-datetime">
+                      <div className="date-section">
+                        <span className="event-day">{new Date(event.event_date).getDate()}</span>
+                        <span className="event-month">{new Date(event.event_date).toLocaleDateString('en-US', { month: 'short' }).toUpperCase()}</span>
                       </div>
-                      <div className="event-location">
-                        <span className="location-icon">📍</span>
-                        {event.company_name || event.organizer_name}
-                      </div>
-                      <div className="event-date">
-                        <span className="date-icon">📅</span>
-                        {formattedDate.date}
-                      </div>
-                    </div>
-                    
-                    <h3 className="event-title">{event.event_name}</h3>
-                    
-                    <div className="event-details">
-                      <div className="event-price">
-                        <span className="price-label">Price:</span>
-                        <span className="price-value">
-                          {event.ticket_price > 0 ? `GH₵${event.ticket_price}` : 'Free'}
-                        </span>
-                      </div>
-                      
-                      <div className="event-capacity">
-                        <span className="capacity-label">Available Tickets:</span>
-                        <span className={`capacity-value ${availableTickets <= 10 ? 'low-capacity' : ''}`}>
-                          {availableTickets} / {event.max_attendees}
-                        </span>
-                      </div>
-                      
-                      <div className="event-organizer">
-                        <span className="organizer-label">Organizer:</span>
-                        <span className="organizer-name">{event.organizer_name}</span>
+                      <div className="time-section">
+                        <span className="event-time">{formattedDate.time}</span>
+                        <span className="event-weekday">{new Date(event.event_date).toLocaleDateString('en-US', { weekday: 'short' })}</span>
                       </div>
                     </div>
 
-                    <div className="event-actions">
+                    {/* Event Title */}
+                    <h3 className="event-title-modern">{event.event_name}</h3>
+
+                    {/* Event Meta Info */}
+                    <div className="event-meta-grid">
+                      <div className="meta-item">
+                        <span className="meta-icon">👥</span>
+                        <span className="meta-text">{availableTickets} tickets left</span>
+                      </div>
+                      <div className="meta-item">
+                        <span className="meta-icon">🏢</span>
+                        <span className="meta-text">{event.company_name || event.organizer_name}</span>
+                      </div>
+                    </div>
+
+                    {/* Capacity Bar */}
+                    <div className="capacity-section">
+                      <div className="capacity-info">
+                        <span className="capacity-text">Capacity</span>
+                        <span className="capacity-numbers">{event.max_attendees - availableTickets}/{event.max_attendees}</span>
+                      </div>
+                      <div className="capacity-bar">
+                        <div 
+                          className="capacity-fill"
+                          style={{ 
+                            width: `${((event.max_attendees - availableTickets) / event.max_attendees) * 100}%` 
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="event-actions-modern">
                       <button 
-                        className={`purchase-btn ${isRegistering ? 'registering' : ''} ${availableTickets <= 0 ? 'sold-out' : ''}`}
+                        className={`primary-action-btn ${isRegistering ? 'loading' : ''} ${isSoldOut ? 'disabled' : ''}`}
                         onClick={() => handleRegisterForEvent(event.event_id)}
-                        disabled={isRegistering || availableTickets <= 0}
+                        disabled={isRegistering || isSoldOut}
                       >
                         {isRegistering ? (
                           <>
-                            <span className="loading-spinner-small"></span>
+                            <span className="btn-spinner"></span>
                             Registering...
                           </>
-                        ) : availableTickets <= 0 ? (
-                          'SOLD OUT'
+                        ) : isSoldOut ? (
+                          <>
+                            <span className="btn-icon">❌</span>
+                            Sold Out
+                          </>
                         ) : (
-                          'REGISTER NOW'
+                          <>
+                            <span className="btn-icon">🎫</span>
+                            Register Now
+                          </>
                         )}
                       </button>
                       
                       <button 
-                        className="details-btn"
+                        className="secondary-action-btn"
                         onClick={() => {
-                          // You can implement a modal or navigate to event details page
                           console.log('View details for event:', event.event_id);
                         }}
                       >
-                        View Details
+                        <span className="btn-icon">📋</span>
+                        Details
                       </button>
                     </div>
                   </div>
@@ -316,11 +353,13 @@ const BrowseEvents = () => {
           )}
         </div>
 
-        {/* Load More Button (if needed) */}
+        {/* Load More Section */}
         {filteredEvents.length > 0 && events.length > filteredEvents.length && (
-          <div className="load-more-section">
-            <button onClick={fetchEvents} className="load-more-btn">
+          <div className="load-more-container">
+            <button onClick={fetchEvents} className="load-more-btn-modern">
+              <span className="btn-icon">⬇️</span>
               Load More Events
+              <span className="btn-subtitle">Discover more amazing events</span>
             </button>
           </div>
         )}

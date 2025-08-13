@@ -2,7 +2,7 @@
 // Frontend service to interact with the attendee listing API
 
 class AttendeeListingService {
-  constructor(apiBaseUrl = 'http://localhost:5000/api') {
+  constructor(apiBaseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api`) {
     this.baseUrl = apiBaseUrl;
   }
 

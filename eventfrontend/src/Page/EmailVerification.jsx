@@ -21,7 +21,7 @@ const EmailVerification = () => {
       }
 
       try {
-        const response = await axios.get(`http://localhost:5000/api/auth/verify-email?token=${token}`);
+        const response = await axios.get(`http://localhost:5001/api/auth/verify-email?token=${token}`);
         
         if (response.data.verified) {
           setVerificationStatus('success');
@@ -62,7 +62,7 @@ const EmailVerification = () => {
 
     try {
       setIsLoading(true);
-      const response = await axios.post('http://localhost:5000/api/auth/resend-verification', {
+      const response = await axios.post('http://localhost:5001/api/auth/resend-verification', {
         email: email
       });
 

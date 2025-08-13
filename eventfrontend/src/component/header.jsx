@@ -105,15 +105,15 @@ const Header = () => {
       ],
       organizer: [
         { to: "/organizer-dashboard", icon: "fas fa-tachometer-alt", text: "Dashboard" },
-        { to: "/organizer-dashboard", icon: "fas fa-plus-circle", text: "Create Event" },
-        { to: "/organizer-dashboard", icon: "fas fa-calendar-check", text: "My Events" },
-        { to: "/organizer-dashboard", icon: "fas fa-users", text: "Attendees" },
-        { to: "/organizer-dashboard", icon: "fas fa-chart-line", text: "Analytics" }
+        // { to: "/organizer-dashboard", icon: "fas fa-plus-circle", text: "Create Event" },
+        // { to: "/organizer-dashboard", icon: "fas fa-calendar-check", text: "My Events" },
+        // { to: "/organizer-dashboard", icon: "fas fa-users", text: "Attendees" },
+        // { to: "/organizer-dashboard", icon: "fas fa-chart-line", text: "Analytics" }
       ],
       attendee: [
         { to: "/attendee-dashboard", icon: "fas fa-tachometer-alt", text: "Dashboard" },
-        { to: "/attendee-dashboard", icon: "fas fa-ticket-alt", text: "My Tickets" },
-        { to: "/attendee-dashboard", icon: "fas fa-bell", text: "Notifications" }
+        // { to: "/attendee-dashboard", icon: "fas fa-ticket-alt", text: "My Tickets" },
+        // { to: "/attendee-dashboard", icon: "fas fa-bell", text: "Notifications" }
       ]
     };
 
@@ -152,14 +152,11 @@ const Header = () => {
               <i className="fas fa-calendar"></i>
               Events
             </Link>
-            <a href="#about" className="nav-link">
+            {/* <Link to="/about" className="nav-link">
               <i className="fas fa-info-circle"></i>
               About
-            </a>
-            <a href="#contact" className="nav-link">
-              <i className="fas fa-envelope"></i>
-              Contact
-            </a>
+            </Link> */}
+          
           </>
         )}
       </nav>

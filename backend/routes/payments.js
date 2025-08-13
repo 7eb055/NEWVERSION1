@@ -222,7 +222,18 @@ router.post('/verify/:reference', authenticateToken, async (req, res) => {
       ]);
 
       // Create event registration
-      const metadata = JSON.parse(payment.metadata);
+      // Safely handle metadata - could be string or object
+      let metadata = {};
+      try {
+        if (typeof payment.metadata === 'string') {
+          metadata = JSON.parse(payment.metadata);
+        } else if (payment.metadata && typeof payment.metadata === 'object') {
+          metadata = payment.metadata;
+        }
+      } catch (error) {
+        console.warn('Failed to parse payment metadata:', error);
+        metadata = {};
+      }
       
       // Get attendee_id for the user
       const attendeeQuery = 'SELECT attendee_id FROM attendees WHERE user_id = $1';
@@ -338,7 +349,19 @@ router.get('/status/:reference', authenticateToken, async (req, res) => {
     }
 
     const payment = result.rows[0];
-    const metadata = JSON.parse(payment.metadata || '{}');
+    
+    // Safely handle metadata - could be string or object
+    let metadata = {};
+    try {
+      if (typeof payment.metadata === 'string') {
+        metadata = JSON.parse(payment.metadata || '{}');
+      } else if (payment.metadata && typeof payment.metadata === 'object') {
+        metadata = payment.metadata;
+      }
+    } catch (error) {
+      console.warn('Failed to parse payment metadata:', error);
+      metadata = {};
+    }
 
     res.json({
       success: true,

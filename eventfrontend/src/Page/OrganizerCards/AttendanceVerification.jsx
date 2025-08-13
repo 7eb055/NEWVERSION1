@@ -31,7 +31,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
     return Math.round((checkedIn / total) * 100);
   };
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
   // Load organizer's events on component mount - now use events prop
   // useEffect(() => {

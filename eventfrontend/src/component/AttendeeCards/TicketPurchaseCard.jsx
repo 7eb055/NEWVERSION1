@@ -25,7 +25,7 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
         return;
       }
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${event.event_id}/register`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -36,7 +36,7 @@ const AttendeeManagement = () => {
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -94,7 +94,7 @@ const AttendeeManagement = () => {
       const token = AuthTokenService.getToken();
       
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees/${deleteConfirm.id}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees/${deleteConfirm.id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

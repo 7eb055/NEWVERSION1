@@ -18,7 +18,12 @@
     "seed": "node scripts/seed.js",
     "db:reset": "node scripts/reset-db.js",
     "build": "echo 'Backend build completed - no build step required'",
-    "postinstall": "npm audit fix || true"
+    "postinstall": "npm audit fix || true",
+    "docker:migrate": "node database/migrate.js",
+    "docker:health": "node database/health-check.js",
+    "docker:start": "npm start",
+    "docker:start-with-migration": "npm run docker:migrate && npm start",
+    "docker:dev": "npm run docker:migrate && npm run dev"
   },
   "keywords": [
     "event",
@@ -43,6 +48,7 @@
     "helmet": "^7.1.0",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
+    "multer": "^2.0.2",
     "nodemailer": "^6.10.1",
     "pg": "^8.11.3",
     "qrcode": "^1.5.4",

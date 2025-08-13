@@ -16,7 +16,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/auth/debug-user/${email}`);
+      const response = await axios.get(`http://localhost:5001/api/auth/debug-user/${email}`);
       setDebugInfo(response.data);
     } catch (error) {
       console.error('Debug error:', error);
@@ -34,7 +34,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`http://localhost:5000/api/auth/debug-token/${token}`);
+      const response = await axios.get(`http://localhost:5001/api/auth/debug-token/${token}`);
       setDebugInfo(response.data);
     } catch (error) {
       console.error('Token debug error:', error);
@@ -52,7 +52,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post(`http://localhost:5000/api/auth/verify-email`, { token });
+      const response = await axios.post(`http://localhost:5001/api/auth/verify-email`, { token });
       setVerificationResult({ success: true, data: response.data });
     } catch (error) {
       console.error('Verification error:', error);

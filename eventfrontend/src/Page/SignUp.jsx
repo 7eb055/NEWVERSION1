@@ -117,7 +117,7 @@ const SignUp = () => {
       }
 
       // Make API request to the correct endpoint
-      const response = await axios.post('http://localhost:5000/api/auth/register', submitData, {
+      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/register`, submitData, {
         headers: {
           'Content-Type': 'application/json'
         }

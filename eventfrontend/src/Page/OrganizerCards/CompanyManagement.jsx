@@ -34,7 +34,7 @@ const CompanyManagement = () => {
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -92,7 +92,7 @@ const CompanyManagement = () => {
       const token = AuthTokenService.getToken();
       
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies/${deleteConfirm.id}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies/${deleteConfirm.id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

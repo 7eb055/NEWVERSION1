@@ -12,6 +12,7 @@ import EventListPage from './Page/Eventslist';
 import AttendeeDashboard from './Page/AttendeeDashboard';
 import EventDetails from './Page/EventDetails';
 import Profile from './Page/Profile';
+import AboutUs from './Page/AboutUs';
 // import ProfileEdit from './Page/ProfileEdit';
 import EmailVerification from './Page/EmailVerification';
 // import EventCreation from './Page/EventCreation';
@@ -35,6 +36,7 @@ function App() {
         {/* Public routes */}
         <Route path="/" element={<Home />} />
         <Route path="/eventslist" element={<EventListPage />} />
+        <Route path="/about" element={<AboutUs />} />
         
         {/* Authentication routes - protected from authenticated users */}
         <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />

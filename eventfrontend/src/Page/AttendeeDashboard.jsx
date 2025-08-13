@@ -6,6 +6,7 @@ import Footer from "../component/footer";
 import EventCard from '../component/AttendeeCards/EventCard';
 import TicketPurchaseCard from '../component/AttendeeCards/TicketPurchaseCard';
 import FeedbackCard from '../component/AttendeeCards/FeedbackCard';
+import EventReviewsCard from '../component/AttendeeCards/EventReviewsCard';
 import ProfileCard from '../component/AttendeeCards/ProfileCard';
 import NotificationsCard from '../component/AttendeeCards/NotificationsCard';
 import MyTicketsCard from '../component/AttendeeCards/MyTicketsCard';
@@ -87,7 +88,7 @@ function Attendee() {
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
 
-    return fetch(`http://localhost:5000${url}`, {
+    return fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`, {
       ...options,
       headers: {
         ...defaultHeaders,
@@ -100,7 +101,7 @@ function Attendee() {
   const fetchEvents = async () => {
     try {
       // Construct URL with search parameters
-      let url = new URL('http://localhost:5000/api/public/events');
+      let url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/public/events`);
       
       // Add search parameters if they exist
       if (searchTerm) url.searchParams.append('search', searchTerm);
@@ -328,7 +329,7 @@ function Attendee() {
     
     try {
       // Fetch ticket types for the selected event
-      const response = await fetch(`http://localhost:5000/api/events/${event.event_id}/ticket-types/public`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/ticket-types/public`);
       
       if (response.ok) {
         const data = await response.json();
@@ -455,30 +456,20 @@ function Attendee() {
   // Handle feedback submission
   const handleSubmitFeedback = async (feedbackData) => {
     try {
-      const response = await makeAuthenticatedRequest('/api/attendee/feedback', {
-        method: 'POST',
-        body: JSON.stringify({
-          eventId: feedbackEventId,
-          ...feedbackData
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        alert(data.message || 'Feedback submitted successfully!');
-        setShowFeedback(false);
-        // Update local state instead of API call
-        // This would normally show the feedback has been submitted for this event
-        alert('Thank you for your feedback!');
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Failed to submit feedback');
-      }
+      // The new FeedbackCard handles submission internally via FeedbackService
+      // This is called when feedback is successfully submitted
+      setShowFeedback(false);
+      
+      // Refresh the user's events to update feedback status
+      await loadUserEvents();
+      
+      // Show success message
+      console.log('Feedback submitted successfully:', feedbackData);
     } catch (error) {
-      console.error('Error submitting feedback:', error);
-      alert('An error occurred while submitting feedback');
+      console.error('Error handling feedback submission:', error);
     }
   };
+
   // Handle profile update
   const handleUpdateProfile = async (profileData) => {
     try {
@@ -744,10 +735,8 @@ function Attendee() {
         
         {activeTab === 'events' && showFeedback && (
           <FeedbackCard 
-            eventId={feedbackEventId}
-            eventName={events.find(e => e.id === feedbackEventId)?.name || 'Event'}
-            onSubmit={handleSubmitFeedback}
-            onCancel={() => setShowFeedback(false)}
+            event={events.find(e => e.event_id === feedbackEventId) || { event_id: feedbackEventId, event_name: 'Event' }}
+            onFeedbackSubmitted={handleSubmitFeedback}
           />
         )}
         
@@ -762,12 +751,7 @@ function Attendee() {
         )}
         
         {activeTab === 'notifications' && (
-          <NotificationsCard 
-            notifications={notifications}
-            onMarkAsRead={handleMarkAsRead}
-            onMarkAllAsRead={handleMarkAllAsRead}
-            onDeleteNotification={handleDeleteNotification}
-          />
+          <NotificationsCard />
         )}
         
         {activeTab === 'profile' && (

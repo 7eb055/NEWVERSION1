@@ -21,6 +21,7 @@ import {
 // Import header and footer
 import Header from '../component/header';
 import Footer from '../component/footer';
+import ImageUpload from '../component/ImageUpload';
 
 const OrganizerDashboard = () => {
   // State management
@@ -70,6 +71,10 @@ const OrganizerDashboard = () => {
     event_type: 'Conference',
     ticket_price: '',
     image_url: '',
+    image_filename: '',
+    image_type: '',
+    image_size: '',
+    image_mimetype: '',
     registration_deadline: '',
     refund_policy: '',
     terms_and_conditions: '',
@@ -318,7 +323,7 @@ const OrganizerDashboard = () => {
     setIsLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -353,7 +358,7 @@ const OrganizerDashboard = () => {
   const loadCompanies = async () => {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -370,7 +375,7 @@ const OrganizerDashboard = () => {
   const loadAttendees = async () => {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -436,182 +441,7 @@ const OrganizerDashboard = () => {
     }
   };
 
-  /*
-  // Load sales data from API
-  const loadSalesData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/sales/overview', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      setSalesData(response.data || { totalIncome: 0, eventSales: [] });
-    } catch (error) {
-      console.error('Error loading sales data:', error);
-      // Set mock data for demonstration
-      setSalesData({
-        totalIncome: 15750.00,
-        eventSales: [
-          { eventId: 1, eventName: 'Tech Conference 2025', ticketsSold: 150, revenue: 7500.00, ticketPrice: 50.00 },
-          { eventId: 2, eventName: 'Marketing Workshop', ticketsSold: 85, revenue: 4250.00, ticketPrice: 50.00 },
-          { eventId: 3, eventName: 'Networking Event', ticketsSold: 200, revenue: 4000.00, ticketPrice: 20.00 }
-        ]
-      });
-    }
-  };
-
-  // Load vendors from API
-  const loadVendors = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/vendors', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      setVendors(response.data.vendors || []);
-    } catch (error) {
-      console.error('Error loading vendors:', error);
-      // Set mock data for demonstration
-      setVendors([
-        { id: 1, name: 'Elite Catering Services', category: 'Catering', rating: 4.8, price: 'GH₵25/person' },
-        { id: 2, name: 'SoundWave Audio', category: 'Audio/Visual', rating: 4.9, price: 'GH₵500/event' },
-        { id: 3, name: 'Perfect Photos', category: 'Photography', rating: 4.7, price: 'GH₵800/event' },
-        { id: 4, name: 'Bloom Decorations', category: 'Decoration', rating: 4.6, price: 'GH₵300/event' },
-        { id: 5, name: 'Secure Events', category: 'Security', rating: 4.8, price: 'GH₵50/hour' }
-      ]);
-    }
-  };
-
-  // Hire vendor for event
-  const hireVendor = async (vendorId, eventId) => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:5000/api/vendors/hire', {
-        vendorId,
-        eventId
-      }, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.data.success) {
-        setSuccess('Vendor hired successfully!');
-        setShowVendorModal(false);
-        // Reload vendor assignments
-        loadEventVendors();
-        setTimeout(() => setSuccess(''), 3000);
-      }
-    } catch (error) {
-      console.error('Error hiring vendor:', error);
-      setError('Failed to hire vendor. Please try again.');
-    }
-  };
-
-  // Load event vendors
-  const loadEventVendors = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/events/vendors', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      setEventVendors(response.data.eventVendors || []);
-    } catch (error) {
-      console.error('Error loading event vendors:', error);
-      // Mock data for demonstration
-      setEventVendors([
-        { eventId: 1, vendorId: 1, vendorName: 'Elite Catering Services', category: 'Catering' },
-        { eventId: 1, vendorId: 2, vendorName: 'SoundWave Audio', category: 'Audio/Visual' },
-        { eventId: 2, vendorId: 3, vendorName: 'Perfect Photos', category: 'Photography' }
-      ]);
-    }
-  };
-
-  // Load feedback data from API
-  const loadFeedbackData = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get('http://localhost:5000/api/feedback', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      setFeedbackData(response.data.feedback || []);
-      setFeedbackSummary(response.data.summary || {});
-    } catch (error) {
-      console.error('Error loading feedback data:', error);
-      // Mock data for demonstration
-      setFeedbackData([
-        {
-          id: 1,
-          event_id: 1,
-          event_name: 'Tech Conference 2025',
-          attendee_name: 'John Smith',
-          attendee_email: 'john@example.com',
-          rating: 5,
-          comment: 'Excellent event! Very informative speakers and great networking opportunities.',
-          submittedAt: '2025-01-15T10:30:00Z'
-        },
-        {
-          id: 2,
-          event_id: 1,
-          event_name: 'Tech Conference 2025',
-          attendee_name: 'Sarah Johnson',
-          attendee_email: 'sarah@example.com',
-          rating: 4,
-          comment: 'Good content but the venue was a bit crowded. Overall enjoyed it.',
-          submittedAt: '2025-01-16T14:22:00Z'
-        },
-        {
-          id: 3,
-          event_id: 2,
-          event_name: 'Marketing Workshop',
-          attendee_name: 'Mike Davis',
-          attendee_email: 'mike@example.com',
-          rating: 5,
-          comment: 'Amazing workshop! Learned practical strategies I can implement immediately.',
-          submittedAt: '2025-01-12T09:15:00Z'
-        },
-        {
-          id: 4,
-          event_id: 1,
-          event_name: 'Tech Conference 2025',
-          attendee_name: 'Emily Chen',
-          attendee_email: 'emily@example.com',
-          rating: 4,
-          comment: 'Great speakers and well organized. Would love to see more interactive sessions.',
-          submittedAt: '2025-01-17T11:45:00Z'
-        },
-        {
-          id: 5,
-          event_id: 3,
-          event_name: 'Networking Event',
-          attendee_name: 'Robert Wilson',
-          attendee_email: 'robert@example.com',
-          rating: 3,
-          comment: 'Nice event but could have been better organized. Food was good though.',
-          submittedAt: '2025-01-10T16:30:00Z'
-        }
-      ]);
-      
-      // Mock summary data
-      setFeedbackSummary({
-        1: { averageRating: 4.3, totalReviews: 3, event_name: 'Tech Conference 2025' },
-        2: { averageRating: 5.0, totalReviews: 1, event_name: 'Marketing Workshop' },
-        3: { averageRating: 3.0, totalReviews: 1, event_name: 'Networking Event' }
-      });
-    }
-  };
-  */
+  
 
   // Filter feedback based on selected filters
   const getFilteredFeedback = () => {
@@ -684,6 +514,34 @@ const OrganizerDashboard = () => {
     if (success) setSuccess('');
   };
 
+  // Handle image upload changes
+  const handleImageChange = (imageData) => {
+    if (imageData) {
+      setFormData(prev => ({
+        ...prev,
+        image_url: imageData.url || '',
+        image_filename: imageData.filename || '',
+        image_type: imageData.type || '',
+        image_size: imageData.size || '',
+        image_mimetype: imageData.mimetype || ''
+      }));
+    } else {
+      // Clear image data when image is removed
+      setFormData(prev => ({
+        ...prev,
+        image_url: '',
+        image_filename: '',
+        image_type: '',
+        image_size: '',
+        image_mimetype: ''
+      }));
+    }
+    
+    // Clear messages when image changes
+    if (error) setError('');
+    if (success) setSuccess('');
+  };
+
   // Validate form - Updated for new schema field names
   const validateForm = () => {
     setError('');
@@ -747,7 +605,7 @@ const OrganizerDashboard = () => {
 
       // Create API request based on whether this is a new company or an update
       let response;
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`;
+      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`;
       
       if (companyData.company && companyData.company.company_id) {
         // Update existing company
@@ -812,7 +670,7 @@ const OrganizerDashboard = () => {
       }
 
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
         {
           email: personData.email,
           full_name: personData.full_name || personData.name,
@@ -896,7 +754,7 @@ const OrganizerDashboard = () => {
       };
       
       console.log('📤 Final payload being sent to backend:', payload);
-      console.log('� URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/manual-registration`);
+      console.log('� URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/manual-registration`);
       
       // Validate required fields before sending
       if (!payload.attendeeEmail || !payload.attendeeName || !payload.ticketTypeId) {
@@ -904,7 +762,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/manual-registration`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/manual-registration`,
         payload,
         {
           headers: {
@@ -977,7 +835,7 @@ const OrganizerDashboard = () => {
       
       // Make API call to create event
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events`, 
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events`, 
         eventData,
         {
           headers: {
@@ -1006,6 +864,10 @@ const OrganizerDashboard = () => {
         event_type: 'Conference',
         ticket_price: '',
         image_url: '',
+        image_filename: '',
+        image_type: '',
+        image_size: '',
+        image_mimetype: '',
         registration_deadline: '',
         refund_policy: '',
         terms_and_conditions: '',
@@ -1068,10 +930,18 @@ const OrganizerDashboard = () => {
     console.log('Editing event:', event);
     setSelectedEvent(event);
     
+    // Format datetime for datetime-local input (requires yyyy-MM-ddThh:mm format)
+    const formatDateTimeForInput = (dateString) => {
+      if (!dateString) return '';
+      const date = new Date(dateString);
+      // Format as YYYY-MM-DDTHH:MM
+      return date.toISOString().slice(0, 16);
+    };
+    
     // Populate form with event data
     setFormData({
       event_name: event.event_name || '',
-      event_date: event.event_date ? event.event_date.split('T')[0] : '',
+      event_date: formatDateTimeForInput(event.event_date),
       venue_name: event.venue_name || '',
       venue_address: event.venue_address || '',
       description: event.description || '',
@@ -1079,7 +949,11 @@ const OrganizerDashboard = () => {
       event_type: event.event_type || 'Conference',
       ticket_price: event.ticket_price || '',
       image_url: event.image_url || '',
-      registration_deadline: event.registration_deadline ? event.registration_deadline.split('T')[0] : '',
+      image_filename: event.image_filename || '',
+      image_type: event.image_type || '',
+      image_size: event.image_size || '',
+      image_mimetype: event.image_mimetype || '',
+      registration_deadline: formatDateTimeForInput(event.registration_deadline),
       refund_policy: event.refund_policy || '',
       terms_and_conditions: event.terms_and_conditions || '',
       status: event.status || 'draft',
@@ -1114,7 +988,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventToDelete.event_id}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventToDelete.event_id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1171,7 +1045,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.put(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEvent.event_id}`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEvent.event_id}`,
         eventData,
         {
           headers: {
@@ -1197,6 +1071,10 @@ const OrganizerDashboard = () => {
           event_type: 'Conference',
           ticket_price: '',
           image_url: '',
+          image_filename: '',
+          image_type: '',
+          image_size: '',
+          image_mimetype: '',
           registration_deadline: '',
           refund_policy: '',
           terms_and_conditions: '',
@@ -1331,6 +1209,7 @@ const OrganizerDashboard = () => {
         <CreateEventForm
           formData={formData}
           handleInputChange={handleInputChange}
+          handleImageChange={handleImageChange}
           handleSubmit={handleSubmit}
           setShowCreateForm={setShowCreateForm}
           isLoading={isLoading}
@@ -1683,14 +1562,12 @@ const OrganizerDashboard = () => {
                   </div>
                   
                   <div className="form-group">
-                    <label htmlFor="edit_image_url">Event Image URL</label>
-                    <input
-                      type="url"
-                      id="edit_image_url"
-                      name="image_url"
-                      value={formData.image_url}
-                      onChange={handleInputChange}
-                      placeholder="https://example.com/image.jpg"
+                    <ImageUpload
+                      currentImage={formData.image_url}
+                      onImageChange={handleImageChange}
+                      label="Event Image"
+                      required={false}
+                      disabled={isLoading}
                     />
                   </div>
                   

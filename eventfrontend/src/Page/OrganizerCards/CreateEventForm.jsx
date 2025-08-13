@@ -1,26 +1,25 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import ImageUpload from '../../component/ImageUpload';
 import './CreateEventForm.css';
 
 const CreateEventForm = ({
   formData,
   handleInputChange,
+  handleImageChange,
   handleSubmit,
   setShowCreateForm,
   isLoading
 }) => {
-  const [imageSource, setImageSource] = useState('url'); // 'url' or 'upload'
-  const [imagePreview, setImagePreview] = useState(formData.image_url || '');
   const [categories, setCategories] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
-  const fileInputRef = useRef(null);
   
   // Fetch categories on component mount
   useEffect(() => {
     const fetchData = async () => {
       try {
         // Fetch event categories
-        const categoriesResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/categories`);
+        const categoriesResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/categories`);
         if (categoriesResponse.data) {
           setCategories(categoriesResponse.data);
         }
@@ -31,42 +30,6 @@ const CreateEventForm = ({
     
     fetchData();
   }, []);
-  
-  const handleImageSourceChange = (source) => {
-    setImageSource(source);
-    // Clear the preview and form data when changing source
-    if (source === 'url' && fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-    if (!formData.image_url) {
-      setImagePreview('');
-    }
-  };
-  
-  const handleImageChange = (e) => {
-    const { name, value, files } = e.target;
-    
-    if (name === 'image_url' && imageSource === 'url') {
-      handleInputChange(e);
-      setImagePreview(value);
-    } else if (name === 'imageFile' && files && files[0]) {
-      const file = files[0];
-      // Handle file upload - store in formData and create preview
-      handleInputChange({
-        target: {
-          name: 'imageFile',
-          value: file
-        }
-      });
-      
-      // Create image preview
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
   
   // Function to handle moving between steps
   const handleNextStep = () => {
@@ -359,71 +322,13 @@ const CreateEventForm = ({
           {currentStep === 3 && (
             <>
               <div className="form-group">
-                <label className="form-label">
-                  <i className="fas fa-image"></i>
-                  Event Image
-                </label>
-                
-                <div className="image-source-toggle">
-                  <button 
-                    type="button" 
-                    className={`image-source-btn ${imageSource === 'url' ? 'active' : ''}`}
-                    onClick={() => handleImageSourceChange('url')}
-                  >
-                    <i className="fas fa-link"></i>
-                    Image URL
-                  </button>
-                  <button 
-                    type="button" 
-                    className={`image-source-btn ${imageSource === 'upload' ? 'active' : ''}`}
-                    onClick={() => handleImageSourceChange('upload')}
-                  >
-                    <i className="fas fa-upload"></i>
-                    Upload Image
-                  </button>
-                </div>
-                
-                {imageSource === 'url' ? (
-                  <input
-                    type="url"
-                    id="image_url"
-                    name="image_url"
-                    className="form-input"
-                    placeholder="Enter image URL"
-                    value={formData.image_url || ''}
-                    onChange={handleImageChange}
-                  />
-                ) : (
-                  <div className="file-upload-container">
-                    <input
-                      type="file"
-                      id="imageFile"
-                      name="imageFile"
-                      ref={fileInputRef}
-                      className="file-input"
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                    <label htmlFor="imageFile" className="file-upload-label">
-                      <i className="fas fa-cloud-upload-alt"></i>
-                      {formData.imageFile ? formData.imageFile.name : 'Choose Image File'}
-                    </label>
-                  </div>
-                )}
-                
-                {imagePreview && (
-                  <div className="image-preview-container">
-                    <img 
-                      src={imagePreview} 
-                      alt="Event Preview" 
-                      className="image-preview" 
-                      onError={(e) => {
-                        e.target.onerror = null;
-                        e.target.src = 'https://via.placeholder.com/400x200?text=Image+Preview+Unavailable';
-                      }}
-                    />
-                  </div>
-                )}
+                <ImageUpload
+                  currentImage={formData.image_url}
+                  onImageChange={handleImageChange}
+                  label="Event Image"
+                  required={false}
+                  disabled={isLoading}
+                />
               </div>
               
               <div className="form-group">

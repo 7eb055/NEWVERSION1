@@ -45,7 +45,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
   //     const token = AuthTokenService.getToken();
   //     console.log('Loading user events with token:', !!token);
   //     
-  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/my-events`, {
+  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
   //       headers: { Authorization: `Bearer ${token}` }
   //     });
   //     
@@ -71,7 +71,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTicketTypes(response.data.ticketTypes || []);
@@ -90,7 +90,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-sales`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-sales`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -123,7 +123,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/registrations-detailed`, {
+      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/registrations-detailed`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRegistrations(response.data.registrations || []);
@@ -147,8 +147,8 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
     try {
       const token = AuthTokenService.getToken();
       const url = editingTicket 
-        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types/${editingTicket.ticket_type_id}`
-        : `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types`;
+        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types/${editingTicket.ticket_type_id}`
+        : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types`;
       
       const method = editingTicket ? 'put' : 'post';
       
@@ -193,7 +193,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${selectedEventId}/ticket-types/${ticketTypeId}`, {
+      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types/${ticketTypeId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Ticket type deleted successfully');
@@ -209,7 +209,7 @@ const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
   const generateQRCode = async (registrationId) => {
     try {
       const token = AuthTokenService.getToken();
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/registrations/${registrationId}/generate-qr`, {}, {
+      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/registrations/${registrationId}/generate-qr`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('QR code generated successfully');

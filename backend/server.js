@@ -3,6 +3,8 @@ const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
 
 // Import routes
@@ -11,6 +13,9 @@ const ticketingRoutes = require('./routes/ticketing');
 const settingsRoutes = require('./routes/settings');
 const adminRoutes = require('./routes/admin');
 const paymentRoutes = require('./routes/payments');
+
+// Import upload middleware
+const { upload, handleMulterError } = require('./middleware/upload');
 
 // Import services
 // const NotificationScheduler = require('./services/NotificationScheduler'); // Disabled
@@ -52,6 +57,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
+
+// Serve static files from uploads directory
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -715,6 +723,10 @@ app.get('/api/events', async (req, res) => {
       SELECT e.event_id, e.event_name, e.event_date, 
              e.ticket_price, e.max_attendees, 
              e.status, e.created_at,
+             e.image_url, e.image_filename, e.image_type, e.image_size, e.image_mimetype,
+             e.venue_name, e.venue_address, e.description, e.category, e.event_type,
+             e.registration_deadline, e.refund_policy, e.terms_and_conditions,
+             e.is_public, e.requires_approval, e.max_tickets_per_person,
              o.full_name as organizer_name, o.company_name,
              COUNT(er.registration_id) as registration_count
       FROM events e
@@ -742,6 +754,10 @@ app.get('/api/events/:eventId/details', async (req, res) => {
       SELECT e.event_id, e.event_name, e.event_date, 
              e.ticket_price, e.max_attendees, 
              e.status, e.created_at,
+             e.image_url, e.image_filename, e.image_type, e.image_size, e.image_mimetype,
+             e.venue_name, e.venue_address, e.description, e.category, e.event_type,
+             e.registration_deadline, e.refund_policy, e.terms_and_conditions,
+             e.is_public, e.requires_approval, e.max_tickets_per_person,
              o.full_name as organizer_name, o.company_name, o.phone as organizer_phone,
              COUNT(er.registration_id) as registration_count
       FROM events e
@@ -1283,6 +1299,10 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
       SELECT e.event_id, e.event_name, e.event_date, 
              e.ticket_price, e.max_attendees, 
              e.status, e.created_at,
+             e.image_url, e.image_filename, e.image_type, e.image_size, e.image_mimetype,
+             e.venue_name, e.venue_address, e.description, e.category, e.event_type,
+             e.registration_deadline, e.refund_policy, e.terms_and_conditions,
+             e.is_public, e.requires_approval, e.max_tickets_per_person,
              COUNT(er.registration_id) as registration_count
       FROM events e
       LEFT JOIN eventregistrations er ON e.event_id = er.event_id
@@ -1533,7 +1553,16 @@ app.post('/api/events', authenticateToken, async (req, res) => {
       event_date,
       ticket_price,
       max_attendees,
-      status = 'draft'
+      status = 'draft',
+      description,
+      venue_name,
+      venue_address,
+      category,
+      image_url,
+      image_filename,
+      image_type,
+      image_size,
+      image_mimetype
     } = req.body;
 
     if (!event_name || !event_date) {
@@ -1541,8 +1570,12 @@ app.post('/api/events', authenticateToken, async (req, res) => {
     }
 
     const newEvent = await pool.query(`
-      INSERT INTO events (event_name, event_date, ticket_price, max_attendees, organizer_id, status)
-      VALUES ($1, $2, $3, $4, $5, $6)
+      INSERT INTO events (
+        event_name, event_date, ticket_price, max_attendees, organizer_id, status,
+        description, venue_name, venue_address, category,
+        image_url, image_filename, image_type, image_size, image_mimetype
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `, [
       event_name,
@@ -1550,7 +1583,16 @@ app.post('/api/events', authenticateToken, async (req, res) => {
       ticket_price || 0,
       max_attendees || 100,
       organizerId,
-      status
+      status,
+      description || null,
+      venue_name || null,
+      venue_address || null,
+      category || null,
+      image_url || null,
+      image_filename || null,
+      image_type || null,
+      image_size || null,
+      image_mimetype || null
     ]);
 
     res.status(201).json({
@@ -1595,7 +1637,16 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
       event_date,
       ticket_price,
       max_attendees,
-      status
+      status,
+      description,
+      venue_name,
+      venue_address,
+      category,
+      image_url,
+      image_filename,
+      image_type,
+      image_size,
+      image_mimetype
     } = req.body;
 
     const updatedEvent = await pool.query(`
@@ -1604,8 +1655,18 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
           event_date = COALESCE($2, event_date),
           ticket_price = COALESCE($3, ticket_price),
           max_attendees = COALESCE($4, max_attendees),
-          status = COALESCE($5, status)
-      WHERE event_id = $6 AND organizer_id = $7
+          status = COALESCE($5, status),
+          description = COALESCE($6, description),
+          venue_name = COALESCE($7, venue_name),
+          venue_address = COALESCE($8, venue_address),
+          category = COALESCE($9, category),
+          image_url = COALESCE($10, image_url),
+          image_filename = COALESCE($11, image_filename),
+          image_type = COALESCE($12, image_type),
+          image_size = COALESCE($13, image_size),
+          image_mimetype = COALESCE($14, image_mimetype),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE event_id = $15 AND organizer_id = $16
       RETURNING *
     `, [
       event_name,
@@ -1613,6 +1674,15 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
       ticket_price,
       max_attendees,
       status,
+      description,
+      venue_name,
+      venue_address,
+      category,
+      image_url,
+      image_filename,
+      image_type,
+      image_size,
+      image_mimetype,
       eventId,
       organizerId
     ]);
@@ -3724,6 +3794,243 @@ app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, 
   }
 });
 
+// Notification Routes
+// GET user notifications
+app.get('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const { page = 1, limit = 20, unread_only = false, type = '' } = req.query;
+    const offset = (page - 1) * limit;
+
+    // Ensure notifications table exists, if not create it and add sample data
+    try {
+      await pool.query('SELECT 1 FROM notifications LIMIT 1');
+    } catch (tableError) {
+      console.log('Notifications table does not exist, creating it...');
+      try {
+        // Read and execute the SQL file
+        const fs = require('fs');
+        const path = require('path');
+        const sqlPath = path.join(__dirname, 'scripts', 'create-notifications-table.sql');
+        
+        if (fs.existsSync(sqlPath)) {
+          const sql = fs.readFileSync(sqlPath, 'utf8');
+          await pool.query(sql);
+          console.log('✅ Notifications table created successfully');
+        } else {
+          // Fallback: create basic table structure
+          await pool.query(`
+            CREATE TABLE IF NOT EXISTS notifications (
+              notification_id SERIAL PRIMARY KEY,
+              user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+              title VARCHAR(255) NOT NULL,
+              message TEXT NOT NULL,
+              type VARCHAR(50) DEFAULT 'system',
+              read BOOLEAN DEFAULT FALSE,
+              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              event_id INTEGER REFERENCES events(event_id) ON DELETE CASCADE,
+              metadata JSONB DEFAULT '{}',
+              priority VARCHAR(20) DEFAULT 'normal',
+              expires_at TIMESTAMP,
+              action_url VARCHAR(500),
+              is_deleted BOOLEAN DEFAULT FALSE
+            );
+          `);
+          console.log('✅ Basic notifications table created');
+        }
+      } catch (createError) {
+        console.error('Error creating notifications table:', createError);
+      }
+    }
+
+    let query = `
+      SELECT n.notification_id as id, n.title, n.message, n.type, n.read, 
+             n.created_at as timestamp, n.priority, n.action_url,
+             e.event_name, e.event_date
+      FROM notifications n
+      LEFT JOIN events e ON n.event_id = e.event_id
+      WHERE n.user_id = $1 AND n.is_deleted = FALSE
+    `;
+    
+    let params = [req.user.user_id];
+    let paramCount = 1;
+
+    if (unread_only === 'true') {
+      query += ` AND n.read = FALSE`;
+    }
+
+    if (type) {
+      paramCount++;
+      query += ` AND n.type = $${paramCount}`;
+      params.push(type);
+    }
+
+    query += ` ORDER BY n.created_at DESC LIMIT $${paramCount + 1} OFFSET $${paramCount + 2}`;
+    params.push(limit, offset);
+
+    const result = await pool.query(query, params);
+
+    // Get unread count
+    const unreadCountResult = await pool.query(
+      'SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = $1 AND read = FALSE AND is_deleted = FALSE',
+      [req.user.user_id]
+    );
+
+    res.json({
+      notifications: result.rows,
+      unread_count: parseInt(unreadCountResult.rows[0].unread_count),
+      total: result.rows.length,
+      page: parseInt(page),
+      limit: parseInt(limit)
+    });
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET notification statistics
+app.get('/api/notifications/stats', authenticateToken, async (req, res) => {
+  try {
+    // Ensure notifications table exists
+    try {
+      await pool.query('SELECT 1 FROM notifications LIMIT 1');
+    } catch (tableError) {
+      console.log('Notifications table does not exist, returning mock stats');
+      return res.json({
+        total: 0,
+        unread: 0,
+        by_type: {},
+        recent_count: 0
+      });
+    }
+
+    const statsQuery = await pool.query(`
+      SELECT 
+        COUNT(*) as total,
+        COUNT(*) FILTER (WHERE read = FALSE) as unread,
+        COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '24 hours') as recent_count,
+        json_object_agg(type, type_count) as by_type
+      FROM (
+        SELECT type, COUNT(*) as type_count
+        FROM notifications 
+        WHERE user_id = $1 AND is_deleted = FALSE
+        GROUP BY type
+      ) as type_stats,
+      (SELECT COUNT(*) as total_count FROM notifications WHERE user_id = $1 AND is_deleted = FALSE) as total_stats
+    `, [req.user.user_id]);
+
+    res.json(statsQuery.rows[0]);
+  } catch (error) {
+    console.error('Error fetching notification stats:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST mark notification as read
+app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE notification_id = $1 AND user_id = $2 RETURNING *',
+      [id, req.user.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json({ message: 'Notification marked as read', notification: result.rows[0] });
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST mark all notifications as read
+app.post('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND read = FALSE RETURNING notification_id',
+      [req.user.user_id]
+    );
+
+    res.json({ 
+      message: 'All notifications marked as read', 
+      updated_count: result.rows.length 
+    });
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE notification
+app.delete('/api/notifications/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query(
+      'UPDATE notifications SET is_deleted = TRUE, updated_at = CURRENT_TIMESTAMP WHERE notification_id = $1 AND user_id = $2 RETURNING *',
+      [id, req.user.user_id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Notification not found' });
+    }
+
+    res.json({ message: 'Notification deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting notification:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST create notification (admin/system use)
+app.post('/api/notifications', authenticateToken, async (req, res) => {
+  try {
+    const { 
+      user_id, 
+      title, 
+      message, 
+      type = 'system', 
+      event_id = null, 
+      priority = 'normal',
+      action_url = null,
+      expires_at = null
+    } = req.body;
+
+    // Only allow admins to create notifications for other users
+    if (user_id && user_id !== req.user.user_id) {
+      const userRoleCheck = await pool.query('SELECT role_type FROM users WHERE user_id = $1', [req.user.user_id]);
+      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role_type !== 'admin') {
+        return res.status(403).json({ message: 'Only admins can create notifications for other users' });
+      }
+    }
+
+    const targetUserId = user_id || req.user.user_id;
+
+    if (!title || !message) {
+      return res.status(400).json({ message: 'Title and message are required' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO notifications (user_id, title, message, type, event_id, priority, action_url, expires_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [targetUserId, title, message, type, event_id, priority, action_url, expires_at]);
+
+    res.status(201).json({ 
+      message: 'Notification created successfully', 
+      notification: result.rows[0] 
+    });
+  } catch (error) {
+    console.error('Error creating notification:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // Authentication Routes
 // Login user
 app.post('/api/auth/login', async (req, res) => {
@@ -4445,6 +4752,107 @@ app.get('/health', (req, res) => {
 
 // Import public events endpoint
 const publicEventsRouter = require('./endpoints/public-events');
+
+// File Upload Endpoints
+// Single image upload
+app.post('/api/upload/image', upload.single('image'), handleMulterError, (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No image file uploaded' 
+      });
+    }
+
+    const imageUrl = `/uploads/events/${req.file.filename}`;
+    
+    res.json({
+      success: true,
+      message: 'Image uploaded successfully',
+      data: {
+        imageUrl: imageUrl,
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype
+      }
+    });
+  } catch (error) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to upload image',
+      details: error.message 
+    });
+  }
+});
+
+// Multiple images upload
+app.post('/api/upload/images', upload.array('images', 5), handleMulterError, (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'No image files uploaded' 
+      });
+    }
+
+    const uploadedImages = req.files.map(file => ({
+      imageUrl: `/uploads/events/${file.filename}`,
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      mimetype: file.mimetype
+    }));
+    
+    res.json({
+      success: true,
+      message: `${req.files.length} images uploaded successfully`,
+      data: {
+        images: uploadedImages,
+        count: req.files.length
+      }
+    });
+  } catch (error) {
+    console.error('Multiple images upload error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to upload images',
+      details: error.message 
+    });
+  }
+});
+
+// Delete uploaded image
+app.delete('/api/upload/image/:filename', authenticateToken, (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(__dirname, 'uploads', 'events', filename);
+    
+    // Check if file exists
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ 
+        success: false, 
+        error: 'Image not found' 
+      });
+    }
+
+    // Delete the file
+    fs.unlinkSync(filePath);
+    
+    res.json({
+      success: true,
+      message: 'Image deleted successfully'
+    });
+  } catch (error) {
+    console.error('Image deletion error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Failed to delete image',
+      details: error.message 
+    });
+  }
+});
 
 // GET all published events with additional details for attendee dashboard
 app.use('/api/public/events', publicEventsRouter);

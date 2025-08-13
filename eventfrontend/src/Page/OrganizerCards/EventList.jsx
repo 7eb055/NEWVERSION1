@@ -44,12 +44,17 @@ const EventList = ({
         <div key={event.event_id} className="event-card">
           {/* Event Image Section */}
           <div className="event-image-container">
-            {event.image_url ? (
+            {(event.image_url || event.image_filename) ? (
               <img 
-                src={event.image_url} 
+                src={
+                  event.image_url 
+                    ? event.image_url
+                    : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}`
+                } 
                 alt={event.event_name}
                 className="event-image"
                 onError={(e) => {
+                  // If image fails to load, hide it and show placeholder
                   e.target.style.display = 'none';
                   e.target.nextElementSibling.style.display = 'flex';
                 }}
@@ -57,7 +62,7 @@ const EventList = ({
             ) : null}
             <div 
               className="event-image-placeholder" 
-              style={{ display: event.image_url ? 'none' : 'flex' }}
+              style={{ display: (event.image_url || event.image_filename) ? 'none' : 'flex' }}
             >
               <i className="fas fa-image"></i>
               <span>No Image</span>

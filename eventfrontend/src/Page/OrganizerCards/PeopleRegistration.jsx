@@ -56,7 +56,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/companies`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -188,7 +188,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       if (editMode && initialData?.attendee_id) {
         // Update existing attendee
         response = await axios.put(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees/${initialData.attendee_id}`,
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees/${initialData.attendee_id}`,
           attendeeData,
           {
             headers: {
@@ -202,7 +202,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       } else {
         // Create new attendee
         response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/attendees`,
+          `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
           attendeeData,
           {
             headers: {

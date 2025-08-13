@@ -41,7 +41,7 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/events/${eventId}/ticket-types`,
+        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/ticket-types`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }

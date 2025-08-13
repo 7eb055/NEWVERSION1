@@ -950,6 +950,140 @@ router.post('/events/:eventId/feedback', authenticateToken, async (req, res) => 
   }
 });
 
+// Get feedback/reviews for an event (public)
+router.get('/events/:eventId/feedback', async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const { page = 1, limit = 10, include_anonymous = true } = req.query;
+    const offset = (page - 1) * limit;
+    
+    let query = `
+      SELECT 
+        ef.feedback_id,
+        ef.rating,
+        ef.feedback_text,
+        ef.is_anonymous,
+        ef.created_at,
+        ef.updated_at,
+        CASE 
+          WHEN ef.is_anonymous = true THEN 'Anonymous'
+          ELSE a.full_name 
+        END as attendee_name
+      FROM eventfeedback ef
+      LEFT JOIN attendees a ON ef.attendee_id = a.attendee_id
+      WHERE ef.event_id = $1
+    `;
+    
+    let queryParams = [eventId];
+    
+    if (include_anonymous === 'false') {
+      query += ` AND ef.is_anonymous = false`;
+    }
+    
+    query += ` ORDER BY ef.created_at DESC LIMIT $${queryParams.length + 1} OFFSET $${queryParams.length + 2}`;
+    queryParams.push(limit, offset);
+    
+    const result = await pool.query(query, queryParams);
+    
+    // Get total count for pagination
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM eventfeedback ef
+      WHERE ef.event_id = $1
+      ${include_anonymous === 'false' ? 'AND ef.is_anonymous = false' : ''}
+    `;
+    const countResult = await pool.query(countQuery, [eventId]);
+    const total = parseInt(countResult.rows[0].total);
+    
+    // Get average rating
+    const avgQuery = `
+      SELECT 
+        AVG(rating) as avg_rating,
+        COUNT(*) as total_reviews,
+        COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+        COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+        COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+        COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+        COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+      FROM eventfeedback 
+      WHERE event_id = $1
+    `;
+    const avgResult = await pool.query(avgQuery, [eventId]);
+    const stats = avgResult.rows[0];
+    
+    res.json({
+      feedback: result.rows,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        totalPages: Math.ceil(total / limit)
+      },
+      stats: {
+        average_rating: parseFloat(stats.avg_rating || 0).toFixed(1),
+        total_reviews: parseInt(stats.total_reviews),
+        rating_breakdown: {
+          5: parseInt(stats.five_star),
+          4: parseInt(stats.four_star),
+          3: parseInt(stats.three_star),
+          2: parseInt(stats.two_star),
+          1: parseInt(stats.one_star)
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error fetching feedback:', error);
+    res.status(500).json({ message: 'Error fetching feedback' });
+  }
+});
+
+// Get user's own feedback for an event
+router.get('/events/:eventId/my-feedback', authenticateToken, async (req, res) => {
+  try {
+    const { eventId } = req.params;
+    const userId = req.user.user_id;
+    
+    // Get attendee ID
+    const attendeeResult = await pool.query(
+      `SELECT attendee_id FROM attendees WHERE user_id = $1`,
+      [userId]
+    );
+    
+    if (attendeeResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Attendee profile not found' });
+    }
+    
+    const attendeeId = attendeeResult.rows[0].attendee_id;
+    
+    // Get user's feedback for this event
+    const feedbackResult = await pool.query(
+      `SELECT 
+        feedback_id,
+        rating,
+        feedback_text,
+        is_anonymous,
+        created_at,
+        updated_at
+       FROM eventfeedback 
+       WHERE event_id = $1 AND attendee_id = $2`,
+      [eventId, attendeeId]
+    );
+    
+    if (feedbackResult.rows.length === 0) {
+      return res.status(404).json({ message: 'No feedback found for this event' });
+    }
+    
+    res.json({
+      feedback: feedbackResult.rows[0]
+    });
+    
+  } catch (error) {
+    console.error('Error fetching user feedback:', error);
+    res.status(500).json({ message: 'Error fetching user feedback' });
+  }
+});
+
 // Get user's profile
 router.get('/profile', authenticateToken, async (req, res) => {
   try {

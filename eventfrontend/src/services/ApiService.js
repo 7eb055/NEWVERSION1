@@ -5,7 +5,7 @@ import axios from 'axios';
 import AuthTokenService from './AuthTokenService';
 
 class ApiService {
-  constructor(baseURL = 'http://localhost:5000') {
+  constructor(baseURL = 'http://localhost:5001') {
     this.baseURL = baseURL;
     this.axiosInstance = this.createAxiosInstance();
   }
@@ -536,6 +536,64 @@ class ApiService {
   setBaseURL(newBaseURL) {
     this.baseURL = newBaseURL;
     this.axiosInstance.defaults.baseURL = newBaseURL;
+  }
+
+  // ===== GENERIC HTTP METHODS =====
+  // These methods provide direct access to HTTP verbs for use by other services
+  
+  // Generic GET method
+  async get(url, config = {}) {
+    try {
+      const response = await this.axiosInstance.get(url, config);
+      return response;
+    } catch (error) {
+      console.error(`GET ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  // Generic POST method
+  async post(url, data = {}, config = {}) {
+    try {
+      const response = await this.axiosInstance.post(url, data, config);
+      return response;
+    } catch (error) {
+      console.error(`POST ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  // Generic PUT method
+  async put(url, data = {}, config = {}) {
+    try {
+      const response = await this.axiosInstance.put(url, data, config);
+      return response;
+    } catch (error) {
+      console.error(`PUT ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  // Generic DELETE method
+  async delete(url, config = {}) {
+    try {
+      const response = await this.axiosInstance.delete(url, config);
+      return response;
+    } catch (error) {
+      console.error(`DELETE ${url} failed:`, error);
+      throw error;
+    }
+  }
+
+  // Generic PATCH method
+  async patch(url, data = {}, config = {}) {
+    try {
+      const response = await this.axiosInstance.patch(url, data, config);
+      return response;
+    } catch (error) {
+      console.error(`PATCH ${url} failed:`, error);
+      throw error;
+    }
   }
 }
 

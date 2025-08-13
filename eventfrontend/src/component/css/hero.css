@@ -61,7 +61,7 @@
 
 /* Left Content */
 .hero-left {
-  color: white;
+  color: rgb(198, 127, 127);
   animation: slideInLeft 1s ease-out;
 }
 
@@ -165,7 +165,7 @@
   backdrop-filter: blur(20px);
   border-radius: 16px;
   padding: 2rem;
-  color: white;
+  color: rgb(73, 46, 93);
   border: 1px solid rgba(255, 255, 255, 0.2);
   animation: fadeInUp 1s ease-out 0.3s both;
 }
