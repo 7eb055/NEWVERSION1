@@ -1,6 +1,14 @@
-# Event Management System
+# 🎉 Event Management System
 
-A full-stack event management application with React frontend and Node.js backend, featuring email verification, authentication, and comprehensive event management capabilities.
+A comprehensive full-stack event management application with React frontend, Node.js backend, and PostgreSQL database. Features include payment integration (Paystack), email verification, QR code generation, feedback system, and admin dashboard.
+
+[![Deploy](https://img.shields.io/badge/Deploy-Ready-brightgreen.svg)](./DEPLOYMENT_GUIDE.md)
+[![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue.svg)](./.github/workflows/ci-cd.yml)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)](./docker-compose.yml)
+
+**🔗 Repository:** https://github.com/7eb055/NEWVERSION1
+**📋 Full Deployment Guide:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
+**🐳 Docker Hub:** *[Add your Docker Hub repository link after publishing]*
 
 ## 🚀 Features
 
@@ -69,27 +77,44 @@ cd backend
 # Install dependencies
 npm install
 
-# Copy environment template
-cp .env.example .env
+## 🚀 Quick Deployment
 
-# Update .env with your database and Gmail credentials
-# See backend/README.md for detailed configuration
+### **Option 1: One-Click Deploy (Recommended)**
+See our [**Complete Deployment Guide**](./DEPLOYMENT_GUIDE.md) for step-by-step instructions for:
+- ✅ Railway.app (Free tier available)
+- ✅ Render.com (Free tier available) 
+- ✅ Heroku (with GitHub Actions CI/CD)
+- ✅ Manual server deployment
 
-# Start the backend server
-npm start
+### **Option 2: Docker (Fastest Setup)**
+```bash
+git clone https://github.com/7eb055/NEWVERSION1.git
+cd NEWVERSION1
+cp .env.docker .env
+docker-compose up -d
 ```
 
-### 3. Frontend Setup
+### **Option 3: Local Development**
 ```bash
-# Navigate to frontend directory
-cd eventfrontend
+# Clone repository
+git clone https://github.com/7eb055/NEWVERSION1.git
+cd NEWVERSION1
 
-# Install dependencies
+# Backend setup
+cd backend
 npm install
+cp .env.example .env
+# Edit .env with your configuration
+npm run migrate
+npm start
 
-# Start the development server
+# Frontend setup (new terminal)
+cd eventfrontend
+npm install
 npm run dev
 ```
+
+**📱 Access:** Frontend: http://localhost:5173 | Backend: http://localhost:5000
 
 The application will be available at:
 - Frontend: http://localhost:5173
@@ -141,6 +166,38 @@ The backend provides a complete RESTful API. Key endpoints:
 - `GET /api/companies/:id` - Get company details
 
 See `backend/README.md` for complete API documentation.
+
+## 🚀 Production Deployment
+
+### **Free Hosting Options**
+- **Railway.app** - Includes free PostgreSQL, automatic deployments
+- **Render.com** - Free tier with database included
+- **Heroku** - With GitHub Actions CI/CD (see workflow file)
+
+### **Environment Requirements**
+- **Node.js:** >= 16.0.0
+- **PostgreSQL:** >= 13.0
+- **Paystack Account:** For payment processing
+- **Gmail SMTP:** For email notifications
+
+### **Docker Support**
+```bash
+# Full stack with database
+docker-compose up -d
+
+# Individual services
+docker build -t event-backend ./backend
+docker build -t event-frontend ./eventfrontend
+```
+
+### **CI/CD Pipeline**
+- ✅ Automated testing (Jest + Vitest)
+- ✅ Code linting and formatting
+- ✅ Security scanning
+- ✅ Multi-environment deployment (staging/production)
+- ✅ Database migrations
+
+**📋 Complete deployment instructions:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 
 ## 🎨 UI/UX Features
 
