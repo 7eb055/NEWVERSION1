@@ -180,13 +180,17 @@ jobs:
           path: eventfrontend/dist
 
       - name: Deploy to Heroku Staging
-        uses: akhileshns/heroku-deploy@v3.12.14
+        uses: AkhileshNS/heroku-deploy@v3.13.15
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: "your-event-app-staging"
-          heroku_email: "your-email@example.com"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
           usedocker: false
           appdir: "backend"
+          procfile: "web: npm start"
+          healthcheck: "https://your-event-app-staging.herokuapp.com/health"
+          checkstring: "ok"
+          delay: 5
         env:
           HD_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
           HD_DB_USER: ${{ secrets.STAGING_DB_USER }}
@@ -217,13 +221,17 @@ jobs:
           path: eventfrontend/dist
 
       - name: Deploy to Heroku Production
-        uses: akhileshns/heroku-deploy@v3.12.14
+        uses: AkhileshNS/heroku-deploy@v3.13.15
         with:
           heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
           heroku_app_name: "your-event-app-production"
-          heroku_email: "your-email@example.com"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
           usedocker: false
           appdir: "backend"
+          procfile: "web: npm start"
+          healthcheck: "https://your-event-app-production.herokuapp.com/health"
+          checkstring: "ok"
+          delay: 5
         env:
           HD_DB_HOST: ${{ secrets.PRODUCTION_DB_HOST }}
           HD_DB_USER: ${{ secrets.PRODUCTION_DB_USER }}
