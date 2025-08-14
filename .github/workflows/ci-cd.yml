@@ -187,8 +187,18 @@ jobs:
           
       - name: Login to Heroku
         run: |
-          # Set Heroku API key for authentication
-          export HEROKU_API_KEY="${{ secrets.HEROKU_API_KEY }}"
+          # Create .netrc file for authentication
+          cat > ~/.netrc <<EOF
+          machine api.heroku.com
+            login ${{ secrets.HEROKU_EMAIL }}
+            password ${{ secrets.HEROKU_API_KEY }}
+          machine git.heroku.com
+            login ${{ secrets.HEROKU_EMAIL }}
+            password ${{ secrets.HEROKU_API_KEY }}
+          EOF
+          chmod 600 ~/.netrc
+          
+          # Also set environment variable as backup
           echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
           
           # Test authentication
@@ -267,8 +277,18 @@ jobs:
           
       - name: Login to Heroku
         run: |
-          # Set Heroku API key for authentication
-          export HEROKU_API_KEY="${{ secrets.HEROKU_API_KEY }}"
+          # Create .netrc file for authentication
+          cat > ~/.netrc <<EOF
+          machine api.heroku.com
+            login ${{ secrets.HEROKU_EMAIL }}
+            password ${{ secrets.HEROKU_API_KEY }}
+          machine git.heroku.com
+            login ${{ secrets.HEROKU_EMAIL }}
+            password ${{ secrets.HEROKU_API_KEY }}
+          EOF
+          chmod 600 ~/.netrc
+          
+          # Also set environment variable as backup
           echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
           
           # Test authentication
