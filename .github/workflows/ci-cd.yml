@@ -205,10 +205,17 @@ jobs:
           git config --global init.defaultBranch main
           
           cd backend
-          heroku git:remote -a your-event-app-staging || heroku create your-event-app-staging
+          
+          # Initialize git repository
           git init
           git add .
           git commit -m "Deploy to staging"
+          
+          # Create or get existing Heroku app and add remote
+          heroku apps:info your-event-app-staging || heroku create your-event-app-staging
+          heroku git:remote -a your-event-app-staging
+          
+          # Push to Heroku
           git push heroku main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -274,10 +281,17 @@ jobs:
           git config --global init.defaultBranch main
           
           cd backend
-          heroku git:remote -a your-event-app-production || heroku create your-event-app-production
+          
+          # Initialize git repository
           git init
           git add .
           git commit -m "Deploy to production"
+          
+          # Create or get existing Heroku app and add remote
+          heroku apps:info your-event-app-production || heroku create your-event-app-production
+          heroku git:remote -a your-event-app-production
+          
+          # Push to Heroku
           git push heroku main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
