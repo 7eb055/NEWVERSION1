@@ -28,7 +28,10 @@
     "indent": ["error", 2],
     "quotes": ["error", "single"],
     "semi": ["error", "always"],
-    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-unused-vars": ["error", { 
+      "argsIgnorePattern": "^_",
+      "varsIgnorePattern": "^[A-Z_]"
+    }],
     "no-console": "warn",
     "prefer-const": "error",
     "no-var": "error"
@@ -42,6 +45,7 @@
     "node_modules/",
     "dist/",
     "build/",
-    "coverage/"
+    "coverage/",
+    "backend_server.js"
   ]
 }

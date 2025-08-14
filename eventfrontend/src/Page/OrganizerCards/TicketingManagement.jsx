@@ -3,7 +3,7 @@ import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/TicketingManagement.css';
 
-const TicketingManagement = ({ events = [], onCancel, isLoading }) => {
+const TicketingManagement = ({ events = [] }) => {
   const [activeTab, setActiveTab] = useState('ticket-types');
   const [ticketTypes, setTicketTypes] = useState([]);
   const [salesData, setSalesData] = useState(null);

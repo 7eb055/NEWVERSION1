@@ -1,5 +1,4 @@
 
-import { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Home from './Page/Home';
 import Login from './Page/Login';
@@ -10,7 +9,7 @@ import './App.css';
 import OrganizerDashboard from './Page/OrganizerDashboard';
 import EventListPage from './Page/Eventslist';
 import AttendeeDashboard from './Page/AttendeeDashboard';
-import EventDetails from './Page/EventDetails';
+import EventDetails from './Page/Eventdetails';
 import Profile from './Page/Profile';
 import AboutUs from './Page/AboutUs';
 // import ProfileEdit from './Page/ProfileEdit';

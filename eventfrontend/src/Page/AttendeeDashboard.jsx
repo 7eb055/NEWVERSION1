@@ -348,7 +348,7 @@ function Attendee() {
   };
 
   // Handle purchase ticket submission
-  const handlePurchaseTicket = async (registrationData) => {
+  const handlePurchaseTicket = async () => {
     try {
       // The TicketPurchaseCard already handles the API call
       // Just show success message and close the modal
@@ -419,7 +419,7 @@ function Attendee() {
   };
 
   // Handle download ticket
-  const handleDownloadTicket = (ticketId) => {
+  const handleDownloadTicket = () => {
     alert('Ticket download functionality will be implemented soon');
   };
 
@@ -461,7 +461,7 @@ function Attendee() {
       setShowFeedback(false);
       
       // Refresh the user's events to update feedback status
-      await loadUserEvents();
+      await fetchEvents();
       
       // Show success message
       console.log('Feedback submitted successfully:', feedbackData);
@@ -496,8 +496,11 @@ function Attendee() {
     }
   };
 
-  // Handle notification actions
-  const handleMarkAsRead = async (notificationId) => {
+  return (
+    <div className="attendee-dashboard">
+      <div className="dashboard-container">
+        {/* Header */}
+        <div className="dashboard-header">
     try {
       const response = await makeAuthenticatedRequest(`/api/attendee/notifications/${notificationId}/read`, {
         method: 'POST'

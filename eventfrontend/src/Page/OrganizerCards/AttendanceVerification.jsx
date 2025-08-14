@@ -5,7 +5,7 @@ import AttendeeListingService from '../../services/attendeeListingService';
 import { formatCurrency, toNumber } from '../../utils/formatters';
 import './css/AttendanceVerification.css';
 
-const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
+const AttendanceVerification = ({ events = [], onCancel }) => {
   const [activeTab, setActiveTab] = useState('scanner');
   const [selectedEvent, setSelectedEvent] = useState('');
   // Remove events state since we're using events prop from parent
@@ -317,7 +317,7 @@ const AttendanceVerification = ({ events = [], onCancel, isLoading }) => {
       
       // Display success message with attendee name if available
       const attendeeName = response.data?.data?.attendee?.full_name || 'Attendee';
-      setSuccess(`${attendeeName} checked out successfully`);
+      console.log(`${attendeeName} checked out successfully`);
       
     } catch (error) {
       console.error('Error undoing check-in:', error);

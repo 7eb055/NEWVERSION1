@@ -35,8 +35,6 @@ export const ProtectedRoute = ({
           
           if (!hasRequiredRole) {
             console.log(`🚫 User doesn't have required role: ${requiredRole}`);
-            // Redirect to appropriate dashboard instead of login
-            const userDashboard = AuthTokenService.getDashboardRoute();
             setAuthStatus('unauthorized');
             setIsChecking(false);
             return;
@@ -80,10 +78,11 @@ export const ProtectedRoute = ({
         />
       );
 
-    case 'unauthorized':
+    case 'unauthorized': {
       // User is authenticated but doesn't have required role
       const userDashboard = AuthTokenService.getDashboardRoute();
       return <Navigate to={userDashboard} replace />;
+    }
 
     case 'authenticated':
       // User is properly authenticated

@@ -32,9 +32,6 @@ const OrganizerDashboard = () => {
   const [success, setSuccess] = useState('');
   
   // Registration & User Management state
-  const [companies, setCompanies] = useState([]);
-  const [people, setPeople] = useState([]);
-  const [eventRegistrations, setEventRegistrations] = useState([]);
   const [showCompanyForm, setShowCompanyForm] = useState(false);
   const [showCompanyManagement, setShowCompanyManagement] = useState(false);
   const [showPeopleForm, setShowPeopleForm] = useState(false);

@@ -175,18 +175,8 @@ const Footer = () => {
     }
   };
 
-  const eventImages = recentEvents.length > 0 
-    ? recentEvents.map(event => event.image_url || `https://images.unsplash.com/photo-${Math.random().toString(36).substr(2, 9)}?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80`)
-    : [
-        'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1559223607-a43c990c692c?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1511578314322-379afb476865?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1556761175-b413da4baf72?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1573164713714-d95e436ab8d6?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80',
-        'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&q=80'
-      ];
-
   return (
+    <div>
       {/* Dynamic Countdown Banner */}
       {upcomingEvent && (timeLeft.days > 0 || timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0) && (
         <div className="countdown-banner animate-slide-down">
@@ -236,6 +226,7 @@ const Footer = () => {
       )}
 
       {/* Main Footer Content */}
+      <footer>
       <div className="footer-content">
         <div className="footer-container">
           {/* Company Info */}
@@ -406,6 +397,7 @@ const Footer = () => {
         </div>
       </div>
     </footer>
+    </div>
   );
 };
 

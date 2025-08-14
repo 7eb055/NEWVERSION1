@@ -104,23 +104,6 @@ function EventListPage() {
     return token;
   };
 
-  // Helper function to make API calls with auth
-  const makeAuthenticatedRequest = async (url, options = {}) => {
-    const token = getAuthToken();
-    const defaultHeaders = {
-      'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` })
-    };
-
-    return fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`, {
-      ...options,
-      headers: {
-        ...defaultHeaders,
-        ...options.headers
-      }
-    });
-  };
-
   // Handle view details click
   const handleViewDetails = (event) => {
     navigate(`/event/${event.event_id}`);

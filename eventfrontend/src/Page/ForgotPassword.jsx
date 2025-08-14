@@ -24,6 +24,7 @@ const ForgotPassword = () => {
       // Handle forgot password logic here
       console.log('Password reset requested for:', email);
     } catch (error) {
+      console.error('Password reset error:', error);
       setMessage('Something went wrong. Please try again.');
       setIsLoading(false);
     }

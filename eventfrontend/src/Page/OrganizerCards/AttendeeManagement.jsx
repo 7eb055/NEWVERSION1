@@ -54,7 +54,7 @@ const AttendeeManagement = () => {
   };
 
   // Function to handle attendee registration or update
-  const handleAttendeeSubmit = async (data) => {
+  const handleAttendeeSubmit = async () => {
     setShowRegistrationForm(false);
     setLoading(true);
     

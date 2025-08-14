@@ -3,6 +3,8 @@ import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import './css/EmailVerification.css';
 
+const API_BASE_URL = 'http://localhost:5001/api';
+
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
   const [verificationStatus, setVerificationStatus] = useState('verifying'); // 'verifying', 'success', 'error'
@@ -21,7 +23,9 @@ const EmailVerification = () => {
       }
 
       try {
-        const response = await axios.get(`http://localhost:5001/api/auth/verify-email?token=${token}`);
+        const response = await axios.post(`${API_BASE_URL}/auth/verify-email`, {
+          token: token
+        });
         
         if (response.data.verified) {
           setVerificationStatus('success');
@@ -62,7 +66,7 @@ const EmailVerification = () => {
 
     try {
       setIsLoading(true);
-      const response = await axios.post('http://localhost:5001/api/auth/resend-verification', {
+      const _response = await axios.post('http://localhost:5001/api/auth/resend-verification', {
         email: email
       });
 

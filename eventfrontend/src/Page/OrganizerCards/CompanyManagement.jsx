@@ -52,7 +52,7 @@ const CompanyManagement = () => {
   };
 
   // Function to handle company registration or update
-  const handleCompanySubmit = async (data) => {
+  const handleCompanySubmit = async () => {
     setShowRegistrationForm(false);
     setLoading(true);
     

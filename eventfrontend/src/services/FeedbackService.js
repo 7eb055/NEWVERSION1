@@ -71,7 +71,7 @@ class FeedbackService {
   }
 
   // Check if user can leave feedback for an event
-  static async canLeaveFeedback(eventId) {
+  static async canLeaveFeedback() {
     try {
       // This would typically check registration and attendance status
       // For now, we'll assume they can if they have an account

@@ -2,7 +2,6 @@ import React from 'react';
 import formatters from '../../utils/formatters';
 
 const FeedbackSection = ({
-  feedbackData,
   feedbackSummary,
   feedbackFilter,
   setFeedbackFilter,
