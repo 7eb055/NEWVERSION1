@@ -1,5 +1,5 @@
 const request = require('supertest');
-const { app, pool } = require('../server');
+const { app } = require('../server');
 
 describe('API Health Check', () => {
   test('GET / should return status 200', async () => {
@@ -43,4 +43,13 @@ describe('Events Endpoints', () => {
     
     expect(Array.isArray(response.body)).toBe(true);
   });
+});
+
+// Clean up database connections after all tests
+afterAll(async () => {
+  // Import pool here to avoid unused variable warning
+  const { pool } = require('../server');
+  if (pool) {
+    await pool.end();
+  }
 });

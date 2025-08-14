@@ -149,17 +149,17 @@ app.get('/api/admin/dashboard-stats', authenticateToken, authorizeAdmin, async (
     const attendees = await pool.query('SELECT COUNT(*) FROM attendees');
     
     // Try to get revenue from eventregistrations table
-    let revenueQuery = 'SELECT COALESCE(SUM(total_amount), 0) as total_revenue FROM eventregistrations WHERE payment_status = \'completed\'';
+    const revenueQuery = 'SELECT COALESCE(SUM(total_amount), 0) as total_revenue FROM eventregistrations WHERE payment_status = \'completed\'';
     try {
       const revenue = await pool.query(revenueQuery);
-      var totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
+      let totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
     } catch (err) {
       // Fallback if eventregistrations table doesn't exist
       try {
         const revenue = await pool.query('SELECT COALESCE(SUM(total_amount), 0) as total_revenue FROM bookings');
-        var totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
+        totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
       } catch (err2) {
-        var totalRevenue = 0;
+        totalRevenue = 0;
       }
     }
 
@@ -190,8 +190,8 @@ app.get('/api/admin/users', authenticateToken, authorizeAdmin, async (req, res) 
     
     let query = 'SELECT user_id, email, role_type, is_email_verified, created_at, last_login FROM users';
     let countQuery = 'SELECT COUNT(*) FROM users';
-    let params = [];
-    let conditions = [];
+    const params = [];
+    const conditions = [];
 
     if (search) {
       conditions.push('email ILIKE $' + (params.length + 1));
@@ -463,7 +463,8 @@ app.delete('/api/admin/events/:eventId', authenticateToken, authorizeAdmin, asyn
 // GET system health and metrics
 app.get('/api/admin/system-health', authenticateToken, authorizeAdmin, async (req, res) => {
   try {
-    const dbHealth = await pool.query('SELECT NOW()');
+    // Test database connection
+    await pool.query('SELECT NOW()');
     const uptime = process.uptime();
     
     const memoryUsage = process.memoryUsage();
@@ -4087,8 +4088,8 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Get all roles for this user
-    let roles = [];
-    let primaryRole = userData.role;
+    const roles = [];
+    const primaryRole = userData.role;
 
     // Check if user is an attendee
     const attendeeData = await pool.query(
