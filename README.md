@@ -7,6 +7,8 @@ A comprehensive full-stack event management application with React frontend, Nod
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)](./docker-compose.yml)
 
 **🔗 Repository:** https://github.com/7eb055/NEWVERSION1
+**🌐 Live Staging:** https://your-event-app-staging-1468a9eab8ec.herokuapp.com/
+**🚀 Live Production:** https://your-event-app-production-1c49193922fb.herokuapp.com/
 **📋 Full Deployment Guide:** [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
 **🐳 Docker Hub:** *[Add your Docker Hub repository link after publishing]*
 
@@ -236,7 +238,10 @@ If you encounter any issues:
 4. Check that both frontend and backend servers are running
 
 For additional help, please open an issue in the repository.
-#   G i t H u b   S e c r e t s   A d d e d   -   T e s t i n g   C I / C D   P i p e l i n e  
- #   S e c r e t s   c o n f i g u r e d   -   t e s t i n g   d e p l o y m e n t  
- #   T e s t i n g   w i t h   G i t H u b   s e c r e t s   c o n f i g u r e d  
+#   G i t H u b   S e c r e t s   A d d e d   -   T e s t i n g   C I / C D   P i p e l i n e 
+ 
+ #   S e c r e t s   c o n f i g u r e d   -   t e s t i n g   d e p l o y m e n t 
+ 
+ #   T e s t i n g   w i t h   G i t H u b   s e c r e t s   c o n f i g u r e d 
+ 
  
