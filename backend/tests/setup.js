@@ -10,6 +10,21 @@ process.env.DB_PASSWORD = 'postgres';
 // Set test timeout
 jest.setTimeout(10000);
 
+// Cleanup after all tests
+afterAll(async () => {
+  // Close any open database connections
+  const { Pool } = require('pg');
+  const pool = new Pool({
+    host: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+  });
+  
+  await pool.end();
+});
+
 // Cleanup after each test
 afterEach(async () => {
   // Clean up database connections if needed

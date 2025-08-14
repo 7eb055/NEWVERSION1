@@ -102,7 +102,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -117,6 +117,25 @@ const authorizeOrganizer = async (req, res, next) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+// Basic Routes
+// Root route for API health check
+app.get('/', (req, res) => {
+  res.json({ 
+    message: 'Event Management API is running',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
+// Health check route
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'OK',
+    service: 'Event Management API',
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Admin Routes
 // GET dashboard statistics
@@ -4039,8 +4058,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT user_id, email, password, role_type, is_email_verified, created_at
-       FROM Users 
+      `SELECT id as user_id, email, password, role, is_suspended, created_at
+       FROM users 
        WHERE email = $1`,
       [email]
     );
@@ -4051,11 +4070,11 @@ app.post('/api/auth/login', async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Check if email is verified
-    if (!userData.is_email_verified) {
+    // Check if user is suspended
+    if (userData.is_suspended) {
       return res.status(401).json({ 
-        message: 'Please verify your email address before logging in',
-        requiresVerification: true
+        message: 'Your account has been suspended. Please contact support.',
+        isSuspended: true
       });
     }
 
@@ -4067,25 +4086,25 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Get all roles for this user
     let roles = [];
-    let primaryRole = userData.role_type;
+    let primaryRole = userData.role;
 
     // Check if user is an attendee
     const attendeeData = await pool.query(
-      'SELECT full_name, phone FROM Attendees WHERE user_id = $1',
+      'SELECT name, phone FROM attendees WHERE user_id = $1',
       [userData.user_id]
     );
 
     if (attendeeData.rows.length > 0) {
       roles.push({
         role: 'attendee',
-        full_name: attendeeData.rows[0].full_name,
+        full_name: attendeeData.rows[0].name,
         phone: attendeeData.rows[0].phone
       });
     }
 
     // Check if user is an organizer
     const organizerData = await pool.query(
-      'SELECT organizer_id, full_name, phone, company_name, business_address FROM Organizers WHERE user_id = $1',
+      'SELECT id as organizer_id, name, phone, company_name, business_address FROM organizers WHERE user_id = $1',
       [userData.user_id]
     );
 
@@ -4093,18 +4112,18 @@ app.post('/api/auth/login', async (req, res) => {
       roles.push({
         role: 'organizer',
         organizer_id: organizerData.rows[0].organizer_id,
-        full_name: organizerData.rows[0].full_name,
+        full_name: organizerData.rows[0].name,
         phone: organizerData.rows[0].phone,
         company_name: organizerData.rows[0].company_name,
         business_address: organizerData.rows[0].business_address
       });
     }
 
-    // Update last login
-    await pool.query(
-      'UPDATE Users SET last_login = NOW() WHERE user_id = $1',
-      [userData.user_id]
-    );
+    // Update last login (optional - we can skip this for now)
+    // await pool.query(
+    //   'UPDATE users SET updated_at = NOW() WHERE id = $1',
+    //   [userData.user_id]
+    // );
 
     // Generate JWT token
     const token = jwt.sign(
@@ -4146,7 +4165,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4156,8 +4175,8 @@ app.post('/api/auth/register', async (req, res) => {
 
     // Create user
     const userResult = await pool.query(
-      'INSERT INTO users (email, password, role_type, is_email_verified) VALUES ($1, $2, $3, $4) RETURNING user_id, email, role_type, created_at',
-      [email, hashedPassword, role_type, true] // Setting email as verified for demo
+      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id as user_id, email, role, created_at',
+      [email.split('@')[0], email, hashedPassword, role_type || 'attendee'] // Use email prefix as name
     );
 
     const newUser = userResult.rows[0];
@@ -4167,7 +4186,7 @@ app.post('/api/auth/register', async (req, res) => {
       { 
         user_id: newUser.user_id, 
         email: newUser.email, 
-        role: newUser.role_type
+        role: newUser.role
       },
       JWT_SECRET,
       { expiresIn: '24h' }
@@ -4179,7 +4198,8 @@ app.post('/api/auth/register', async (req, res) => {
       user: {
         user_id: newUser.user_id,
         email: newUser.email,
-        primary_role: newUser.role_type,
+        role: newUser.role,
+        primary_role: newUser.role,
         roles: [],
         created_at: newUser.created_at
       }
@@ -4868,24 +4888,26 @@ app.use('/api/admin', adminRoutes);
 // Mount payment routes
 app.use('/api/payments', paymentRoutes);
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  
-  // Email notification scheduler is temporarily disabled
-  console.log('📧 Email notification scheduler is disabled');
-  console.log('💡 To re-enable: uncomment notification scheduler code in server.js');
-  
-  // Commented out notification scheduler
-  // if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NOTIFICATIONS === 'true') {
-  //   notificationScheduler.start();
-  //   console.log('📧 Email notification scheduler started');
-  // } else {
-  //   console.log('📧 Email notification scheduler disabled (set ENABLE_NOTIFICATIONS=true to enable)');
-  // }
-});
+// Start server only if not in test mode
+if (process.env.NODE_ENV !== 'test') {
+  app.listen(PORT, () => {
+    console.log(`🚀 Server running on port ${PORT}`);
+    console.log(`📊 Health check: http://localhost:${PORT}/health`);
+    console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+    
+    // Email notification scheduler is temporarily disabled
+    console.log('📧 Email notification scheduler is disabled');
+    console.log('💡 To re-enable: uncomment notification scheduler code in server.js');
+    
+    // Commented out notification scheduler
+    // if (process.env.NODE_ENV === 'production' || process.env.ENABLE_NOTIFICATIONS === 'true') {
+    //   notificationScheduler.start();
+    //   console.log('📧 Email notification scheduler started');
+    // } else {
+    //   console.log('📧 Email notification scheduler disabled (set ENABLE_NOTIFICATIONS=true to enable)');
+    // }
+  });
+}
 
 // Graceful shutdown (notification scheduler disabled)
 process.on('SIGTERM', () => {
