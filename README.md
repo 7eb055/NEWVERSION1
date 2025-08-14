@@ -236,3 +236,5 @@ If you encounter any issues:
 4. Check that both frontend and backend servers are running
 
 For additional help, please open an issue in the repository.
+#   G i t H u b   S e c r e t s   A d d e d   -   T e s t i n g   C I / C D   P i p e l i n e  
+ 
