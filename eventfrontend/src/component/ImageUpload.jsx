@@ -118,6 +118,7 @@ const ImageUpload = ({
       });
       setError(null);
     } catch (error) {
+      console.error('Error setting image URL:', error);
       setError('Please enter a valid image URL (must start with http:// or https://)');
     }
   };

@@ -190,7 +190,7 @@ const BrowseEvents = () => {
               <span className="chip-icon">📋</span>
               All Events ({events.length})
             </button>
-            {eventDates.slice(0, 4).map((eventDate, index) => (
+            {eventDates.slice(0, 4).map((eventDate) => (
               <button
                 key={eventDate.dateString}
                 className={`filter-chip ${selectedDate === eventDate.dateString ? 'active' : ''}`}

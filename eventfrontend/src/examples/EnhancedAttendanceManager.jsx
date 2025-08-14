@@ -12,6 +12,7 @@ const EnhancedAttendanceManager = () => {
   const [loading, setLoading] = useState(true);
   const [selectedView, setSelectedView] = useState('attendance'); // 'attendance' or 'listing'
 
+  // eslint-disable-next-line no-unused-vars
   const attendeeService = new AttendeeListingService();
 
   useEffect(() => {

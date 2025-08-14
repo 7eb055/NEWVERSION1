@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
-import { getValidToken, clearInvalidToken } from '../utils/tokenValidation';
 import AuthTokenService from '../services/AuthTokenService';
 import '../Page/css/TicketPurchase.css';
 
@@ -117,7 +116,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
       });
       
       if (paymentResponse.data && paymentResponse.data.success) {
-        const { authorization_url, reference, amount } = paymentResponse.data.data;
+        const { authorization_url, reference } = paymentResponse.data.data;
         
         // Open Paystack payment popup or redirect
         const paymentWindow = window.open(

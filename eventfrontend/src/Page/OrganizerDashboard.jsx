@@ -49,6 +49,14 @@ const OrganizerDashboard = () => {
     eventSales: []
   });
   
+  // Additional missing state variables (temporarily unused but may be needed for future features)
+  // eslint-disable-next-line no-unused-vars
+  const [companies, setCompanies] = useState([]);
+  // eslint-disable-next-line no-unused-vars
+  const [people, setPeople] = useState([]);
+  // eslint-disable-next-line no-unused-vars
+  const [eventRegistrations, setEventRegistrations] = useState([]);
+  
   // Feedback and Reviews state
   const [feedbackData, setFeedbackData] = useState([]);
   const [feedbackSummary, setFeedbackSummary] = useState({});
@@ -616,6 +624,7 @@ const OrganizerDashboard = () => {
             }
           }
         );
+        console.log('Company updated successfully:', response.data);
         setSuccess('Company updated successfully!');
       } else {
         // Create new company
@@ -629,6 +638,7 @@ const OrganizerDashboard = () => {
             }
           }
         );
+        console.log('Company registered successfully:', response.data);
         setSuccess('Company registered successfully!');
       }
       

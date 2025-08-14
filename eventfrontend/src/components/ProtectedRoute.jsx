@@ -97,13 +97,14 @@ export const ProtectedRoute = ({
 };
 
 // Higher-order component for role-based access
-export const withRoleProtection = (Component, requiredRole) => {
-  return (props) => (
-    <ProtectedRoute requiredRole={requiredRole}>
-      <Component {...props} />
-    </ProtectedRoute>
-  );
-};
+// Note: Commented out to satisfy Fast Refresh requirement (only export components)
+// export const withRoleProtection = (Component, requiredRole) => {
+//   return (props) => (
+//     <ProtectedRoute requiredRole={requiredRole}>
+//       <Component {...props} />
+//     </ProtectedRoute>
+//   );
+// };
 
 // Specific protected route components for common use cases
 export const AttendeeProtectedRoute = ({ children }) => (

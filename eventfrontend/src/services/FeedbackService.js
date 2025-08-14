@@ -72,21 +72,12 @@ class FeedbackService {
 
   // Check if user can leave feedback for an event
   static async canLeaveFeedback() {
-    try {
-      // This would typically check registration and attendance status
-      // For now, we'll assume they can if they have an account
-      return {
-        success: true,
-        canLeaveFeedback: true
-      };
-    } catch (error) {
-      console.error('Error checking feedback eligibility:', error);
-      return {
-        success: false,
-        canLeaveFeedback: false,
-        error: 'Failed to check feedback eligibility'
-      };
-    }
+    // This would typically check registration and attendance status
+    // For now, we'll assume they can if they have an account
+    return {
+      success: true,
+      canLeaveFeedback: true
+    };
   }
 
   // Format rating display

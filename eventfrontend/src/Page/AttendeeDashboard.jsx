@@ -496,60 +496,7 @@ function Attendee() {
     }
   };
 
-  return (
-    <div className="attendee-dashboard">
-      <div className="dashboard-container">
-        {/* Header */}
-        <div className="dashboard-header">
-    try {
-      const response = await makeAuthenticatedRequest(`/api/attendee/notifications/${notificationId}/read`, {
-        method: 'POST'
-      });
-
-      if (response.ok) {
-        console.log(`Marked notification ${notificationId} as read`);
-        // Update local state
-        setNotifications(prev => 
-          prev.map(notif => 
-            notif.id === notificationId ? { ...notif, read: true } : notif
-          )
-        );
-        // Update stats
-        setNotificationStats(prev => ({
-          ...prev,
-          unread: Math.max(0, prev.unread - 1)
-        }));
-      } else {
-        console.error('Failed to mark notification as read');
-      }
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  const handleMarkAllAsRead = async () => {
-    try {
-      const response = await makeAuthenticatedRequest('/api/attendee/notifications/mark-all-read', {
-        method: 'POST'
-      });
-
-      if (response.ok) {
-        console.log('Marked all notifications as read');
-        // Update local state
-        setNotifications(prev => prev.map(notif => ({ ...notif, read: true })));
-        // Update stats
-        setNotificationStats(prev => ({
-          ...prev,
-          unread: 0
-        }));
-      } else {
-        console.error('Failed to mark all notifications as read');
-      }
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    }
-  };
-
+  // eslint-disable-next-line no-unused-vars
   const handleDeleteNotification = async (notificationId) => {
     try {
       const response = await makeAuthenticatedRequest(`/api/attendee/notifications/${notificationId}`, {

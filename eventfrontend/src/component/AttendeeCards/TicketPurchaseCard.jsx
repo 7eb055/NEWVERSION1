@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { getValidToken, clearInvalidToken } from '../../utils/tokenValidation';
 import AuthTokenService from '../../services/AuthTokenService';
 import './AttendeeCards.css';
 
-const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurchase, onCancel }) => {
+const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurchase }) => {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [quantity, setQuantity] = useState(1);
   const [paymentMethod, setPaymentMethod] = useState('credit_card');
