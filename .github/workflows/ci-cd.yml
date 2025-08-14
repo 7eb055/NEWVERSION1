@@ -199,6 +199,11 @@ jobs:
           
       - name: Deploy to Heroku Staging
         run: |
+          # Configure Git identity
+          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions"
+          git config --global init.defaultBranch main
+          
           cd backend
           heroku git:remote -a your-event-app-staging || heroku create your-event-app-staging
           git init
@@ -263,6 +268,11 @@ jobs:
           
       - name: Deploy to Heroku Production
         run: |
+          # Configure Git identity
+          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions"
+          git config --global init.defaultBranch main
+          
           cd backend
           heroku git:remote -a your-event-app-production || heroku create your-event-app-production
           git init
