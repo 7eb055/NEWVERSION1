@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS companies (
     contact_info JSONB NOT NULL,
     description TEXT,
     services TEXT,
-    organizer_id INTEGER NOT NULL REFERENCES organizers(organizer_id) ON DELETE CASCADE,
+    organizer_id INTEGER NOT NULL REFERENCES organizers(id) ON DELETE CASCADE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(company_name)

@@ -72,17 +72,6 @@ jobs:
         env:
           PGPASSWORD: postgres
 
-      - name: Run database migrations
-        run: |
-          cd backend
-          npm run migrate:test
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: event_management_test
-          DB_USER: postgres
-          DB_PASSWORD: postgres
-
       - name: Run backend tests
         run: |
           cd backend
