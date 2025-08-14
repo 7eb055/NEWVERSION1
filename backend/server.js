@@ -149,10 +149,11 @@ app.get('/api/admin/dashboard-stats', authenticateToken, authorizeAdmin, async (
     const attendees = await pool.query('SELECT COUNT(*) FROM attendees');
     
     // Try to get revenue from eventregistrations table
+    let totalRevenue = 0;
     const revenueQuery = 'SELECT COALESCE(SUM(total_amount), 0) as total_revenue FROM eventregistrations WHERE payment_status = \'completed\'';
     try {
       const revenue = await pool.query(revenueQuery);
-      let totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
+      totalRevenue = parseFloat(revenue.rows[0].total_revenue) || 0;
     } catch (err) {
       // Fallback if eventregistrations table doesn't exist
       try {
@@ -245,8 +246,8 @@ app.get('/api/admin/events', authenticateToken, authorizeAdmin, async (req, res)
       LEFT JOIN eventregistrations er ON e.event_id = er.event_id
     `;
     
-    let conditions = [];
-    let params = [];
+    const conditions = [];
+    const params = [];
 
     if (status) {
       conditions.push('e.status = $' + (params.length + 1));
@@ -284,7 +285,7 @@ app.get('/api/admin/logs', authenticateToken, authorizeAdmin, async (req, res) =
     const offset = (page - 1) * limit;
     
     let query = 'SELECT log_id, level, message, timestamp, user_id FROM logs';
-    let params = [];
+    const params = [];
     
     if (level) {
       query += ' WHERE level = $1';
@@ -549,39 +550,39 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
       return res.status(400).json({ message: 'Invalid bulk action request' });
     }
     
-    let result = {};
+    const result = {};
     
     switch (action) {
-      case 'delete':
-        if (target === 'users') {
-          const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-          await pool.query(`DELETE FROM users WHERE user_id IN (${placeholders})`, ids);
-          result.message = `Deleted ${ids.length} users`;
-        } else if (target === 'events') {
-          const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-          await pool.query(`DELETE FROM events WHERE event_id IN (${placeholders})`, ids);
-          result.message = `Deleted ${ids.length} events`;
-        }
-        break;
+    case 'delete':
+      if (target === 'users') {
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+        await pool.query(`DELETE FROM users WHERE user_id IN (${placeholders})`, ids);
+        result.message = `Deleted ${ids.length} users`;
+      } else if (target === 'events') {
+        const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
+        await pool.query(`DELETE FROM events WHERE event_id IN (${placeholders})`, ids);
+        result.message = `Deleted ${ids.length} events`;
+      }
+      break;
         
-      case 'update_status':
-        if (target === 'events' && data.status) {
-          const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-          await pool.query(`UPDATE events SET status = $1 WHERE event_id IN (${placeholders})`, [data.status, ...ids]);
-          result.message = `Updated status for ${ids.length} events`;
-        }
-        break;
+    case 'update_status':
+      if (target === 'events' && data.status) {
+        const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
+        await pool.query(`UPDATE events SET status = $1 WHERE event_id IN (${placeholders})`, [data.status, ...ids]);
+        result.message = `Updated status for ${ids.length} events`;
+      }
+      break;
         
-      case 'update_role':
-        if (target === 'users' && data.role_type) {
-          const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-          await pool.query(`UPDATE users SET role_type = $1 WHERE user_id IN (${placeholders})`, [data.role_type, ...ids]);
-          result.message = `Updated role for ${ids.length} users`;
-        }
-        break;
+    case 'update_role':
+      if (target === 'users' && data.role_type) {
+        const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
+        await pool.query(`UPDATE users SET role_type = $1 WHERE user_id IN (${placeholders})`, [data.role_type, ...ids]);
+        result.message = `Updated role for ${ids.length} users`;
+      }
+      break;
         
-      default:
-        return res.status(400).json({ message: 'Unknown bulk action' });
+    default:
+      return res.status(400).json({ message: 'Unknown bulk action' });
     }
     
     // Log bulk action
@@ -908,7 +909,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
     await client.query('BEGIN');
 
     // Get attendee_id from the user, or create one if it doesn't exist
-    let attendeeQuery = await client.query(
+    const attendeeQuery = await client.query(
       'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
@@ -949,8 +950,6 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
       return res.status(404).json({ message: 'Event not found or not available for registration' });
     }
 
-    const event = eventQuery.rows[0];
-
     // Check if ticket type exists and is available
     const ticketTypeQuery = await client.query(
       'SELECT ticket_type_id, type_name, price, quantity_available, quantity_sold FROM tickettypes WHERE ticket_type_id = $1 AND event_id = $2',
@@ -988,15 +987,15 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
       VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7, $8)
       RETURNING *
     `, [
-        eventId,
-        attendeeId,
-        ticket_type_id,
-        totalAmount,
-        payment_status,
-        payment_method,
-        ticket_quantity,
-        qrCode
-      ]);
+      eventId,
+      attendeeId,
+      ticket_type_id,
+      totalAmount,
+      payment_status,
+      payment_method,
+      ticket_quantity,
+      qrCode
+    ]);
 
     // Update ticket quantity sold
     await client.query(
@@ -1047,7 +1046,6 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
       attendeeName,
       attendeeEmail,
       attendeePhone,
-      company,
       ticketTypeId,
       ticketQuantity = 1,
       registrationType = 'manual',
@@ -2010,7 +2008,7 @@ app.post('/api/events/:eventId/ticket-types', authenticateToken, async (req, res
     const { eventId } = req.params;
     const { 
       type_name, price, quantity_available, description, 
-      benefits, is_active, sales_start_date, sales_end_date 
+      benefits
     } = req.body;
     
     // Validate required fields
@@ -2088,7 +2086,7 @@ app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, as
     const { eventId, ticketTypeId } = req.params;
     const { 
       type_name, price, quantity_available, description, 
-      benefits, is_active, sales_start_date, sales_end_date 
+      benefits
     } = req.body;
     
     // Get organizer_id from the user
@@ -3870,7 +3868,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
       WHERE n.user_id = $1 AND n.is_deleted = FALSE
     `;
     
-    let params = [req.user.user_id];
+    const params = [req.user.user_id];
     let paramCount = 1;
 
     if (unread_only === 'true') {
@@ -4308,7 +4306,7 @@ app.get('/api/events/:eventId/sessions', async (req, res) => {
       FROM event_sessions 
       WHERE event_id = $1
     `;
-    let params = [eventId];
+    const params = [eventId];
 
     if (day) {
       query += ' AND session_date = CURRENT_DATE + ($2 || \' days\')::interval';

@@ -4,7 +4,7 @@ const router = express.Router();
 // Helper function to build attendee listing query
 const buildAttendeeListingQuery = (baseQuery, filters = {}) => {
   let query = baseQuery;
-  let params = [];
+  const params = [];
   let paramIndex = 1;
 
   // Add filters

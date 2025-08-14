@@ -97,7 +97,7 @@ class DatabaseHealthChecker {
       const queries = [
         { name: 'Simple SELECT', query: 'SELECT 1' },
         { name: 'Current Time', query: 'SELECT NOW()' },
-        { name: 'Database Size', query: "SELECT pg_size_pretty(pg_database_size(current_database())) as size" },
+        { name: 'Database Size', query: 'SELECT pg_size_pretty(pg_database_size(current_database())) as size' },
       ];
 
       const results = [];

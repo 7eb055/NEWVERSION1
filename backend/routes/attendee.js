@@ -66,7 +66,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
     const userData = userQuery.rows[0];
     
     // Get or create attendee data
-    let attendeeQuery = await pool.query(
+    const attendeeQuery = await pool.query(
       `SELECT attendee_id, full_name, phone, date_of_birth, gender, interests,
               emergency_contact_name, emergency_contact_phone, dietary_restrictions,
               accessibility_needs, profile_picture_url, bio, social_media_links,
@@ -271,7 +271,7 @@ router.get('/notifications', authenticateToken, async (req, res) => {
     console.log(`Fetching notifications for user ID: ${userId}`);
     
     // First, get or create attendee ID
-    let attendeeResult = await pool.query(
+    const attendeeResult = await pool.query(
       'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [userId]
     );
@@ -316,7 +316,7 @@ router.get('/notifications', authenticateToken, async (req, res) => {
       WHERE n.user_id = $1
     `;
     
-    let queryParams = [userId];
+    const queryParams = [userId];
     
     if (unread_only === 'true') {
       notificationQuery += ' AND n.is_read = false';
@@ -764,6 +764,19 @@ router.post('/events/:eventId/purchase', authenticateToken, async (req, res) => 
     
     const ticketType = ticketTypeResult.rows[0];
     
+    // Get event details for notifications
+    const eventResult = await client.query(
+      'SELECT event_name, event_date FROM events WHERE event_id = $1',
+      [eventId]
+    );
+    
+    if (eventResult.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ message: 'Event not found' });
+    }
+    
+    const event = eventResult.rows[0];
+    
     // Check if enough tickets are available
     if (ticketType.quantity_available < quantity) {
       await client.query('ROLLBACK');
@@ -887,7 +900,7 @@ router.post('/events/:eventId/feedback', authenticateToken, async (req, res) => 
     }
     
     // Check if user has already checked in (optional depending on your requirements)
-    const attendanceResult = await pool.query(
+    await pool.query(
       `SELECT al.attendance_id 
        FROM attendancelogs al
        JOIN eventregistrations er ON al.registration_id = er.registration_id
@@ -974,7 +987,7 @@ router.get('/events/:eventId/feedback', async (req, res) => {
       WHERE ef.event_id = $1
     `;
     
-    let queryParams = [eventId];
+    const queryParams = [eventId];
     
     if (include_anonymous === 'false') {
       query += ` AND ef.is_anonymous = false`;
@@ -1384,7 +1397,7 @@ router.get('/tickets', authenticateToken, async (req, res) => {
     console.log('Fetching tickets for user ID:', userId);
     
     // First, get the attendee_id from the attendees table
-    let attendeeResult = await pool.query(
+    const attendeeResult = await pool.query(
       'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [userId]
     );
@@ -1514,8 +1527,6 @@ router.get('/tickets', authenticateToken, async (req, res) => {
 // Get attendee's notifications
 router.get('/notifications', authenticateToken, async (req, res) => {
   try {
-    const userId = req.user.user_id;
-    
     // Simplified placeholder for notifications
     // In a real implementation, you would query a notifications table
     const mockNotifications = [

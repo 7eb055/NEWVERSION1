@@ -59,13 +59,10 @@ class DatabaseService {
   async checkUserRole(userId, role) {
     try {
       let query;
-      let tableName;
 
       if (role === 'attendee') {
-        tableName = 'Attendees';
         query = 'SELECT attendee_id, full_name, phone FROM Attendees WHERE user_id = $1';
       } else if (role === 'organizer') {
-        tableName = 'Organizers';
         query = 'SELECT organizer_id, full_name, phone, company_name, business_address FROM Organizers WHERE user_id = $1';
       } else {
         throw new Error('Invalid role specified');

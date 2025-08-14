@@ -257,12 +257,12 @@ class NotificationScheduler {
       
       // Check specific notification type preferences
       switch (notificationType) {
-        case 'event_reminder':
-          return preferences.event_updates !== false;
-        case 'marketing':
-          return preferences.promotions === true;
-        default:
-          return preferences.email !== false;
+      case 'event_reminder':
+        return preferences.event_updates !== false;
+      case 'marketing':
+        return preferences.promotions === true;
+      default:
+        return preferences.email !== false;
       }
       
     } catch (error) {

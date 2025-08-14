@@ -123,7 +123,7 @@ class DatabaseMigrator {
         path.join(__dirname, '../'), // Root directory for loose SQL files
       ];
 
-      let migrationFiles = [];
+      const migrationFiles = [];
 
       for (const migrationPath of migrationPaths) {
         if (fs.existsSync(migrationPath)) {

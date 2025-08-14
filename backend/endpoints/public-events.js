@@ -16,7 +16,7 @@ router.get('/', async (req, res) => {
     } = req.query;
     
     const offset = (page - 1) * limit;
-    let params = ['published']; // Default status filter
+    const params = ['published']; // Default status filter
     let paramIndex = 1;
     
     let query = `

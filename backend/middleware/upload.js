@@ -23,7 +23,6 @@ const storage = multer.diskStorage({
   filename: function (req, file, cb) {
     // Generate unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const fileExtension = path.extname(file.originalname);
     const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
     cb(null, `event-${uniqueSuffix}-${sanitizedName}`);
   }
@@ -61,22 +60,22 @@ const upload = multer({
 const handleMulterError = (error, req, res, next) => {
   if (error instanceof multer.MulterError) {
     switch (error.code) {
-      case 'LIMIT_FILE_SIZE':
-        return res.status(400).json({ 
-          error: 'File too large. Maximum size is 10MB.' 
-        });
-      case 'LIMIT_FILE_COUNT':
-        return res.status(400).json({ 
-          error: 'Too many files. Maximum 5 files allowed.' 
-        });
-      case 'LIMIT_UNEXPECTED_FILE':
-        return res.status(400).json({ 
-          error: 'Unexpected file field.' 
-        });
-      default:
-        return res.status(400).json({ 
-          error: 'File upload error: ' + error.message 
-        });
+    case 'LIMIT_FILE_SIZE':
+      return res.status(400).json({ 
+        error: 'File too large. Maximum size is 10MB.' 
+      });
+    case 'LIMIT_FILE_COUNT':
+      return res.status(400).json({ 
+        error: 'Too many files. Maximum 5 files allowed.' 
+      });
+    case 'LIMIT_UNEXPECTED_FILE':
+      return res.status(400).json({ 
+        error: 'Unexpected file field.' 
+      });
+    default:
+      return res.status(400).json({ 
+        error: 'File upload error: ' + error.message 
+      });
     }
   } else if (error) {
     return res.status(400).json({ 

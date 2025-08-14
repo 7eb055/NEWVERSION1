@@ -12,9 +12,6 @@ module.exports = {
     sourceType: 'module'
   },
   rules: {
-    // Allow console statements in backend (needed for logging)
-    'no-console': 'off',
-    
     // Allow unused vars that start with underscore
     'no-unused-vars': ['error', { 'argsIgnorePattern': '^_' }],
     
@@ -28,7 +25,7 @@ module.exports = {
     // Consistent indentation
     'indent': ['error', 2],
     
-    // Allow console in development files
+    // Allow console in backend (needed for logging)
     'no-console': 'off'
   },
   overrides: [

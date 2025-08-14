@@ -412,14 +412,14 @@ router.post('/webhook', express.raw({ type: 'application/json' }), async (req, r
 
     // Handle different webhook events
     switch (event.event) {
-      case 'charge.success':
-        await handleSuccessfulCharge(event.data);
-        break;
-      case 'charge.failed':
-        await handleFailedCharge(event.data);
-        break;
-      default:
-        console.log('Unhandled webhook event:', event.event);
+    case 'charge.success':
+      await handleSuccessfulCharge(event.data);
+      break;
+    case 'charge.failed':
+      await handleFailedCharge(event.data);
+      break;
+    default:
+      console.log('Unhandled webhook event:', event.event);
     }
 
     res.status(200).json({ success: true });

@@ -21,7 +21,7 @@ async function runMigration() {
     
     // Read the SQL migration file
     const sqlFilePath = path.join(__dirname, 'paystack-migration.sql');
-    let sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
+    const sqlContent = fs.readFileSync(sqlFilePath, 'utf8');
     
     console.log(`📝 Executing SQL migration...`);
     

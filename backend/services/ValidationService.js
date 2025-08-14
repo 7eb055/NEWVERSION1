@@ -100,7 +100,7 @@ class ValidationService {
     }
 
     // Allow letters, spaces, hyphens, apostrophes
-    if (!/^[a-zA-Z\s\-'\.]+$/.test(trimmedName)) {
+    if (!/^[a-zA-Z\s\-'.]+$/.test(trimmedName)) {
       errors.push(`${fieldName} can only contain letters, spaces, hyphens, and apostrophes`);
     }
 

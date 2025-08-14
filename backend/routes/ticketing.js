@@ -4,7 +4,6 @@ const { v4: uuidv4 } = require('uuid');
 const QRCode = require('qrcode');
 const pool = require('../db');
 const authenticateToken = require('../middleware/auth');
-const nodemailer = require('nodemailer');
 
 // Mock email sender for development (replace with actual email service in production)
 const mockEmailSender = async (to, subject, html) => {

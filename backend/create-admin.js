@@ -13,7 +13,6 @@ const pool = new Pool({
 // Admin credentials
 const ADMIN_EMAIL = 'admin@eventsystem.com';
 const ADMIN_PASSWORD = 'AdminEventSystem2025!';
-const ADMIN_NAME = 'System Administrator';
 
 async function createAdminUser() {
   try {

@@ -1,4 +1,3 @@
-const fs = require('fs');
 const { Pool } = require('pg');
 require('dotenv').config();
 

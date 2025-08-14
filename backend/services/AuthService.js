@@ -128,7 +128,7 @@ class AuthService {
 
   // Create new user account
   async createUser(userData, client) {
-    const { email, password, role, username } = userData;
+    const { email, password, role } = userData;
 
     // Hash password
     const saltRounds = 12;
@@ -246,7 +246,7 @@ class AuthService {
 
       let userId;
       let verificationToken = null;
-      let isNewUser = !userCheck.exists;
+      const isNewUser = !userCheck.exists;
 
       if (!userCheck.exists) {
         // Create new user
