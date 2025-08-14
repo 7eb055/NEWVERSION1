@@ -16,30 +16,8 @@ CREATE TABLE IF NOT EXISTS companies (
     UNIQUE(company_name)
 );
 
-        -- Create index on organizer_id for faster lookups
-        CREATE INDEX idx_companies_organizer_id ON companies(organizer_id);
-
-        -- Create index on company type for filtering
-        CREATE INDEX idx_companies_type ON companies(company_type);
-
-        -- Create index on company category for filtering
-        CREATE INDEX idx_companies_category ON companies(category);
-
-        -- Add trigger to update updated_at timestamp
-        CREATE OR REPLACE FUNCTION update_companies_updated_at()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            NEW.updated_at = CURRENT_TIMESTAMP;
-            RETURN NEW;
-        END;
-        $$ language 'plpgsql';
-
-        CREATE TRIGGER update_companies_updated_at_trigger
-            BEFORE UPDATE ON companies
-            FOR EACH ROW
-            EXECUTE FUNCTION update_companies_updated_at();
-    END IF;
-END $$;
+-- Create index on organizer_id for faster lookups
+CREATE INDEX IF NOT EXISTS idx_companies_organizer_id ON companies(organizer_id);
 
 -- Create index on company type for filtering
 CREATE INDEX IF NOT EXISTS idx_companies_type ON companies(company_type);
@@ -53,9 +31,11 @@ RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = CURRENT_TIMESTAMP;
     RETURN NEW;
-END
+END;
 $$ LANGUAGE plpgsql;
 
+-- Create trigger only if it doesn't exist
+DROP TRIGGER IF EXISTS update_companies_updated_at_trigger ON companies;
 CREATE TRIGGER update_companies_updated_at_trigger
     BEFORE UPDATE ON companies
     FOR EACH ROW

@@ -720,21 +720,19 @@ app.get('/api/events', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const eventsQuery = await pool.query(`
-      SELECT e.event_id, e.event_name, e.event_date, 
-             e.ticket_price, e.max_attendees, 
+      SELECT e.id as event_id, e.title as event_name, e.start_date as event_date, 
+             e.ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
-             e.image_url, e.image_filename, e.image_type, e.image_size, e.image_mimetype,
-             e.venue_name, e.venue_address, e.description, e.category, e.event_type,
-             e.registration_deadline, e.refund_policy, e.terms_and_conditions,
-             e.is_public, e.requires_approval, e.max_tickets_per_person,
-             o.full_name as organizer_name, o.company_name,
-             COUNT(er.registration_id) as registration_count
+             e.image as image_url, e.description, e.venue as venue_name, 
+             e.location as venue_address, e.event_type as category,
+             o.name as organizer_name, o.company_name,
+             COUNT(t.id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
-      LEFT JOIN eventregistrations er ON e.event_id = er.event_id
+      LEFT JOIN organizers o ON e.organizer_id = o.id
+      LEFT JOIN tickets t ON e.id = t.event_id
       WHERE e.status = $1
-      GROUP BY e.event_id, o.full_name, o.company_name
-      ORDER BY e.event_date ASC
+      GROUP BY e.id, o.name, o.company_name
+      ORDER BY e.start_date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 
@@ -751,20 +749,18 @@ app.get('/api/events/:eventId/details', async (req, res) => {
     const { eventId } = req.params;
 
     const eventQuery = await pool.query(`
-      SELECT e.event_id, e.event_name, e.event_date, 
-             e.ticket_price, e.max_attendees, 
+      SELECT e.id as event_id, e.title as event_name, e.start_date as event_date, 
+             e.ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
-             e.image_url, e.image_filename, e.image_type, e.image_size, e.image_mimetype,
-             e.venue_name, e.venue_address, e.description, e.category, e.event_type,
-             e.registration_deadline, e.refund_policy, e.terms_and_conditions,
-             e.is_public, e.requires_approval, e.max_tickets_per_person,
-             o.full_name as organizer_name, o.company_name, o.phone as organizer_phone,
-             COUNT(er.registration_id) as registration_count
+             e.image as image_url, e.description, e.venue as venue_name, 
+             e.location as venue_address, e.event_type as category,
+             o.name as organizer_name, o.company_name, o.phone as organizer_phone,
+             COUNT(t.id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
-      LEFT JOIN eventregistrations er ON e.event_id = er.event_id
-      WHERE e.event_id = $1
-      GROUP BY e.event_id, o.full_name, o.company_name, o.phone
+      LEFT JOIN organizers o ON e.organizer_id = o.id
+      LEFT JOIN tickets t ON e.id = t.event_id
+      WHERE e.id = $1
+      GROUP BY e.id, o.name, o.company_name, o.phone
     `, [eventId]);
 
     if (eventQuery.rows.length === 0) {
