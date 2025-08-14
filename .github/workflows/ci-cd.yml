@@ -20,9 +20,9 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_PASSWORD: postgres
+          POSTGRES_PASSWORD: 2312
           POSTGRES_USER: postgres
-          POSTGRES_DB: event_management_test
+          POSTGRES_DB: event_management_db
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
@@ -59,6 +59,18 @@ jobs:
           DB_PASSWORD: postgres
           JWT_SECRET: test-jwt-secret-key-for-github-actions
           NODE_ENV: test
+
+      - name: Wait for Postgres to be ready
+        run: |
+          until pg_isready -h localhost -U postgres; do sleep 1; done
+        env:
+          PGPASSWORD: postgres
+
+      - name: Load database schema
+        run: |
+          psql -h localhost -U postgres -d event_management_test -f backend/database/migrations/schema.sql
+        env:
+          PGPASSWORD: postgres
 
       - name: Run database migrations
         run: |
