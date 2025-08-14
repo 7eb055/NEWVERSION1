@@ -35,15 +35,17 @@ const pool = new Pool({
 // Initialize notification scheduler - DISABLED
 // const notificationScheduler = new NotificationScheduler();
 
-// Test database connection
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-  } else {
-    console.log('✅ Connected to PostgreSQL database');
-    release();
-  }
-});
+// Test database connection (only in non-test environments)
+if (process.env.NODE_ENV !== 'test') {
+  pool.connect((err, client, release) => {
+    if (err) {
+      console.error('Error connecting to database:', err);
+    } else {
+      console.log('✅ Connected to PostgreSQL database');
+      release();
+    }
+  });
+}
 
 // Middleware
 app.use(cors({
@@ -4164,6 +4166,17 @@ app.post('/api/auth/register', async (req, res) => {
       return res.status(400).json({ message: 'Email and password are required' });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ message: 'Invalid email format' });
+    }
+
+    // Validate password strength
+    if (password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
     // Check if user already exists
     const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
@@ -4912,14 +4925,19 @@ if (process.env.NODE_ENV !== 'test') {
 // Graceful shutdown (notification scheduler disabled)
 process.on('SIGTERM', () => {
   console.log('🛑 SIGTERM received, shutting down gracefully...');
-  // notificationScheduler.stop(); // Disabled
-  process.exit(0);
+  pool.end().then(() => {
+    console.log('Database connections closed.');
+    process.exit(0);
+  });
 });
 
 process.on('SIGINT', () => {
   console.log('🛑 SIGINT received, shutting down gracefully...');
-  // notificationScheduler.stop(); // Disabled
-  process.exit(0);
+  pool.end().then(() => {
+    console.log('Database connections closed.');
+    process.exit(0);
+  });
 });
 
-module.exports = app;
+// Export app and pool for testing
+module.exports = { app, pool };

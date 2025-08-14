@@ -9,14 +9,16 @@ const pool = new Pool({
   password: process.env.DB_PASSWORD,
 });
 
-// Test connection when this module is imported
-pool.connect((err, client, release) => {
-  if (err) {
-    console.error('Error connecting to database from db module:', err);
-    return;
-  }
-  release();
-  console.log('✅ DB module connected to PostgreSQL database');
-});
+// Test connection when this module is imported (skip in test mode)
+if (process.env.NODE_ENV !== 'test') {
+  pool.connect((err, client, release) => {
+    if (err) {
+      console.error('Error connecting to database from db module:', err);
+      return;
+    }
+    release();
+    console.log('✅ DB module connected to PostgreSQL database');
+  });
+}
 
 module.exports = pool;
