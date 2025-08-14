@@ -187,15 +187,12 @@ jobs:
           
       - name: Login to Heroku
         run: |
-          cat > ~/.netrc <<EOF
-          machine api.heroku.com
-          login ${{ secrets.HEROKU_EMAIL }}
-          password ${{ secrets.HEROKU_API_KEY }}
-          machine git.heroku.com
-          login ${{ secrets.HEROKU_EMAIL }}
-          password ${{ secrets.HEROKU_API_KEY }}
-          EOF
-          chmod 600 ~/.netrc
+          # Set Heroku API key for authentication
+          export HEROKU_API_KEY="${{ secrets.HEROKU_API_KEY }}"
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
+          
+          # Test authentication
+          heroku auth:whoami
           
       - name: Deploy to Heroku Staging
         run: |
@@ -211,8 +208,15 @@ jobs:
           git add .
           git commit -m "Deploy to staging"
           
-          # Create or get existing Heroku app and add remote
-          heroku apps:info your-event-app-staging || heroku create your-event-app-staging
+          # Create Heroku app if it doesn't exist
+          if ! heroku apps:info your-event-app-staging >/dev/null 2>&1; then
+            echo "Creating new Heroku app..."
+            heroku create your-event-app-staging
+          else
+            echo "Using existing Heroku app..."
+          fi
+          
+          # Add Heroku git remote
           heroku git:remote -a your-event-app-staging
           
           # Push to Heroku
@@ -263,15 +267,12 @@ jobs:
           
       - name: Login to Heroku
         run: |
-          cat > ~/.netrc <<EOF
-          machine api.heroku.com
-          login ${{ secrets.HEROKU_EMAIL }}
-          password ${{ secrets.HEROKU_API_KEY }}
-          machine git.heroku.com
-          login ${{ secrets.HEROKU_EMAIL }}
-          password ${{ secrets.HEROKU_API_KEY }}
-          EOF
-          chmod 600 ~/.netrc
+          # Set Heroku API key for authentication
+          export HEROKU_API_KEY="${{ secrets.HEROKU_API_KEY }}"
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
+          
+          # Test authentication
+          heroku auth:whoami
           
       - name: Deploy to Heroku Production
         run: |
@@ -287,8 +288,15 @@ jobs:
           git add .
           git commit -m "Deploy to production"
           
-          # Create or get existing Heroku app and add remote
-          heroku apps:info your-event-app-production || heroku create your-event-app-production
+          # Create Heroku app if it doesn't exist
+          if ! heroku apps:info your-event-app-production >/dev/null 2>&1; then
+            echo "Creating new Heroku app..."
+            heroku create your-event-app-production
+          else
+            echo "Using existing Heroku app..."
+          fi
+          
+          # Add Heroku git remote
           heroku git:remote -a your-event-app-production
           
           # Push to Heroku
