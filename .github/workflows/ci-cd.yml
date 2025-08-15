@@ -184,10 +184,9 @@ jobs:
           # Install Heroku CLI using the official method
           curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
           
-          # Add to PATH and verify installation
-          export PATH="/usr/local/bin:$PATH"
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          /usr/local/bin/heroku --version
+          # Find where heroku was installed and verify
+          which heroku
+          heroku --version
           
           # Login to Heroku using environment variable
           export HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}
@@ -205,7 +204,7 @@ jobs:
           chmod 600 ~/.netrc
           
           # Test authentication
-          /usr/local/bin/heroku auth:whoami
+          heroku auth:whoami
 
       - name: Deploy to Heroku Staging
         run: |
@@ -222,10 +221,10 @@ jobs:
           git commit -m "Deploy to staging"
           
           # Create Heroku app (ignore if exists)
-          /usr/local/bin/heroku create your-event-app-staging || echo "App already exists"
+          heroku create your-event-app-staging || echo "App already exists"
           
           # Add Heroku git remote
-          /usr/local/bin/heroku git:remote -a your-event-app-staging
+          heroku git:remote -a your-event-app-staging
           
           # Push to Heroku
           git push heroku main --force
@@ -234,7 +233,7 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
-          /usr/local/bin/heroku config:set \
+          heroku config:set \
             DB_HOST="${{ secrets.STAGING_DB_HOST }}" \
             DB_USER="${{ secrets.STAGING_DB_USER }}" \
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
@@ -272,10 +271,9 @@ jobs:
           # Install Heroku CLI using the official method
           curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
           
-          # Add to PATH and verify installation
-          export PATH="/usr/local/bin:$PATH"
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          /usr/local/bin/heroku --version
+          # Find where heroku was installed and verify
+          which heroku
+          heroku --version
           
           # Login to Heroku using environment variable
           export HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}
@@ -293,7 +291,7 @@ jobs:
           chmod 600 ~/.netrc
           
           # Test authentication
-          /usr/local/bin/heroku auth:whoami
+          heroku auth:whoami
 
       - name: Deploy to Heroku Production
         run: |
@@ -310,10 +308,10 @@ jobs:
           git commit -m "Deploy to production"
           
           # Create Heroku app (ignore if exists)
-          /usr/local/bin/heroku create your-event-app-production || echo "App already exists"
+          heroku create your-event-app-production || echo "App already exists"
           
           # Add Heroku git remote
-          /usr/local/bin/heroku git:remote -a your-event-app-production
+          heroku git:remote -a your-event-app-production
           
           # Push to Heroku
           git push heroku main --force
@@ -322,7 +320,7 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
-          /usr/local/bin/heroku config:set \
+          heroku config:set \
             DB_HOST="${{ secrets.PRODUCTION_DB_HOST }}" \
             DB_USER="${{ secrets.PRODUCTION_DB_USER }}" \
             DB_PASSWORD="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
