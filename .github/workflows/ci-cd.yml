@@ -182,27 +182,7 @@ jobs:
       - name: Setup Heroku CLI
         run: |
           curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
-          export PATH="$PATH:/usr/local/bin"
-          echo "$PATH" >> $GITHUB_PATH
-          
-      - name: Login to Heroku
-        run: |
-          # Create .netrc file for authentication
-          cat > ~/.netrc <<EOF
-          machine api.heroku.com
-            login ${{ secrets.HEROKU_EMAIL }}
-            password ${{ secrets.HEROKU_API_KEY }}
-          machine git.heroku.com
-            login ${{ secrets.HEROKU_EMAIL }}
-            password ${{ secrets.HEROKU_API_KEY }}
-          EOF
-          chmod 600 ~/.netrc
-          
-          # Also set environment variable as backup
-          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
-          
-          # Test authentication
-          heroku auth:whoami
+          echo "/usr/local/bin" >> $GITHUB_PATH
           
       - name: Deploy to Heroku Staging
         run: |
@@ -218,25 +198,19 @@ jobs:
           git add .
           git commit -m "Deploy to staging"
           
-          # Create Heroku app if it doesn't exist
-          if ! heroku apps:info your-event-app-staging >/dev/null 2>&1; then
-            echo "Creating new Heroku app..."
-            heroku create your-event-app-staging
-          else
-            echo "Using existing Heroku app..."
-          fi
-          
-          # Add Heroku git remote
-          heroku git:remote -a your-event-app-staging
+          # Use full path for heroku commands
+          /usr/local/bin/heroku create your-event-app-staging --region us || echo "App might already exist"
+          /usr/local/bin/heroku git:remote -a your-event-app-staging
           
           # Push to Heroku
-          git push heroku main --force
+          git push https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/your-event-app-staging.git HEAD:main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
           
       - name: Configure Heroku Environment Variables
         run: |
-          heroku config:set \
+          /usr/local/bin/heroku config:set \
             DB_HOST="${{ secrets.STAGING_DB_HOST }}" \
             DB_USER="${{ secrets.STAGING_DB_USER }}" \
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
@@ -272,27 +246,7 @@ jobs:
       - name: Setup Heroku CLI
         run: |
           curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
-          export PATH="$PATH:/usr/local/bin"
-          echo "$PATH" >> $GITHUB_PATH
-          
-      - name: Login to Heroku
-        run: |
-          # Create .netrc file for authentication
-          cat > ~/.netrc <<EOF
-          machine api.heroku.com
-            login ${{ secrets.HEROKU_EMAIL }}
-            password ${{ secrets.HEROKU_API_KEY }}
-          machine git.heroku.com
-            login ${{ secrets.HEROKU_EMAIL }}
-            password ${{ secrets.HEROKU_API_KEY }}
-          EOF
-          chmod 600 ~/.netrc
-          
-          # Also set environment variable as backup
-          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
-          
-          # Test authentication
-          heroku auth:whoami
+          echo "/usr/local/bin" >> $GITHUB_PATH
           
       - name: Deploy to Heroku Production
         run: |
@@ -308,25 +262,19 @@ jobs:
           git add .
           git commit -m "Deploy to production"
           
-          # Create Heroku app if it doesn't exist
-          if ! heroku apps:info your-event-app-production >/dev/null 2>&1; then
-            echo "Creating new Heroku app..."
-            heroku create your-event-app-production
-          else
-            echo "Using existing Heroku app..."
-          fi
-          
-          # Add Heroku git remote
-          heroku git:remote -a your-event-app-production
+          # Use full path for heroku commands
+          /usr/local/bin/heroku create your-event-app-production --region us || echo "App might already exist"
+          /usr/local/bin/heroku git:remote -a your-event-app-production
           
           # Push to Heroku
-          git push heroku main --force
+          git push https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/your-event-app-production.git HEAD:main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
           
       - name: Configure Heroku Environment Variables
         run: |
-          heroku config:set \
+          /usr/local/bin/heroku config:set \
             DB_HOST="${{ secrets.PRODUCTION_DB_HOST }}" \
             DB_USER="${{ secrets.PRODUCTION_DB_USER }}" \
             DB_PASSWORD="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
