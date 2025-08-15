@@ -13,6 +13,8 @@ async function initializeDatabase() {
 
   try {
     console.log('🔄 Starting database initialization...');
+    console.log('Environment:', process.env.NODE_ENV);
+    console.log('Database URL available:', !!process.env.DATABASE_URL);
     
     // Check if tables already exist
     const result = await pool.query(`
@@ -30,7 +32,14 @@ async function initializeDatabase() {
     
     // Read and execute the schema file
     const schemaPath = path.join(__dirname, 'database', 'migrations', 'schema.sql');
+    console.log('Schema path:', schemaPath);
+    
+    if (!fs.existsSync(schemaPath)) {
+      throw new Error(`Schema file not found at: ${schemaPath}`);
+    }
+    
     const schema = fs.readFileSync(schemaPath, 'utf8');
+    console.log('Schema file read, length:', schema.length);
     
     await pool.query(schema);
     

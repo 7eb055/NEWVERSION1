@@ -45,7 +45,7 @@ const pool = new Pool(
 
 // Test database connection (only in non-test environments)
 if (process.env.NODE_ENV !== 'test') {
-  pool.connect((err, client, release) => {
+  pool.connect(async (err, client, release) => {
     if (err) {
       console.error('Error connecting to database:', err);
       console.error('Database configuration:', {
@@ -62,8 +62,13 @@ if (process.env.NODE_ENV !== 'test') {
       
       // Initialize database schema if needed (Heroku deployment)
       if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
-        const { initializeDatabase } = require('./initDb');
-        initializeDatabase().catch(console.error);
+        try {
+          const { initializeDatabase } = require('./initDb');
+          await initializeDatabase();
+          console.log('✅ Database initialization completed');
+        } catch (error) {
+          console.error('❌ Database initialization failed:', error);
+        }
       }
     }
   });
