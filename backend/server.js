@@ -5013,5 +5013,42 @@ process.on('SIGINT', () => {
   });
 });
 
+// Debug endpoint to check database schema
+app.get('/debug/db', async (req, res) => {
+  try {
+    // Check users table structure
+    const usersColumns = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'users' 
+      ORDER BY ordinal_position
+    `);
+    
+    // Check if users table exists and has data
+    const userCount = await pool.query('SELECT COUNT(*) as count FROM users');
+    
+    // Get all tables
+    const allTables = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    res.json({
+      users_table: {
+        exists: usersColumns.rows.length > 0,
+        columns: usersColumns.rows,
+        count: parseInt(userCount.rows[0].count)
+      },
+      all_tables: allTables.rows.map(r => r.table_name)
+    });
+    
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Export app and pool for testing
 module.exports = { app, pool };
