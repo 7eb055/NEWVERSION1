@@ -24,7 +24,42 @@ async function initializeDatabase() {
     `);
 
     if (result.rows.length > 0) {
-      console.log('✅ Database tables already exist, skipping initialization');
+      console.log('✅ Database tables already exist, checking for missing columns...');
+      
+      // Check if users table has authentication columns and add them if missing
+      console.log('🔄 Checking for authentication columns in users table...');
+      
+      try {
+        // Check if password column exists
+        const passwordColumnCheck = await pool.query(`
+          SELECT column_name 
+          FROM information_schema.columns 
+          WHERE table_name = 'users' AND column_name = 'password'
+        `);
+        
+        if (passwordColumnCheck.rows.length === 0) {
+          console.log('📝 Adding missing authentication columns to users table...');
+          
+          // Add password column
+          await pool.query('ALTER TABLE users ADD COLUMN password character varying(255)');
+          console.log('✅ Added password column');
+          
+          // Add role column
+          await pool.query("ALTER TABLE users ADD COLUMN role character varying(50) DEFAULT 'attendee'");
+          console.log('✅ Added role column');
+          
+          // Add is_suspended column
+          await pool.query('ALTER TABLE users ADD COLUMN is_suspended boolean DEFAULT false');
+          console.log('✅ Added is_suspended column');
+          
+          console.log('✅ User authentication columns added successfully');
+        } else {
+          console.log('✅ User authentication columns already exist');
+        }
+      } catch (migrationError) {
+        console.error('⚠️ Migration warning:', migrationError.message);
+      }
+      
       return;
     }
 
