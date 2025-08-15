@@ -4641,6 +4641,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
     // Generate new verification token
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
 
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Update user with new token
     await pool.query(
