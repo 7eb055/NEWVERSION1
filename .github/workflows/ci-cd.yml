@@ -131,6 +131,8 @@ jobs:
         run: |
           cd eventfrontend
           npm run build
+        env:
+          VITE_API_URL: https://your-event-app-staging-1468a9eab8ec.herokuapp.com
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -178,6 +180,11 @@ jobs:
         with:
           name: frontend-build
           path: eventfrontend/dist
+          
+      - name: Copy staging build to backend
+        run: |
+          rm -rf backend/public
+          cp -r eventfrontend/dist backend/public
 
       - name: Setup Heroku CLI
         run: |
@@ -260,11 +267,29 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Download frontend build
-        uses: actions/download-artifact@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          name: frontend-build
-          path: eventfrontend/dist
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: eventfrontend/package-lock.json
+
+      - name: Install frontend dependencies
+        run: |
+          cd eventfrontend
+          npm ci
+
+      - name: Build frontend for production
+        run: |
+          cd eventfrontend
+          npm run build
+        env:
+          VITE_API_URL: https://your-event-app-production-1c49193922fb.herokuapp.com
+          
+      - name: Copy production build to backend
+        run: |
+          rm -rf backend/public
+          cp -r eventfrontend/dist backend/public
 
       - name: Setup Heroku CLI
         run: |
