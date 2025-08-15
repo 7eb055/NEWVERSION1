@@ -31,7 +31,7 @@ async function initializeDatabase() {
     console.log('📋 Database is empty, running schema migration...');
     
     // Read and execute the schema file
-    const schemaPath = path.join(__dirname, 'database', 'migrations', 'schema.sql');
+    const schemaPath = path.join(__dirname, 'database', 'migrations', 'heroku-schema.sql');
     console.log('Schema path:', schemaPath);
     
     if (!fs.existsSync(schemaPath)) {
