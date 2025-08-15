@@ -167,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -383,7 +383,7 @@ app.get('/api/debug/tables', async (req, res) => {
     console.log('🔍 Debug endpoint called - checking database records');
     
     // Check users table
-    const usersResult = await pool.query('SELECT user_id, email, role_type as role, created_at FROM users ORDER BY user_id LIMIT 10');
+    const usersResult = await pool.query('SELECT id as user_id, email, role, created_at FROM users ORDER BY user_id LIMIT 10');
     
     // Check attendees table
     const attendeesResult = await pool.query('SELECT attendee_id, user_id, full_name as name, phone, created_at FROM attendees ORDER BY attendee_id LIMIT 10');
@@ -486,7 +486,7 @@ app.get('/api/admin/users', authenticateToken, authorizeAdmin, async (req, res) 
     const { page = 1, limit = 10, search = '', role = '' } = req.query;
     const offset = (page - 1) * limit;
     
-    let query = 'SELECT user_id, email, role_type, is_email_verified, created_at, last_login FROM users';
+    let query = 'SELECT id as user_id, email, role_type, is_suspended, created_at, last_login FROM users';
     let countQuery = 'SELECT COUNT(*) FROM users';
     const params = [];
     const conditions = [];
@@ -600,7 +600,7 @@ app.get('/api/admin/logs', authenticateToken, authorizeAdmin, async (req, res) =
           level VARCHAR(20) NOT NULL,
           message TEXT NOT NULL,
           timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          user_id INTEGER
+          id INTEGER
         )
       `);
       
@@ -639,7 +639,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role_type = $1 WHERE user_id = $2',
+      'UPDATE users SET role_type = $1 WHERE id = $2',
       [role_type, userId]
     );
 
@@ -666,7 +666,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const { userId } = req.params;
 
     // Get user details before deletion for logging
-    const userResult = await pool.query('SELECT email FROM users WHERE user_id = $1', [userId]);
+    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -674,7 +674,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const userEmail = userResult.rows[0].email;
 
     // Delete user (this should cascade delete related records)
-    await pool.query('DELETE FROM users WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
     // Log this action
     try {
@@ -853,7 +853,7 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
     case 'delete':
       if (target === 'users') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-        await pool.query(`DELETE FROM users WHERE user_id IN (${placeholders})`, ids);
+        await pool.query(`DELETE FROM users WHERE id IN (${placeholders})`, ids);
         result.message = `Deleted ${ids.length} users`;
       } else if (target === 'events') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -873,7 +873,7 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
     case 'update_role':
       if (target === 'users' && data.role_type) {
         const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-        await pool.query(`UPDATE users SET role_type = $1 WHERE user_id IN (${placeholders})`, [data.role_type, ...ids]);
+        await pool.query(`UPDATE users SET role_type = $1 WHERE id IN (${placeholders})`, [data.role_type, ...ids]);
         result.message = `Updated role for ${ids.length} users`;
       }
       break;
@@ -936,7 +936,7 @@ app.put('/api/companies/:id', authenticateToken, async (req, res) => {
 
     // Get the user's organizer_id
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -985,7 +985,7 @@ app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
     
     // Get the user's organizer_id
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1209,7 +1209,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
 
     // Get attendee_id from the user, or create one if it doesn't exist
     const attendeeQuery = await client.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1217,7 +1217,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
     if (attendeeQuery.rows.length === 0) {
       // Get user info to create attendee record
       const userQuery = await client.query(
-        'SELECT email FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE id = $1',
         [req.user.user_id]
       );
       
@@ -1365,7 +1365,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1393,7 +1393,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
       // Check if user exists
       const userCheck = await client.query(
-        'SELECT user_id FROM users WHERE email = $1',
+        'SELECT id as user_id FROM users WHERE email = $1',
         [attendeeEmail]
       );
 
@@ -1424,7 +1424,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
         // User exists, get or create attendee profile
         userId = userCheck.rows[0].user_id;
         const attendeeCheck = await client.query(
-          'SELECT attendee_id FROM attendees WHERE user_id = $1',
+          'SELECT attendee_id FROM attendees WHERE id = $1',
           [userId]
         );
 
@@ -1548,7 +1548,7 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
   try {
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1599,7 +1599,7 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
   try {
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1739,7 +1739,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Check if user exists
     const userCheck = await client.query(
-      'SELECT user_id FROM users WHERE email = $1',
+      'SELECT id as user_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -1762,7 +1762,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Create or update attendee profile
     const attendeeCheck = await client.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [userId]
     );
 
@@ -1804,7 +1804,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
           social_media_links = $13,
           notification_preferences = $14,
           updated_at = NOW()
-        WHERE user_id = $1
+        WHERE id = $1
         RETURNING *`,
         [
           userId, full_name, phone, date_of_birth || null, gender,
@@ -1853,7 +1853,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
   try {
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -1927,7 +1927,7 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2019,7 +2019,7 @@ app.delete('/api/events/:eventId', authenticateToken, async (req, res) => {
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2058,7 +2058,7 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2097,7 +2097,7 @@ app.get('/api/events/:eventId/registrations-detailed', authenticateToken, async 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2195,7 +2195,7 @@ app.get('/api/events/:eventId/ticket-types', authenticateToken, async (req, res)
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2317,7 +2317,7 @@ app.post('/api/events/:eventId/ticket-types', authenticateToken, async (req, res
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2390,7 +2390,7 @@ app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, as
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2474,7 +2474,7 @@ app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken,
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2515,7 +2515,7 @@ app.get('/api/events/:eventId/ticket-sales', authenticateToken, async (req, res)
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2654,7 +2654,7 @@ app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken,
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2712,7 +2712,7 @@ app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2793,7 +2793,7 @@ app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2869,7 +2869,7 @@ app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -2962,7 +2962,7 @@ app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3020,7 +3020,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3107,7 +3107,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
       let attendeeId;
 
       const existingUserQuery = await client.query(
-        'SELECT user_id FROM users WHERE email = $1',
+        'SELECT id as user_id FROM users WHERE email = $1',
         [email]
       );
 
@@ -3117,7 +3117,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
         
         // Check if they're already an attendee
         const existingAttendeeQuery = await client.query(
-          'SELECT attendee_id FROM attendees WHERE user_id = $1',
+          'SELECT attendee_id FROM attendees WHERE id = $1',
           [userId]
         );
         
@@ -3139,7 +3139,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
         
         const newUserQuery = await client.query(`
-          INSERT INTO users (email, password, role_type, is_email_verified, created_at)
+          INSERT INTO users (email, password, role_type, is_suspended, created_at)
           VALUES ($1, $2, 'attendee', true, NOW())
           RETURNING user_id
         `, [email, hashedPassword]);
@@ -3331,7 +3331,7 @@ app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (r
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3496,7 +3496,7 @@ app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3577,7 +3577,7 @@ app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3652,7 +3652,7 @@ app.get('/api/events/:eventId/attendance/stats', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3708,7 +3708,7 @@ app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3768,7 +3768,7 @@ app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3862,7 +3862,7 @@ app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (r
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3919,7 +3919,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -3999,7 +3999,7 @@ app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -4136,7 +4136,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
           await pool.query(`
             CREATE TABLE IF NOT EXISTS notifications (
               notification_id SERIAL PRIMARY KEY,
-              user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+              id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
               title VARCHAR(255) NOT NULL,
               message TEXT NOT NULL,
               type VARCHAR(50) DEFAULT 'system',
@@ -4187,7 +4187,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
 
     // Get unread count
     const unreadCountResult = await pool.query(
-      'SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = $1 AND read = FALSE AND is_deleted = FALSE',
+      'SELECT COUNT(*) as unread_count FROM notifications WHERE id = $1 AND read = FALSE AND is_deleted = FALSE',
       [req.user.user_id]
     );
 
@@ -4229,10 +4229,10 @@ app.get('/api/notifications/stats', authenticateToken, async (req, res) => {
       FROM (
         SELECT type, COUNT(*) as type_count
         FROM notifications 
-        WHERE user_id = $1 AND is_deleted = FALSE
+        WHERE id = $1 AND is_deleted = FALSE
         GROUP BY type
       ) as type_stats,
-      (SELECT COUNT(*) as total_count FROM notifications WHERE user_id = $1 AND is_deleted = FALSE) as total_stats
+      (SELECT COUNT(*) as total_count FROM notifications WHERE id = $1 AND is_deleted = FALSE) as total_stats
     `, [req.user.user_id]);
 
     res.json(statsQuery.rows[0]);
@@ -4267,7 +4267,7 @@ app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
 app.post('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND read = FALSE RETURNING notification_id',
+      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND read = FALSE RETURNING notification_id',
       [req.user.user_id]
     );
 
@@ -4318,7 +4318,7 @@ app.post('/api/notifications', authenticateToken, async (req, res) => {
 
     // Only allow admins to create notifications for other users
     if (user_id && user_id !== req.user.user_id) {
-      const userRoleCheck = await pool.query('SELECT role_type FROM users WHERE user_id = $1', [req.user.user_id]);
+      const userRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.user_id]);
       if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role_type !== 'admin') {
         return res.status(403).json({ message: 'Only admins can create notifications for other users' });
       }
@@ -4358,8 +4358,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, password, role, is_active as account_status, created_at, 
-              COALESCE(is_suspended, false) as is_email_verified
+      `SELECT id as user_id, email, password, role, is_active as is_active, created_at, 
+              COALESCE(is_suspended, false) as is_suspended
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4372,7 +4372,7 @@ app.post('/api/auth/login', async (req, res) => {
     const userData = userQuery.rows[0];
 
     // Check if user account is suspended or inactive
-    if (userData.account_status === 'suspended' || userData.account_status === 'inactive') {
+    if (userData.is_active === 'suspended' || userData.is_active === 'inactive') {
       return res.status(401).json({ 
         message: 'Your account has been suspended. Please contact support.',
         isSuspended: true
@@ -4380,7 +4380,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     // Check if email is verified
-    if (!userData.is_email_verified) {
+    if (!userData.is_suspended) {
       return res.status(401).json({ 
         message: 'Please verify your email address before logging in. Check your email for a verification link.',
         emailNotVerified: true
@@ -4399,7 +4399,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Check if user is an attendee
     const attendeeData = await pool.query(
-      'SELECT full_name, phone FROM attendees WHERE user_id = $1',
+      'SELECT full_name, phone FROM attendees WHERE id = $1',
       [userData.user_id]
     );
 
@@ -4413,7 +4413,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Check if user is an organizer
     const organizerData = await pool.query(
-      'SELECT organizer_id, organizer_name as name, phone, company FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id, organizer_name as name, phone, company FROM organizers WHERE id = $1',
       [userData.user_id]
     );
 
@@ -4541,8 +4541,8 @@ app.post('/api/auth/register', async (req, res) => {
         primary_role: newUser.role,
         roles: [],
         created_at: newUser.created_at,
-        is_email_verified: false,
-        account_status: 'pending'
+        is_suspended: false,
+        is_active: 'pending'
       },
       requiresEmailVerification: true
     });
@@ -4564,7 +4564,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
     // Find user with this verification token
     const userQuery = await pool.query(
-      `SELECT user_id, email, email_verification_expires, is_email_verified 
+      `SELECT id as user_id, email, email_verification_expires, is_suspended 
        FROM users 
        WHERE email_verification_token = $1`,
       [token]
@@ -4577,7 +4577,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
     const user = userQuery.rows[0];
 
     // Check if email is already verified
-    if (user.is_email_verified) {
+    if (user.is_suspended) {
       return res.status(200).json({ message: 'Email already verified' });
     }
 
@@ -4592,12 +4592,12 @@ app.post('/api/auth/verify-email', async (req, res) => {
     // Update user as verified
     await pool.query(
       `UPDATE users 
-       SET is_email_verified = true, 
+       SET is_suspended = true, 
            email_verified_at = NOW(), 
-           account_status = 'active',
+           is_active = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE user_id = $1`,
+       WHERE id = $1`,
       [user.user_id]
     );
 
@@ -4623,7 +4623,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
     // Find user by email
     const userQuery = await pool.query(
-      'SELECT user_id, email, is_email_verified FROM users WHERE email = $1',
+      'SELECT id as user_id, email, is_suspended FROM users WHERE email = $1',
       [email]
     );
 
@@ -4634,7 +4634,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
     const user = userQuery.rows[0];
 
     // Check if email is already verified
-    if (user.is_email_verified) {
+    if (user.is_suspended) {
       return res.status(400).json({ message: 'Email is already verified' });
     }
 
@@ -4647,7 +4647,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       `UPDATE users 
        SET email_verification_token = $1, 
            email_verification_expires = $2
-       WHERE user_id = $3`,
+       WHERE id = $3`,
       [emailVerificationToken, emailVerificationExpires, user.user_id]
     );
 
@@ -4681,7 +4681,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
-      'SELECT user_id, email, role_type, is_email_verified, created_at, last_login FROM users WHERE user_id = $1',
+      'SELECT id as user_id, email, role_type, is_suspended, created_at, last_login FROM users WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -4945,7 +4945,7 @@ app.get('/api/events/:eventId/my-agenda', authenticateToken, async (req, res) =>
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -5007,7 +5007,7 @@ app.post('/api/events/:eventId/agenda/add', authenticateToken, async (req, res) 
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -5051,7 +5051,7 @@ app.delete('/api/events/:eventId/agenda/:sessionId', authenticateToken, async (r
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -5092,14 +5092,14 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
   try {
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id, full_name FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id, full_name FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
     if (attendeeQuery.rows.length === 0) {
       // If user is not in attendees table, create a basic entry
       const userQuery = await pool.query(
-        'SELECT email FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE id = $1',
         [req.user.user_id]
       );
       
@@ -5173,7 +5173,7 @@ app.get('/api/events/:eventId/networking', authenticateToken, async (req, res) =
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE user_id = $1',
+      'SELECT attendee_id FROM attendees WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -5441,3 +5441,5 @@ app.get('/debug/db', async (req, res) => {
 
 // Export app and pool for testing
 module.exports = { app, pool };
+
+
