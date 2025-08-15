@@ -5,7 +5,10 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
-    this.transporter = this.createTransporter();
+    // Skip transporter creation in test environment
+    if (process.env.NODE_ENV !== 'test') {
+      this.transporter = this.createTransporter();
+    }
     this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   }
 
@@ -25,6 +28,10 @@ class EmailService {
 
   // Test email configuration
   async testConnection() {
+    if (process.env.NODE_ENV === 'test') {
+      return true;
+    }
+    
     try {
       await this.transporter.verify();
       console.log('✅ Email service is ready');
@@ -596,6 +603,16 @@ Event Management System Team
 
   // Generic email sending method with error handling and retry logic
   async sendEmail(mailOptions, emailType = 'general', retryCount = 0) {
+    // In test environment, simulate successful email sending
+    if (process.env.NODE_ENV === 'test') {
+      console.log(`📧 [TEST MODE] Simulating ${emailType} email to: ${mailOptions.to}`);
+      return {
+        success: true,
+        messageId: 'test-message-id',
+        response: 'Test email simulated successfully'
+      };
+    }
+    
     const maxRetries = 3;
     
     try {

@@ -22,28 +22,51 @@ const { upload, handleMulterError } = require('./middleware/upload');
 const EmailService = require('./services/EmailService');
 // const NotificationScheduler = require('./services/NotificationScheduler'); // Disabled
 
-// Initialize email service
-const emailService = new EmailService();
+// Initialize email service (skip in test environment)
+let emailService;
+if (process.env.NODE_ENV !== 'test') {
+  emailService = new EmailService();
+} else {
+  // Mock email service for testing
+  emailService = {
+    sendVerificationEmail: async () => ({ success: true, messageId: 'test' }),
+    sendPasswordResetEmail: async () => ({ success: true, messageId: 'test' }),
+    testConnection: async () => true
+  };
+}
 
 const app = express();
 const PORT = process.env.PORT || 5001;
 
 // Database connection
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-    : {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-);
+let pool;
+if (process.env.NODE_ENV === 'test') {
+  // Mock database pool for testing
+  pool = {
+    query: async () => ({ rows: [] }),
+    connect: async (callback) => {
+      if (callback) callback(null, { query: async () => ({ rows: [] }), release: () => {} }, () => {});
+      return { query: async () => ({ rows: [] }), release: () => {} };
+    },
+    end: async () => {}
+  };
+} else {
+  pool = new Pool(
+    process.env.DATABASE_URL
+      ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
+      }
+      : {
+        host: process.env.DB_HOST || 'localhost',
+        port: process.env.DB_PORT || 5432,
+        database: process.env.DB_NAME,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
+      }
+  );
+}
 
 // Initialize notification scheduler - DISABLED
 // const notificationScheduler = new NotificationScheduler();
