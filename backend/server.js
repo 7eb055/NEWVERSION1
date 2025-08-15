@@ -5015,3 +5015,5 @@ process.on('SIGINT', () => {
 
 // Export app and pool for testing
 module.exports = { app, pool };
+c o n s o l e . l o g ( ' F o r c e   r e d e p l o y   t o   t e s t   D B   m i g r a t i o n ' ) ;  
+ 
