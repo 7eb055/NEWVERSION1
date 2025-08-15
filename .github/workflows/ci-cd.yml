@@ -215,8 +215,18 @@ jobs:
 
       - name: Deploy to Heroku with Docker
         run: |
+          # Configure Git identity
+          git config --global user.email "github-actions@example.com"
+          git config --global user.name "GitHub Actions"
+          
+          # Create Heroku app (ignore if exists)
+          heroku create your-event-app-staging || echo "App already exists"
+          
           # Set Heroku stack to container
           heroku stack:set container -a your-event-app-staging || echo "Stack already set to container"
+          
+          # Add Heroku git remote
+          heroku git:remote -a your-event-app-staging
           
           # Deploy using git push (heroku.yml will handle Docker build)
           git push heroku main --force
