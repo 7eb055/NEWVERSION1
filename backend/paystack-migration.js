@@ -1,6 +1,4 @@
 const { Pool } = require('pg');
-const fs = require('fs');
-const path = require('path');
 require('dotenv').config();
 
 // Database configuration from environment variables

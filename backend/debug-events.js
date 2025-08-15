@@ -16,7 +16,7 @@ async function testSimpleQuery() {
     // Let's try a direct test query
     try {
       console.log('\nTrying admin login to test database connection...');
-      const loginResponse = await axios.post('http://localhost:5000/api/auth/login', {
+      await axios.post('http://localhost:5000/api/auth/login', {
         email: 'admin@eventsystem.com',
         password: 'AdminEventSystem2025!'
       });

@@ -46,7 +46,7 @@ async function testManualRegistration() {
 }
 
 // Uncomment to run test (make sure to provide valid event ID and token)
-// testManualRegistration();
+testManualRegistration();
 
 console.log('Manual registration test script ready');
 console.log('Update eventId and token variables, then uncomment the function call to test');

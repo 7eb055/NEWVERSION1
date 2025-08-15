@@ -102,15 +102,6 @@ const createFeedbackTable = async () => {
       const sampleAttendee = await pool.query(sampleAttendeeQuery);
       
       if (sampleEvent.rows.length > 0 && sampleAttendee.rows.length > 0) {
-        const insertSampleDataQuery = `
-          INSERT INTO eventfeedback (event_id, attendee_id, rating, feedback_text, is_anonymous)
-          VALUES 
-            ($1, $2, 5, 'Amazing event! Great organization and fantastic speakers. Would definitely attend again!', FALSE),
-            ($1, $2, 4, 'Really enjoyed the event. Good content and well organized.', TRUE)
-          ON CONFLICT (event_id, attendee_id) DO NOTHING
-          RETURNING feedback_id;
-        `;
-        
         // For sample data, we'll use different attendee IDs if available
         const allAttendeesQuery = 'SELECT attendee_id FROM attendees ORDER BY attendee_id LIMIT 3';
         const allAttendees = await pool.query(allAttendeesQuery);
