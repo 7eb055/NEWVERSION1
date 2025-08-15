@@ -146,7 +146,7 @@ class DatabaseService {
       const { fullName, phone } = attendeeData;
 
       const result = await dbClient.query(
-        `INSERT INTO Attendees (user_id, full_name, phone) 
+        `INSERT INTO attendees (user_id, full_name, phone) 
          VALUES ($1, $2, $3) 
          RETURNING attendee_id, full_name, phone`,
         [userId, fullName, phone]

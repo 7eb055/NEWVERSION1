@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 require('dotenv').config();
 
 // Import routes
@@ -18,10 +19,14 @@ const paymentRoutes = require('./routes/payments');
 const { upload, handleMulterError } = require('./middleware/upload');
 
 // Import services
+const EmailService = require('./services/EmailService');
 // const NotificationScheduler = require('./services/NotificationScheduler'); // Disabled
 
+// Initialize email service
+const emailService = new EmailService();
+
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // Database connection
 const pool = new Pool(
@@ -200,6 +205,65 @@ app.get('/health', async (req, res) => {
       },
       environment: process.env.NODE_ENV,
       deploymentVersion: '2025-08-15-table-fix-v2'
+    });
+  }
+});
+
+// Temporary debug endpoint to check database records
+app.get('/api/debug/tables', async (req, res) => {
+  try {
+    console.log('🔍 Debug endpoint called - checking database records');
+    
+    // Check users table
+    const usersResult = await pool.query('SELECT user_id, email, role_type as role, created_at FROM users ORDER BY user_id LIMIT 10');
+    
+    // Check attendees table
+    const attendeesResult = await pool.query('SELECT attendee_id, user_id, full_name as name, phone, created_at FROM attendees ORDER BY attendee_id LIMIT 10');
+    
+    // Check organizers table
+    const organizersResult = await pool.query('SELECT organizer_id, organizer_name as name, email, company, created_at FROM organizers ORDER BY organizer_id LIMIT 10');
+    
+    // Check table schemas
+    const usersSchema = await pool.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `);
+    
+    const organizersSchema = await pool.query(`
+      SELECT column_name, data_type, is_nullable 
+      FROM information_schema.columns 
+      WHERE table_name = 'organizers' AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `);
+    
+    res.json({
+      message: 'Database debug information',
+      timestamp: new Date().toISOString(),
+      tables: {
+        users: {
+          count: usersResult.rows.length,
+          records: usersResult.rows,
+          schema: usersSchema.rows
+        },
+        attendees: {
+          count: attendeesResult.rows.length,
+          records: attendeesResult.rows
+        },
+        organizers: {
+          count: organizersResult.rows.length,
+          records: organizersResult.rows,
+          schema: organizersSchema.rows
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Debug endpoint error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch debug information',
+      message: error.message,
+      timestamp: new Date().toISOString()
     });
   }
 });
@@ -808,19 +872,19 @@ app.get('/api/events', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const eventsQuery = await pool.query(`
-      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
-             e.price as ticket_price, e.capacity as max_attendees, 
+      SELECT e.event_id as event_id, e.event_name as event_name, e.event_date as event_date, 
+             e.ticket_price as ticket_price, e.max_attendees as max_attendees, 
              e.status, e.created_at,
-             e.image_url as image_url, e.description, e.location as venue_name, 
-             e.location as venue_address, e.event_type as category,
-             o.name as organizer_name, o.company as company_name,
-             COUNT(r.id) as registration_count
+             e.image_url as image_url, e.description, e.venue_name as venue_name, 
+             e.venue_address as venue_address, e.event_type as category,
+             o.organizer_name as organizer_name, o.company as company_name,
+             COUNT(r.registration_id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.id
-      LEFT JOIN registrations r ON e.id = r.event_id
+      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
+      LEFT JOIN eventregistrations r ON e.event_id = r.event_id
       WHERE e.status = $1
-      GROUP BY e.id, o.name, o.company
-      ORDER BY e.date ASC
+      GROUP BY e.event_id, o.organizer_name, o.company
+      ORDER BY e.event_date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 
@@ -837,18 +901,18 @@ app.get('/api/events/:eventId/details', async (req, res) => {
     const { eventId } = req.params;
 
     const eventQuery = await pool.query(`
-      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
-             e.price as ticket_price, e.capacity as max_attendees, 
+      SELECT e.event_id as event_id, e.event_name as event_name, e.event_date as event_date, 
+             e.ticket_price as ticket_price, e.max_attendees as max_attendees, 
              e.status, e.created_at,
-             e.image_url as image_url, e.description, e.location as venue_name, 
-             e.location as venue_address, e.event_type as category,
-             o.name as organizer_name, o.company as company_name, o.phone as organizer_phone,
-             COUNT(r.id) as registration_count
+             e.image_url as image_url, e.description, e.venue_name as venue_name, 
+             e.venue_address as venue_address, e.event_type as category,
+             o.organizer_name as organizer_name, o.company as company_name, o.phone as organizer_phone,
+             COUNT(r.registration_id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.id
-      LEFT JOIN registrations r ON e.id = r.event_id
-      WHERE e.id = $1
-      GROUP BY e.id, o.name, o.company, o.phone
+      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
+      LEFT JOIN eventregistrations r ON e.event_id = r.event_id
+      WHERE e.event_id = $1
+      GROUP BY e.event_id, o.organizer_name, o.company, o.phone
     `, [eventId]);
 
     if (eventQuery.rows.length === 0) {
@@ -1845,7 +1909,7 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
     }
 
     const registrationsResult = await pool.query(
-      'SELECT r.*, u.email, u.username FROM registrations r LEFT JOIN users u ON r.user_id = u.user_id WHERE r.event_id = $1',
+      'SELECT r.*, u.email FROM eventregistrations r LEFT JOIN attendees a ON r.attendee_id = a.attendee_id LEFT JOIN users u ON a.user_id = u.user_id WHERE r.event_id = $1',
       [eventId]
     );
 
@@ -4124,7 +4188,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, password, role, is_suspended, created_at
+      `SELECT user_id, email, password, role_type as role, account_status, created_at, is_email_verified
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4136,11 +4200,19 @@ app.post('/api/auth/login', async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Check if user is suspended
-    if (userData.is_suspended) {
+    // Check if user account is suspended or inactive
+    if (userData.account_status === 'suspended' || userData.account_status === 'inactive') {
       return res.status(401).json({ 
         message: 'Your account has been suspended. Please contact support.',
         isSuspended: true
+      });
+    }
+
+    // Check if email is verified
+    if (!userData.is_email_verified) {
+      return res.status(401).json({ 
+        message: 'Please verify your email address before logging in. Check your email for a verification link.',
+        emailNotVerified: true
       });
     }
 
@@ -4156,21 +4228,21 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Check if user is an attendee
     const attendeeData = await pool.query(
-      'SELECT name, phone FROM attendees WHERE user_id = $1',
+      'SELECT full_name, phone FROM attendees WHERE user_id = $1',
       [userData.user_id]
     );
 
     if (attendeeData.rows.length > 0) {
       roles.push({
         role: 'attendee',
-        full_name: attendeeData.rows[0].name,
+        full_name: attendeeData.rows[0].full_name,
         phone: attendeeData.rows[0].phone
       });
     }
 
     // Check if user is an organizer
     const organizerData = await pool.query(
-      'SELECT id as organizer_id, name, phone, company FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id, organizer_name as name, phone, company FROM organizers WHERE user_id = $1',
       [userData.user_id]
     );
 
@@ -4241,7 +4313,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4249,13 +4321,35 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Create user with email verification fields
     const userResult = await pool.query(
-      'INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING id as user_id, email, role, created_at',
-      [email.split('@')[0], email, hashedPassword, role_type || 'attendee'] // Use email prefix as name
+      `INSERT INTO users (
+        email, password, role_type, 
+        email_verification_token, email_verification_expires,
+        account_status
+      ) VALUES ($1, $2, $3, $4, $5, $6) 
+      RETURNING user_id, email, role_type as role, created_at`,
+      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires, 'pending']
     );
 
     const newUser = userResult.rows[0];
+
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail(
+        email, 
+        emailVerificationToken, 
+        email.split('@')[0] // Use email prefix as username
+      );
+      console.log('✅ Verification email sent to:', email);
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      // Don't fail registration if email fails, but log the error
+    }
 
     // Generate JWT token
     const token = jwt.sign(
@@ -4269,7 +4363,7 @@ app.post('/api/auth/register', async (req, res) => {
     );
 
     res.status(201).json({
-      message: 'User registered successfully',
+      message: 'User registered successfully. Please check your email to verify your account.',
       token,
       user: {
         user_id: newUser.user_id,
@@ -4277,12 +4371,139 @@ app.post('/api/auth/register', async (req, res) => {
         role: newUser.role,
         primary_role: newUser.role,
         roles: [],
-        created_at: newUser.created_at
-      }
+        created_at: newUser.created_at,
+        is_email_verified: false,
+        account_status: 'pending'
+      },
+      requiresEmailVerification: true
     });
 
   } catch (error) {
     console.error('Registration error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Email verification endpoint
+app.post('/api/auth/verify-email', async (req, res) => {
+  try {
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: 'Verification token is required' });
+    }
+
+    // Find user with this verification token
+    const userQuery = await pool.query(
+      `SELECT user_id, email, email_verification_expires, is_email_verified 
+       FROM users 
+       WHERE email_verification_token = $1`,
+      [token]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(400).json({ message: 'Invalid or expired verification token' });
+    }
+
+    const user = userQuery.rows[0];
+
+    // Check if email is already verified
+    if (user.is_email_verified) {
+      return res.status(200).json({ message: 'Email already verified' });
+    }
+
+    // Check if token has expired
+    if (new Date() > new Date(user.email_verification_expires)) {
+      return res.status(400).json({ 
+        message: 'Verification token has expired. Please request a new verification email.',
+        expired: true
+      });
+    }
+
+    // Update user as verified
+    await pool.query(
+      `UPDATE users 
+       SET is_email_verified = true, 
+           email_verified_at = NOW(), 
+           account_status = 'active',
+           email_verification_token = NULL,
+           email_verification_expires = NULL
+       WHERE user_id = $1`,
+      [user.user_id]
+    );
+
+    res.json({ 
+      message: 'Email verified successfully! Your account is now active.',
+      verified: true
+    });
+
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Resend verification email endpoint
+app.post('/api/auth/resend-verification', async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    // Find user by email
+    const userQuery = await pool.query(
+      'SELECT user_id, email, is_email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (userQuery.rows.length === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const user = userQuery.rows[0];
+
+    // Check if email is already verified
+    if (user.is_email_verified) {
+      return res.status(400).json({ message: 'Email is already verified' });
+    }
+
+    // Generate new verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new token
+    await pool.query(
+      `UPDATE users 
+       SET email_verification_token = $1, 
+           email_verification_expires = $2
+       WHERE user_id = $3`,
+      [emailVerificationToken, emailVerificationExpires, user.user_id]
+    );
+
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail(
+        email, 
+        emailVerificationToken, 
+        email.split('@')[0]
+      );
+      
+      res.json({ 
+        message: 'Verification email sent successfully. Please check your email.',
+        sent: true
+      });
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      res.status(500).json({ 
+        message: 'Failed to send verification email. Please try again later.',
+        error: emailError.message
+      });
+    }
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

@@ -182,7 +182,7 @@ class AuthService {
 
     if (role === 'attendee') {
       await client.query(
-        `INSERT INTO Attendees (user_id, full_name, phone) 
+        `INSERT INTO attendees (user_id, full_name, phone) 
          VALUES ($1, $2, $3)`,
         [userId, username, phone]
       );

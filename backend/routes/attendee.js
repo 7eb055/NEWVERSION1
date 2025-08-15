@@ -80,7 +80,7 @@ router.get('/profile', authenticateToken, async (req, res) => {
       // Auto-create attendee profile if it doesn't exist
       console.log('Creating new attendee profile for user:', req.user.user_id);
       const newAttendeeResult = await pool.query(
-        'INSERT INTO attendees (user_id, full_name) VALUES ($1, $2) RETURNING attendee_id, full_name, phone, date_of_birth, gender, interests, emergency_contact_name, emergency_contact_phone, dietary_restrictions, accessibility_needs, profile_picture_url, bio, social_media_links, notification_preferences, created_at, updated_at',
+        'INSERT INTO attendees (user_id, full_name) VALUES ($1, $2) RETURNING *',
         [req.user.user_id, userData.email.split('@')[0]]
       );
       attendeeData = newAttendeeResult.rows[0];
@@ -289,8 +289,8 @@ router.get('/notifications', authenticateToken, async (req, res) => {
       }
       
       const newAttendeeResult = await pool.query(
-        'INSERT INTO attendees (user_id, email, first_name) VALUES ($1, $2, $3) RETURNING attendee_id',
-        [userId, userResult.rows[0].email, 'Attendee']
+        'INSERT INTO attendees (user_id, full_name) VALUES ($1, $2) RETURNING attendee_id',
+        [userId, userResult.rows[0].email.split('@')[0] || 'Attendee']
       );
       attendeeId = newAttendeeResult.rows[0].attendee_id;
       console.log(`Auto-created attendee ID: ${attendeeId}`);
@@ -731,14 +731,12 @@ router.post('/events/:eventId/purchase', authenticateToken, async (req, res) => 
     if (attendeeResult.rows.length === 0) {
       // Create attendee profile if doesn't exist
       const userResult = await client.query(
-        'SELECT email, username, first_name, last_name FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE user_id = $1',
         [userId]
       );
       
       const user = userResult.rows[0];
-      const fullName = user.first_name && user.last_name 
-        ? `${user.first_name} ${user.last_name}` 
-        : user.username;
+      const fullName = user.email.split('@')[0] || 'Attendee';
       
       const newAttendeeResult = await client.query(
         `INSERT INTO attendees (user_id, full_name) 
@@ -1162,20 +1160,12 @@ router.put('/profile', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
     const { 
-      first_name, last_name, phone, date_of_birth, gender,
+      full_name, phone, date_of_birth, gender,
       interests, dietary_restrictions, accessibility_needs,
       notification_preferences
     } = req.body;
     
     await client.query('BEGIN');
-    
-    // Update user table
-    await client.query(
-      `UPDATE users
-       SET first_name = $1, last_name = $2, updated_at = CURRENT_TIMESTAMP
-       WHERE user_id = $3`,
-      [first_name, last_name, userId]
-    );
     
     // Check if attendee profile exists
     const attendeeResult = await client.query(
@@ -1192,7 +1182,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId, 
-          `${first_name} ${last_name}`,
+          full_name,
           phone,
           date_of_birth,
           gender,
@@ -1300,7 +1290,7 @@ router.post('/purchase-ticket', authenticateToken, async (req, res) => {
     if (attendeeResult.rows.length === 0) {
       // Create attendee profile if doesn't exist
       const userQuery = `
-        SELECT email, first_name, last_name FROM users WHERE user_id = $1
+        SELECT email FROM users WHERE user_id = $1
       `;
       
       const userResult = await client.query(userQuery, [userId]);
@@ -1407,7 +1397,7 @@ router.get('/tickets', authenticateToken, async (req, res) => {
       console.log('No attendee profile found, creating one...');
       // Create attendee profile if doesn't exist
       const userResult = await pool.query(
-        'SELECT email, username, first_name, last_name FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE user_id = $1',
         [userId]
       );
       
@@ -1416,9 +1406,7 @@ router.get('/tickets', authenticateToken, async (req, res) => {
       }
       
       const user = userResult.rows[0];
-      const fullName = user.first_name && user.last_name 
-        ? `${user.first_name} ${user.last_name}` 
-        : user.username;
+      const fullName = user.email.split('@')[0] || 'Attendee';
       
       const newAttendeeResult = await pool.query(
         `INSERT INTO attendees (user_id, full_name) 
