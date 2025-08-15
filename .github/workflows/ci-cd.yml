@@ -213,27 +213,12 @@ jobs:
           # Test authentication
           heroku auth:whoami
 
-      - name: Deploy to Heroku Staging
+      - name: Deploy to Heroku with Docker
         run: |
-          # Configure Git identity
-          git config --global user.email "github-actions@example.com"
-          git config --global user.name "GitHub Actions"
-          git config --global init.defaultBranch main
+          # Set Heroku stack to container
+          heroku stack:set container -a your-event-app-staging || echo "Stack already set to container"
           
-          cd backend
-          
-          # Initialize git repository
-          git init
-          git add .
-          git commit -m "Deploy to staging"
-          
-          # Create Heroku app (ignore if exists)
-          heroku create your-event-app-staging || echo "App already exists"
-          
-          # Add Heroku git remote
-          heroku git:remote -a your-event-app-staging
-          
-          # Push to Heroku
+          # Deploy using git push (heroku.yml will handle Docker build)
           git push heroku main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
@@ -247,7 +232,8 @@ jobs:
           heroku config:set \
             JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
             PAYSTACK_SECRET_KEY="${{ secrets.STAGING_PAYSTACK_SECRET_KEY }}" \
-            NODE_ENV=staging \
+            NODE_ENV=production \
+            --app your-event-app-staging
             --app your-event-app-staging
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
