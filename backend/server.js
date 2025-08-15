@@ -167,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -182,151 +182,6 @@ const authorizeOrganizer = async (req, res, next) => {
     return res.status(500).json({ message: 'Internal server error' });
   }
 };
-
-// Debug endpoint to check actual database schema
-app.get('/api/debug/schema', async (req, res) => {
-  try {
-    // Check what tables exist
-    const tablesQuery = await pool.query(`
-      SELECT table_name 
-      FROM information_schema.tables 
-      WHERE table_schema = 'public'
-      ORDER BY table_name
-    `);
-    
-    // Check actual schema of critical tables
-    const organizersSchema = await pool.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'organizers' AND table_schema = 'public'
-      ORDER BY ordinal_position
-    `);
-    
-    const usersSchema = await pool.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'users' AND table_schema = 'public'
-      ORDER BY ordinal_position
-    `);
-    
-    const eventsSchema = await pool.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns 
-      WHERE table_name = 'events' AND table_schema = 'public'
-      ORDER BY ordinal_position
-    `);
-    
-    // Check if organizers table exists and what columns it has
-    const organizersExists = await pool.query(`
-      SELECT EXISTS (
-        SELECT FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name = 'organizers'
-      )
-    `);
-    
-    res.json({
-      tablesInDatabase: tablesQuery.rows.map(row => row.table_name),
-      organizersTableExists: organizersExists.rows[0].exists,
-      schemas: {
-        organizers: organizersSchema.rows,
-        users: usersSchema.rows,
-        events: eventsSchema.rows
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Schema debug error:', error);
-    res.status(500).json({
-      error: 'Failed to fetch schema information',
-      message: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
-
-// Emergency migration endpoint - USE WITH CAUTION
-app.post('/api/debug/migrate-schema', async (req, res) => {
-  try {
-    console.log('🔄 Running schema alignment migration...');
-    
-    // Add missing columns to organizers table
-    await pool.query(`
-      DO $$ 
-      BEGIN
-        -- Add organizer_id as alias for id
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'organizers' AND column_name = 'organizer_id') THEN
-          ALTER TABLE organizers ADD COLUMN organizer_id INTEGER;
-          UPDATE organizers SET organizer_id = id;
-        END IF;
-        
-        -- Add full_name as alias for name
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'organizers' AND column_name = 'full_name') THEN
-          ALTER TABLE organizers ADD COLUMN full_name VARCHAR(255);
-          UPDATE organizers SET full_name = name;
-        END IF;
-        
-        -- Add company_name as alias for company
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'organizers' AND column_name = 'company_name') THEN
-          ALTER TABLE organizers ADD COLUMN company_name VARCHAR(255);
-          UPDATE organizers SET company_name = company;
-        END IF;
-      END
-      $$;
-    `);
-    
-    // Add missing columns to events table
-    await pool.query(`
-      DO $$ 
-      BEGIN
-        -- Add event_id as alias for id
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'events' AND column_name = 'event_id') THEN
-          ALTER TABLE events ADD COLUMN event_id INTEGER;
-          UPDATE events SET event_id = id;
-        END IF;
-        
-        -- Add event_name as alias for name
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'events' AND column_name = 'event_name') THEN
-          ALTER TABLE events ADD COLUMN event_name VARCHAR(255);
-          UPDATE events SET event_name = name;
-        END IF;
-        
-        -- Add event_description as alias for description
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'events' AND column_name = 'event_description') THEN
-          ALTER TABLE events ADD COLUMN event_description TEXT;
-          UPDATE events SET event_description = description;
-        END IF;
-        
-        -- Add max_attendees if it doesn't exist
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
-                      WHERE table_name = 'events' AND column_name = 'max_attendees') THEN
-          ALTER TABLE events ADD COLUMN max_attendees INTEGER DEFAULT 100;
-        END IF;
-      END
-      $$;
-    `);
-    
-    console.log('✅ Schema alignment completed successfully!');
-    res.json({ 
-      message: 'Schema alignment completed successfully',
-      success: true,
-      timestamp: new Date().toISOString()
-    });
-    
-  } catch (error) {
-    console.error('❌ Schema alignment failed:', error);
-    res.status(500).json({ 
-      error: 'Schema alignment failed', 
-      details: error.message,
-      timestamp: new Date().toISOString()
-    });
-  }
-});
 
 // Basic Routes
 // Serve frontend for all non-API routes
@@ -383,13 +238,13 @@ app.get('/api/debug/tables', async (req, res) => {
     console.log('🔍 Debug endpoint called - checking database records');
     
     // Check users table
-    const usersResult = await pool.query('SELECT id as user_id, email, role, created_at FROM users ORDER BY user_id LIMIT 10');
+    const usersResult = await pool.query('SELECT user_id, email, role_type as role, created_at FROM users ORDER BY user_id LIMIT 10');
     
     // Check attendees table
     const attendeesResult = await pool.query('SELECT attendee_id, user_id, full_name as name, phone, created_at FROM attendees ORDER BY attendee_id LIMIT 10');
     
     // Check organizers table
-    const organizersResult = await pool.query('SELECT organizer_id, full_name as name, email, company_name as company, created_at FROM organizers ORDER BY organizer_id LIMIT 10');
+    const organizersResult = await pool.query('SELECT organizer_id, organizer_name as name, email, company, created_at FROM organizers ORDER BY organizer_id LIMIT 10');
     
     // Check table schemas
     const usersSchema = await pool.query(`
@@ -486,7 +341,7 @@ app.get('/api/admin/users', authenticateToken, authorizeAdmin, async (req, res) 
     const { page = 1, limit = 10, search = '', role = '' } = req.query;
     const offset = (page - 1) * limit;
     
-    let query = 'SELECT id as user_id, email, role_type, is_suspended, created_at, last_login FROM users';
+    let query = 'SELECT user_id, email, role_type, is_email_verified, created_at, last_login FROM users';
     let countQuery = 'SELECT COUNT(*) FROM users';
     const params = [];
     const conditions = [];
@@ -600,7 +455,7 @@ app.get('/api/admin/logs', authenticateToken, authorizeAdmin, async (req, res) =
           level VARCHAR(20) NOT NULL,
           message TEXT NOT NULL,
           timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-          id INTEGER
+          user_id INTEGER
         )
       `);
       
@@ -639,7 +494,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role_type = $1 WHERE id = $2',
+      'UPDATE users SET role = $1 WHERE id = $2',
       [role_type, userId]
     );
 
@@ -873,7 +728,7 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
     case 'update_role':
       if (target === 'users' && data.role_type) {
         const placeholders = ids.map((_, i) => `$${i + 2}`).join(',');
-        await pool.query(`UPDATE users SET role_type = $1 WHERE id IN (${placeholders})`, [data.role_type, ...ids]);
+        await pool.query(`UPDATE users SET role_type = $1 WHERE user_id IN (${placeholders})`, [data.role_type, ...ids]);
         result.message = `Updated role for ${ids.length} users`;
       }
       break;
@@ -936,7 +791,7 @@ app.put('/api/companies/:id', authenticateToken, async (req, res) => {
 
     // Get the user's organizer_id
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -985,7 +840,7 @@ app.delete('/api/companies/:id', authenticateToken, async (req, res) => {
     
     // Get the user's organizer_id
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1040,21 +895,19 @@ app.get('/api/events', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const eventsQuery = await pool.query(`
-      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
-             e.price as ticket_price, e.capacity as max_attendees, 
+      SELECT e.event_id as event_id, e.event_name as event_name, e.event_date as event_date, 
+             e.ticket_price as ticket_price, e.max_attendees as max_attendees, 
              e.status, e.created_at,
-             e.image_url as image_url, e.description, e.location as venue_name, 
-             e.venue_details as venue_address, e.event_type as category,
-             o.full_name as organizer_name, o.company_name as company_name,
-             COUNT(r.id) as registration_count
+             e.image_url as image_url, e.description, e.venue_name as venue_name, 
+             e.venue_address as venue_address, e.event_type as category,
+             o.organizer_name as organizer_name, o.company as company_name,
+             COUNT(r.registration_id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.id
-      LEFT JOIN registrations r ON e.id = r.event_id
+      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
+      LEFT JOIN eventregistrations r ON e.event_id = r.event_id
       WHERE e.status = $1
-      GROUP BY e.id, e.title, e.date, e.price, e.capacity, e.status, e.created_at, 
-               e.image_url, e.description, e.location, e.venue_details, e.event_type,
-               o.full_name, o.company_name
-      ORDER BY e.date ASC
+      GROUP BY e.event_id, o.organizer_name, o.company
+      ORDER BY e.event_date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 
@@ -1076,13 +929,13 @@ app.get('/api/events/:eventId/details', async (req, res) => {
              e.status, e.created_at,
              e.image_url as image_url, e.description, e.venue_name as venue_name, 
              e.venue_address as venue_address, e.event_type as category,
-             o.full_name as organizer_name, o.company_name as company_name, o.phone as organizer_phone,
+             o.organizer_name as organizer_name, o.company as company_name, o.phone as organizer_phone,
              COUNT(r.registration_id) as registration_count
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
       LEFT JOIN eventregistrations r ON e.event_id = r.event_id
       WHERE e.event_id = $1
-      GROUP BY e.event_id, o.full_name, o.company_name, o.phone
+      GROUP BY e.event_id, o.organizer_name, o.company, o.phone
     `, [eventId]);
 
     if (eventQuery.rows.length === 0) {
@@ -1209,7 +1062,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
 
     // Get attendee_id from the user, or create one if it doesn't exist
     const attendeeQuery = await client.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1365,7 +1218,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1424,7 +1277,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
         // User exists, get or create attendee profile
         userId = userCheck.rows[0].user_id;
         const attendeeCheck = await client.query(
-          'SELECT attendee_id FROM attendees WHERE id = $1',
+          'SELECT attendee_id FROM attendees WHERE user_id = $1',
           [userId]
         );
 
@@ -1548,7 +1401,7 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
   try {
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1567,7 +1420,7 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
              e.venue_name, e.venue_address, e.description as event_description,
              e.image_url as event_image,
              tt.type_name as ticket_type_name, tt.price as ticket_price,
-             o.full_name as organizer_name, o.company_name as company_name,
+             o.full_name as organizer_name, o.company as company_name,
              CASE 
                WHEN al.check_in_time IS NOT NULL THEN true 
                ELSE false 
@@ -1599,7 +1452,7 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
   try {
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1762,7 +1615,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Create or update attendee profile
     const attendeeCheck = await client.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [userId]
     );
 
@@ -1804,7 +1657,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
           social_media_links = $13,
           notification_preferences = $14,
           updated_at = NOW()
-        WHERE id = $1
+        WHERE user_id = $1
         RETURNING *`,
         [
           userId, full_name, phone, date_of_birth || null, gender,
@@ -1853,7 +1706,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
   try {
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1927,7 +1780,7 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2019,7 +1872,7 @@ app.delete('/api/events/:eventId', authenticateToken, async (req, res) => {
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2058,7 +1911,7 @@ app.get('/api/events/:eventId/registrations', authenticateToken, async (req, res
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2097,7 +1950,7 @@ app.get('/api/events/:eventId/registrations-detailed', authenticateToken, async 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2195,7 +2048,7 @@ app.get('/api/events/:eventId/ticket-types', authenticateToken, async (req, res)
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2317,7 +2170,7 @@ app.post('/api/events/:eventId/ticket-types', authenticateToken, async (req, res
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2390,7 +2243,7 @@ app.put('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken, as
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2474,7 +2327,7 @@ app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken,
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2515,7 +2368,7 @@ app.get('/api/events/:eventId/ticket-sales', authenticateToken, async (req, res)
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2654,7 +2507,7 @@ app.delete('/api/events/:eventId/ticket-types/:ticketTypeId', authenticateToken,
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2712,7 +2565,7 @@ app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2793,7 +2646,7 @@ app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2869,7 +2722,7 @@ app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -2962,7 +2815,7 @@ app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3020,7 +2873,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3117,7 +2970,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
         
         // Check if they're already an attendee
         const existingAttendeeQuery = await client.query(
-          'SELECT attendee_id FROM attendees WHERE id = $1',
+          'SELECT attendee_id FROM attendees WHERE user_id = $1',
           [userId]
         );
         
@@ -3139,7 +2992,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
         const hashedPassword = await bcrypt.hash(randomPassword, 10);
         
         const newUserQuery = await client.query(`
-          INSERT INTO users (email, password, role_type, is_suspended, created_at)
+          INSERT INTO users (email, password, role_type, is_email_verified, created_at)
           VALUES ($1, $2, 'attendee', true, NOW())
           RETURNING user_id
         `, [email, hashedPassword]);
@@ -3331,7 +3184,7 @@ app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (r
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3496,7 +3349,7 @@ app.get('/api/events/:eventId/attendee-listing', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3577,7 +3430,7 @@ app.get('/api/events/:eventId/attendee-stats', authenticateToken, async (req, re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3652,7 +3505,7 @@ app.get('/api/events/:eventId/attendance/stats', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3708,7 +3561,7 @@ app.get('/api/events/:eventId/attendance/history', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3768,7 +3621,7 @@ app.post('/api/events/:eventId/attendance/checkin', authenticateToken, async (re
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3862,7 +3715,7 @@ app.post('/api/events/:eventId/attendance/checkout', authenticateToken, async (r
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3919,7 +3772,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -3999,7 +3852,7 @@ app.post('/api/events/:eventId/attendance/scan', authenticateToken, async (req, 
     
     // Get organizer_id from the user
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -4136,7 +3989,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
           await pool.query(`
             CREATE TABLE IF NOT EXISTS notifications (
               notification_id SERIAL PRIMARY KEY,
-              id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+              user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
               title VARCHAR(255) NOT NULL,
               message TEXT NOT NULL,
               type VARCHAR(50) DEFAULT 'system',
@@ -4187,7 +4040,7 @@ app.get('/api/notifications', authenticateToken, async (req, res) => {
 
     // Get unread count
     const unreadCountResult = await pool.query(
-      'SELECT COUNT(*) as unread_count FROM notifications WHERE id = $1 AND read = FALSE AND is_deleted = FALSE',
+      'SELECT COUNT(*) as unread_count FROM notifications WHERE user_id = $1 AND read = FALSE AND is_deleted = FALSE',
       [req.user.user_id]
     );
 
@@ -4229,10 +4082,10 @@ app.get('/api/notifications/stats', authenticateToken, async (req, res) => {
       FROM (
         SELECT type, COUNT(*) as type_count
         FROM notifications 
-        WHERE id = $1 AND is_deleted = FALSE
+        WHERE user_id = $1 AND is_deleted = FALSE
         GROUP BY type
       ) as type_stats,
-      (SELECT COUNT(*) as total_count FROM notifications WHERE id = $1 AND is_deleted = FALSE) as total_stats
+      (SELECT COUNT(*) as total_count FROM notifications WHERE user_id = $1 AND is_deleted = FALSE) as total_stats
     `, [req.user.user_id]);
 
     res.json(statsQuery.rows[0]);
@@ -4267,7 +4120,7 @@ app.post('/api/notifications/:id/read', authenticateToken, async (req, res) => {
 app.post('/api/notifications/mark-all-read', authenticateToken, async (req, res) => {
   try {
     const result = await pool.query(
-      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 AND read = FALSE RETURNING notification_id',
+      'UPDATE notifications SET read = TRUE, updated_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND read = FALSE RETURNING notification_id',
       [req.user.user_id]
     );
 
@@ -4319,7 +4172,7 @@ app.post('/api/notifications', authenticateToken, async (req, res) => {
     // Only allow admins to create notifications for other users
     if (user_id && user_id !== req.user.user_id) {
       const userRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.user_id]);
-      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role_type !== 'admin') {
+      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role !== 'admin') {
         return res.status(403).json({ message: 'Only admins can create notifications for other users' });
       }
     }
@@ -4358,8 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, password, role, is_active as is_active, created_at, 
-              COALESCE(is_suspended, false) as is_suspended
+      `SELECT id as user_id, email, password, role as role_type, is_suspended, created_at
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4371,19 +4223,11 @@ app.post('/api/auth/login', async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Check if user account is suspended or inactive
-    if (userData.is_active === 'suspended' || userData.is_active === 'inactive') {
+    // Check if user account is suspended
+    if (userData.is_suspended) {
       return res.status(401).json({ 
         message: 'Your account has been suspended. Please contact support.',
         isSuspended: true
-      });
-    }
-
-    // Check if email is verified
-    if (!userData.is_suspended) {
-      return res.status(401).json({ 
-        message: 'Please verify your email address before logging in. Check your email for a verification link.',
-        emailNotVerified: true
       });
     }
 
@@ -4395,36 +4239,44 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Get all roles for this user
     const roles = [];
-    const primaryRole = userData.role;
+    const primaryRole = userData.role_type;
 
-    // Check if user is an attendee
-    const attendeeData = await pool.query(
-      'SELECT full_name, phone FROM attendees WHERE id = $1',
-      [userData.user_id]
-    );
+    // Check if user is an attendee (table might not exist in production)
+    try {
+      const attendeeData = await pool.query(
+        'SELECT full_name, phone FROM attendees WHERE user_id = $1',
+        [userData.user_id]
+      );
 
-    if (attendeeData.rows.length > 0) {
-      roles.push({
-        role: 'attendee',
-        full_name: attendeeData.rows[0].full_name,
-        phone: attendeeData.rows[0].phone
-      });
+      if (attendeeData.rows.length > 0) {
+        roles.push({
+          role: 'attendee',
+          full_name: attendeeData.rows[0].full_name,
+          phone: attendeeData.rows[0].phone
+        });
+      }
+    } catch (error) {
+      console.log('Attendees table not found, skipping attendee role check');
     }
 
-    // Check if user is an organizer
-    const organizerData = await pool.query(
-      'SELECT organizer_id, organizer_name as name, phone, company FROM organizers WHERE id = $1',
-      [userData.user_id]
-    );
+    // Check if user is an organizer (table might not exist in production)
+    try {
+      const organizerData = await pool.query(
+        'SELECT organizer_id, organizer_name as name, phone, company FROM organizers WHERE user_id = $1',
+        [userData.user_id]
+      );
 
-    if (organizerData.rows.length > 0) {
-      roles.push({
-        role: 'organizer',
-        organizer_id: organizerData.rows[0].organizer_id,
-        full_name: organizerData.rows[0].name,
-        phone: organizerData.rows[0].phone,
-        company_name: organizerData.rows[0].company
-      });
+      if (organizerData.rows.length > 0) {
+        roles.push({
+          role: 'organizer',
+          organizer_id: organizerData.rows[0].organizer_id,
+          full_name: organizerData.rows[0].name,
+          phone: organizerData.rows[0].phone,
+          company_name: organizerData.rows[0].company
+        });
+      }
+    } catch (error) {
+      console.log('Organizers table not found, skipping organizer role check');
     }
 
     // Update last login (optional - we can skip this for now)
@@ -4492,47 +4344,30 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate email verification token
-    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-
-
-    // Create user with basic fields available in production schema
+    // Create user with basic fields (production schema compatibility)
     const userResult = await pool.query(
       `INSERT INTO users (
-        name, email, password, role
+        email, password, role, name
       ) VALUES ($1, $2, $3, $4) 
-      RETURNING id as user_id, email, role, created_at`,
-      [email.split('@')[0], email, hashedPassword, role_type || 'attendee']
+      RETURNING id as user_id, email, role as role_type, created_at`,
+      [email, hashedPassword, role_type || 'attendee', email.split('@')[0]]
     );
 
     const newUser = userResult.rows[0];
-
-    // Send verification email
-    try {
-      await emailService.sendVerificationEmail(
-        email, 
-        emailVerificationToken, 
-        email.split('@')[0] // Use email prefix as username
-      );
-      console.log('✅ Verification email sent to:', email);
-    } catch (emailError) {
-      console.error('❌ Failed to send verification email:', emailError);
-      // Don't fail registration if email fails, but log the error
-    }
 
     // Generate JWT token
     const token = jwt.sign(
       { 
         user_id: newUser.user_id, 
         email: newUser.email, 
-        role: newUser.role
+        role: newUser.role_type
       },
       JWT_SECRET,
       { expiresIn: '24h' }
     );
 
     res.status(201).json({
-      message: 'User registered successfully. Please check your email to verify your account.',
+      message: 'User registered successfully.',
       token,
       user: {
         user_id: newUser.user_id,
@@ -4541,8 +4376,8 @@ app.post('/api/auth/register', async (req, res) => {
         primary_role: newUser.role,
         roles: [],
         created_at: newUser.created_at,
-        is_suspended: false,
-        is_active: 'pending'
+        is_email_verified: false,
+        account_status: 'pending'
       },
       requiresEmailVerification: true
     });
@@ -4564,7 +4399,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
     // Find user with this verification token
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, email_verification_expires, is_suspended 
+      `SELECT user_id, email, email_verification_expires, is_email_verified 
        FROM users 
        WHERE email_verification_token = $1`,
       [token]
@@ -4577,7 +4412,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
     const user = userQuery.rows[0];
 
     // Check if email is already verified
-    if (user.is_suspended) {
+    if (user.is_email_verified) {
       return res.status(200).json({ message: 'Email already verified' });
     }
 
@@ -4592,12 +4427,12 @@ app.post('/api/auth/verify-email', async (req, res) => {
     // Update user as verified
     await pool.query(
       `UPDATE users 
-       SET is_suspended = true, 
+       SET is_email_verified = true, 
            email_verified_at = NOW(), 
-           is_active = 'active',
+           account_status = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE id = $1`,
+       WHERE user_id = $1`,
       [user.user_id]
     );
 
@@ -4623,7 +4458,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
     // Find user by email
     const userQuery = await pool.query(
-      'SELECT id as user_id, email, is_suspended FROM users WHERE email = $1',
+      'SELECT id as user_id, email FROM users WHERE email = $1',
       [email]
     );
 
@@ -4634,13 +4469,12 @@ app.post('/api/auth/resend-verification', async (req, res) => {
     const user = userQuery.rows[0];
 
     // Check if email is already verified
-    if (user.is_suspended) {
+    if (user.is_email_verified) {
       return res.status(400).json({ message: 'Email is already verified' });
     }
 
     // Generate new verification token
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
-
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Update user with new token
@@ -4648,7 +4482,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       `UPDATE users 
        SET email_verification_token = $1, 
            email_verification_expires = $2
-       WHERE id = $3`,
+       WHERE user_id = $3`,
       [emailVerificationToken, emailVerificationExpires, user.user_id]
     );
 
@@ -4682,7 +4516,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
-      'SELECT id as user_id, email, role_type, is_suspended, created_at, last_login FROM users WHERE id = $1',
+      'SELECT id as user_id, email, role as role_type, created_at FROM users WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -4946,7 +4780,7 @@ app.get('/api/events/:eventId/my-agenda', authenticateToken, async (req, res) =>
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -5008,7 +4842,7 @@ app.post('/api/events/:eventId/agenda/add', authenticateToken, async (req, res) 
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -5052,7 +4886,7 @@ app.delete('/api/events/:eventId/agenda/:sessionId', authenticateToken, async (r
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -5093,7 +4927,7 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
   try {
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id, full_name FROM attendees WHERE id = $1',
+      'SELECT attendee_id, full_name FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -5132,7 +4966,7 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
     const eventsQuery = await pool.query(`
       SELECT e.event_id, e.event_name, e.event_date, e.status,
              er.registration_date, er.ticket_quantity,
-             o.full_name as organizer_name, o.company_name as company_name
+             o.full_name as organizer_name, o.company as company_name
       FROM eventregistrations er
       JOIN events e ON er.event_id = e.event_id
       JOIN organizers o ON e.organizer_id = o.organizer_id
@@ -5174,7 +5008,7 @@ app.get('/api/events/:eventId/networking', authenticateToken, async (req, res) =
 
     // Get attendee_id from the user
     const attendeeQuery = await pool.query(
-      'SELECT attendee_id FROM attendees WHERE id = $1',
+      'SELECT attendee_id FROM attendees WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -5187,7 +5021,7 @@ app.get('/api/events/:eventId/networking', authenticateToken, async (req, res) =
     // Get other attendees registered for the same event
     const networkingQuery = await pool.query(`
       SELECT DISTINCT a.attendee_id, a.full_name, u.email,
-             o.company_name as company
+             o.company as company
       FROM eventregistrations er1
       JOIN eventregistrations er2 ON er1.event_id = er2.event_id
       JOIN attendees a ON er2.attendee_id = a.attendee_id
@@ -5442,5 +5276,3 @@ app.get('/debug/db', async (req, res) => {
 
 // Export app and pool for testing
 module.exports = { app, pool };
-
-
