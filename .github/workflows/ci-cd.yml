@@ -233,11 +233,16 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
+          # Add PostgreSQL add-on if not exists
+          heroku addons:create heroku-postgresql:essential-0 --app your-event-app-staging || echo "PostgreSQL add-on may already exist"
+          
+          # Set environment variables
           heroku config:set \
             DB_HOST="${{ secrets.STAGING_DB_HOST }}" \
             DB_USER="${{ secrets.STAGING_DB_USER }}" \
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
             DB_NAME="${{ secrets.STAGING_DB_NAME }}" \
+            DATABASE_URL="${{ secrets.STAGING_DATABASE_URL }}" \
             JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
             PAYSTACK_SECRET_KEY="${{ secrets.STAGING_PAYSTACK_SECRET_KEY }}" \
             NODE_ENV=staging \
@@ -320,11 +325,16 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
+          # Add PostgreSQL add-on if not exists
+          heroku addons:create heroku-postgresql:essential-0 --app your-event-app-production || echo "PostgreSQL add-on may already exist"
+          
+          # Set environment variables
           heroku config:set \
             DB_HOST="${{ secrets.PRODUCTION_DB_HOST }}" \
             DB_USER="${{ secrets.PRODUCTION_DB_USER }}" \
             DB_PASSWORD="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
             DB_NAME="${{ secrets.PRODUCTION_DB_NAME }}" \
+            DATABASE_URL="${{ secrets.PRODUCTION_DATABASE_URL }}" \
             JWT_SECRET="${{ secrets.PRODUCTION_JWT_SECRET }}" \
             PAYSTACK_SECRET_KEY="${{ secrets.PRODUCTION_PAYSTACK_SECRET_KEY }}" \
             NODE_ENV=production \

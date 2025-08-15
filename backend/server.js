@@ -28,14 +28,15 @@ const pool = new Pool(
   process.env.DATABASE_URL
     ? {
       connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
     }
     : {
-      host: process.env.DB_HOST,
-      port: process.env.DB_PORT,
+      host: process.env.DB_HOST || 'localhost',
+      port: process.env.DB_PORT || 5432,
       database: process.env.DB_NAME,
       user: process.env.DB_USER,
       password: process.env.DB_PASSWORD,
+      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
     }
 );
 
@@ -47,6 +48,14 @@ if (process.env.NODE_ENV !== 'test') {
   pool.connect((err, client, release) => {
     if (err) {
       console.error('Error connecting to database:', err);
+      console.error('Database configuration:', {
+        DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[NOT SET]',
+        DB_HOST: process.env.DB_HOST,
+        DB_PORT: process.env.DB_PORT,
+        DB_NAME: process.env.DB_NAME,
+        DB_USER: process.env.DB_USER,
+        NODE_ENV: process.env.NODE_ENV
+      });
     } else {
       console.log('✅ Connected to PostgreSQL database');
       release();
