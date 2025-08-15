@@ -809,17 +809,17 @@ app.get('/api/events', async (req, res) => {
 
     const eventsQuery = await pool.query(`
       SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
-             e.ticket_price, e.capacity as max_attendees, 
+             e.price as ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
-             e.image as image_url, e.description, e.venue as venue_name, 
+             e.image_url as image_url, e.description, e.location as venue_name, 
              e.location as venue_address, e.event_type as category,
-             o.name as organizer_name, o.company_name,
+             o.name as organizer_name, o.company as company_name,
              COUNT(r.id) as registration_count
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.id
       LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.status = $1
-      GROUP BY e.id, o.name, o.company_name
+      GROUP BY e.id, o.name, o.company
       ORDER BY e.date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
@@ -838,17 +838,17 @@ app.get('/api/events/:eventId/details', async (req, res) => {
 
     const eventQuery = await pool.query(`
       SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
-             e.ticket_price, e.capacity as max_attendees, 
+             e.price as ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
-             e.image as image_url, e.description, e.venue as venue_name, 
+             e.image_url as image_url, e.description, e.location as venue_name, 
              e.location as venue_address, e.event_type as category,
-             o.name as organizer_name, o.company_name, o.phone as organizer_phone,
+             o.name as organizer_name, o.company as company_name, o.phone as organizer_phone,
              COUNT(r.id) as registration_count
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.id
       LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.id = $1
-      GROUP BY e.id, o.name, o.company_name, o.phone
+      GROUP BY e.id, o.name, o.company, o.phone
     `, [eventId]);
 
     if (eventQuery.rows.length === 0) {
