@@ -476,6 +476,38 @@ CREATE SEQUENCE public.users_id_seq
 ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
 
 --
+-- Name: attendees; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.attendees (
+    attendee_id integer NOT NULL,
+    user_id integer NOT NULL,
+    name character varying(100) NOT NULL,
+    phone character varying(20),
+    full_name character varying(200),
+    created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+    updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+);
+
+--
+-- Name: attendees_attendee_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.attendees_attendee_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+--
+-- Name: attendees_attendee_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.attendees_attendee_id_seq OWNED BY public.attendees.attendee_id;
+
+--
 -- Name: admins id; Type: DEFAULT; Schema: public; Owner: -
 --
 
@@ -486,6 +518,12 @@ ALTER TABLE ONLY public.admins ALTER COLUMN id SET DEFAULT nextval('public.admin
 --
 
 ALTER TABLE ONLY public.attendee_listings ALTER COLUMN id SET DEFAULT nextval('public.attendee_listings_id_seq'::regclass);
+
+--
+-- Name: attendees attendee_id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attendees ALTER COLUMN attendee_id SET DEFAULT nextval('public.attendees_attendee_id_seq'::regclass);
 
 --
 -- Name: attendance_verifications id; Type: DEFAULT; Schema: public; Owner: -
@@ -574,6 +612,13 @@ ALTER TABLE ONLY public.admins
 
 ALTER TABLE ONLY public.attendee_listings
     ADD CONSTRAINT attendee_listings_pkey PRIMARY KEY (id);
+
+--
+-- Name: attendees attendees_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.attendees
+    ADD CONSTRAINT attendees_pkey PRIMARY KEY (attendee_id);
 
 --
 -- Name: attendance_verifications attendance_verifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
