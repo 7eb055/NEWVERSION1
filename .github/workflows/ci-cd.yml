@@ -179,48 +179,29 @@ jobs:
           name: frontend-build
           path: eventfrontend/dist
 
-      - name: Setup Heroku CLI
-        run: |
-          curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          
       - name: Deploy to Heroku Staging
-        run: |
-          # Configure Git identity
-          git config --global user.email "github-actions@example.com"
-          git config --global user.name "GitHub Actions"
-          git config --global init.defaultBranch main
-          
-          cd backend
-          
-          # Initialize git repository
-          git init
-          git add .
-          git commit -m "Deploy to staging"
-          
-          # Use full path for heroku commands
-          /usr/local/bin/heroku create your-event-app-staging --region us || echo "App might already exist"
-          /usr/local/bin/heroku git:remote -a your-event-app-staging
-          
-          # Push to Heroku
-          git push https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/your-event-app-staging.git HEAD:main --force
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
+        uses: akhileshns/heroku-deploy@v3.13.15
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "your-event-app-staging"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          appdir: "backend"
           
       - name: Configure Heroku Environment Variables
-        run: |
-          /usr/local/bin/heroku config:set \
-            DB_HOST="${{ secrets.STAGING_DB_HOST }}" \
-            DB_USER="${{ secrets.STAGING_DB_USER }}" \
-            DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
-            DB_NAME="${{ secrets.STAGING_DB_NAME }}" \
-            JWT_SECRET="${{ secrets.STAGING_JWT_SECRET }}" \
-            PAYSTACK_SECRET_KEY="${{ secrets.STAGING_PAYSTACK_SECRET_KEY }}" \
-            NODE_ENV=staging \
-            --app your-event-app-staging
+        uses: akhileshns/heroku-deploy@v3.13.15
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "your-event-app-staging"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          justlogin: true
         env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HD_DB_HOST: ${{ secrets.STAGING_DB_HOST }}
+          HD_DB_USER: ${{ secrets.STAGING_DB_USER }}
+          HD_DB_PASSWORD: ${{ secrets.STAGING_DB_PASSWORD }}
+          HD_DB_NAME: ${{ secrets.STAGING_DB_NAME }}
+          HD_JWT_SECRET: ${{ secrets.STAGING_JWT_SECRET }}
+          HD_PAYSTACK_SECRET_KEY: ${{ secrets.STAGING_PAYSTACK_SECRET_KEY }}
+          HD_NODE_ENV: "staging"
 
   # Deploy to production (only on main branch with manual approval)
   deploy-production:
@@ -243,45 +224,26 @@ jobs:
           name: frontend-build
           path: eventfrontend/dist
 
-      - name: Setup Heroku CLI
-        run: |
-          curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
-          echo "/usr/local/bin" >> $GITHUB_PATH
-          
       - name: Deploy to Heroku Production
-        run: |
-          # Configure Git identity
-          git config --global user.email "github-actions@example.com"
-          git config --global user.name "GitHub Actions"
-          git config --global init.defaultBranch main
-          
-          cd backend
-          
-          # Initialize git repository
-          git init
-          git add .
-          git commit -m "Deploy to production"
-          
-          # Use full path for heroku commands
-          /usr/local/bin/heroku create your-event-app-production --region us || echo "App might already exist"
-          /usr/local/bin/heroku git:remote -a your-event-app-production
-          
-          # Push to Heroku
-          git push https://heroku:${{ secrets.HEROKU_API_KEY }}@git.heroku.com/your-event-app-production.git HEAD:main --force
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-          HEROKU_EMAIL: ${{ secrets.HEROKU_EMAIL }}
+        uses: akhileshns/heroku-deploy@v3.13.15
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "your-event-app-production"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          appdir: "backend"
           
       - name: Configure Heroku Environment Variables
-        run: |
-          /usr/local/bin/heroku config:set \
-            DB_HOST="${{ secrets.PRODUCTION_DB_HOST }}" \
-            DB_USER="${{ secrets.PRODUCTION_DB_USER }}" \
-            DB_PASSWORD="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
-            DB_NAME="${{ secrets.PRODUCTION_DB_NAME }}" \
-            JWT_SECRET="${{ secrets.PRODUCTION_JWT_SECRET }}" \
-            PAYSTACK_SECRET_KEY="${{ secrets.PRODUCTION_PAYSTACK_SECRET_KEY }}" \
-            NODE_ENV=production \
-            --app your-event-app-production
+        uses: akhileshns/heroku-deploy@v3.13.15
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: "your-event-app-production"
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          justlogin: true
         env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HD_DB_HOST: ${{ secrets.PRODUCTION_DB_HOST }}
+          HD_DB_USER: ${{ secrets.PRODUCTION_DB_USER }}
+          HD_DB_PASSWORD: ${{ secrets.PRODUCTION_DB_PASSWORD }}
+          HD_DB_NAME: ${{ secrets.PRODUCTION_DB_NAME }}
+          HD_JWT_SECRET: ${{ secrets.PRODUCTION_JWT_SECRET }}
+          HD_PAYSTACK_SECRET_KEY: ${{ secrets.PRODUCTION_PAYSTACK_SECRET_KEY }}
+          HD_NODE_ENV: "production"
