@@ -183,6 +183,67 @@ const authorizeOrganizer = async (req, res, next) => {
   }
 };
 
+// Debug endpoint to check actual database schema
+app.get('/api/debug/schema', async (req, res) => {
+  try {
+    // Check what tables exist
+    const tablesQuery = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
+      ORDER BY table_name
+    `);
+    
+    // Check actual schema of critical tables
+    const organizersSchema = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'organizers' AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `);
+    
+    const usersSchema = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'users' AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `);
+    
+    const eventsSchema = await pool.query(`
+      SELECT column_name, data_type, is_nullable, column_default
+      FROM information_schema.columns 
+      WHERE table_name = 'events' AND table_schema = 'public'
+      ORDER BY ordinal_position
+    `);
+    
+    // Check if organizers table exists and what columns it has
+    const organizersExists = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' AND table_name = 'organizers'
+      )
+    `);
+    
+    res.json({
+      tablesInDatabase: tablesQuery.rows.map(row => row.table_name),
+      organizersTableExists: organizersExists.rows[0].exists,
+      schemas: {
+        organizers: organizersSchema.rows,
+        users: usersSchema.rows,
+        events: eventsSchema.rows
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Schema debug error:', error);
+    res.status(500).json({
+      error: 'Failed to fetch schema information',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Basic Routes
 // Serve frontend for all non-API routes
 app.get('/', (req, res) => {
