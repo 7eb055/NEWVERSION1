@@ -1,6 +1,6 @@
 build:
   docker:
-    web: backend/Dockerfile
+    web: Dockerfile
 setup:
   addons:
     - plan: heroku-postgresql:essential-0
@@ -10,4 +10,4 @@ release:
   image: web
   command:
     - node
-    - backend/initDb.js
+    - initDb.js

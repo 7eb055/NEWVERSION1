@@ -1,4 +1,14 @@
-# Eventify Full-Stack Docker Configuration
+# Multi-stage build for Event Management App
+FROM node:18-alpine as frontend-builder
+
+# Build frontend
+WORKDIR /frontend
+COPY eventfrontend/package*.json ./
+RUN npm ci
+COPY eventfrontend/ ./
+RUN npm run build
+
+# Backend stage
 FROM node:18-alpine
 
 WORKDIR /app
@@ -14,14 +24,17 @@ RUN apk add --no-cache \
     && rm -rf /var/cache/apk/*
 
 # Copy backend package files
-COPY package*.json ./
+COPY backend/package*.json ./
 
 # Install backend dependencies
 RUN npm ci --only=production && \
     npm cache clean --force
 
+# Copy built frontend from previous stage
+COPY --from=frontend-builder /frontend/dist ./public
+
 # Copy backend application code
-COPY . .
+COPY backend/ ./
 
 # Create necessary directories
 RUN mkdir -p uploads logs && \
