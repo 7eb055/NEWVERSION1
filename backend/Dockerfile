@@ -1,4 +1,4 @@
-# Eventify Backend Docker Configuration
+# Eventify Full-Stack Docker Configuration
 FROM node:18-alpine
 
 WORKDIR /app
@@ -13,14 +13,25 @@ RUN apk add --no-cache \
     postgresql-client \
     && rm -rf /var/cache/apk/*
 
-# Copy package files
+# Copy backend package files
 COPY package*.json ./
 
-# Install dependencies
+# Install backend dependencies
 RUN npm ci --only=production && \
     npm cache clean --force
 
-# Copy application code
+# Copy and build frontend
+COPY ../eventfrontend /tmp/frontend
+WORKDIR /tmp/frontend
+RUN npm ci && npm run build
+
+# Copy built frontend to backend public directory
+WORKDIR /app
+RUN mkdir -p public && \
+    cp -r /tmp/frontend/dist/* public/ && \
+    rm -rf /tmp/frontend
+
+# Copy backend application code
 COPY . .
 
 # Create necessary directories
