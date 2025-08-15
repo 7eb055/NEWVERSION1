@@ -1333,7 +1333,7 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
              e.venue_name, e.venue_address, e.description as event_description,
              e.image_url as event_image,
              tt.type_name as ticket_type_name, tt.price as ticket_price,
-             o.full_name as organizer_name, o.company_name,
+             o.full_name as organizer_name, o.company as company_name,
              CASE 
                WHEN al.check_in_time IS NOT NULL THEN true 
                ELSE false 
@@ -4170,7 +4170,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Check if user is an organizer
     const organizerData = await pool.query(
-      'SELECT id as organizer_id, name, phone, company_name, business_address FROM organizers WHERE user_id = $1',
+      'SELECT id as organizer_id, name, phone, company, business_address FROM organizers WHERE user_id = $1',
       [userData.user_id]
     );
 
@@ -4180,7 +4180,7 @@ app.post('/api/auth/login', async (req, res) => {
         organizer_id: organizerData.rows[0].organizer_id,
         full_name: organizerData.rows[0].name,
         phone: organizerData.rows[0].phone,
-        company_name: organizerData.rows[0].company_name,
+        company_name: organizerData.rows[0].company,
         business_address: organizerData.rows[0].business_address
       });
     }
@@ -4742,7 +4742,7 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
     const eventsQuery = await pool.query(`
       SELECT e.event_id, e.event_name, e.event_date, e.status,
              er.registration_date, er.ticket_quantity,
-             o.full_name as organizer_name, o.company_name
+             o.full_name as organizer_name, o.company as company_name
       FROM eventregistrations er
       JOIN events e ON er.event_id = e.event_id
       JOIN organizers o ON e.organizer_id = o.organizer_id
@@ -4797,7 +4797,7 @@ app.get('/api/events/:eventId/networking', authenticateToken, async (req, res) =
     // Get other attendees registered for the same event
     const networkingQuery = await pool.query(`
       SELECT DISTINCT a.attendee_id, a.full_name, u.email,
-             o.company_name as company
+             o.company as company
       FROM eventregistrations er1
       JOIN eventregistrations er2 ON er1.event_id = er2.event_id
       JOIN attendees a ON er2.attendee_id = a.attendee_id
