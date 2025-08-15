@@ -4170,7 +4170,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Check if user is an organizer
     const organizerData = await pool.query(
-      'SELECT id as organizer_id, name, phone, company, business_address FROM organizers WHERE user_id = $1',
+      'SELECT id as organizer_id, name, phone, company FROM organizers WHERE user_id = $1',
       [userData.user_id]
     );
 
@@ -4180,8 +4180,7 @@ app.post('/api/auth/login', async (req, res) => {
         organizer_id: organizerData.rows[0].organizer_id,
         full_name: organizerData.rows[0].name,
         phone: organizerData.rows[0].phone,
-        company_name: organizerData.rows[0].company,
-        business_address: organizerData.rows[0].business_address
+        company_name: organizerData.rows[0].company
       });
     }
 
