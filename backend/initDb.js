@@ -45,7 +45,7 @@ async function initializeDatabase() {
           console.log('✅ Added password column');
           
           // Add role column
-          await pool.query("ALTER TABLE users ADD COLUMN role character varying(50) DEFAULT 'attendee'");
+          await pool.query('ALTER TABLE users ADD COLUMN role character varying(50) DEFAULT \'attendee\'');
           console.log('✅ Added role column');
           
           // Add is_suspended column
