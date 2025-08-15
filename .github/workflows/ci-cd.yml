@@ -181,13 +181,19 @@ jobs:
 
       - name: Setup Heroku CLI
         run: |
-          # Install Heroku CLI via snap (more reliable)
-          sudo snap install --classic heroku
+          # Install Heroku CLI using the official method
+          curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
           
-          # Verify installation
-          heroku --version
+          # Add to PATH and verify installation
+          export PATH="/usr/local/bin:$PATH"
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          /usr/local/bin/heroku --version
           
-          # Login to Heroku
+          # Login to Heroku using environment variable
+          export HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
+          
+          # Create .netrc for git operations
           cat > ~/.netrc <<EOF
           machine api.heroku.com
             login ${{ secrets.HEROKU_EMAIL }}
@@ -199,7 +205,7 @@ jobs:
           chmod 600 ~/.netrc
           
           # Test authentication
-          heroku auth:whoami
+          /usr/local/bin/heroku auth:whoami
 
       - name: Deploy to Heroku Staging
         run: |
@@ -216,10 +222,10 @@ jobs:
           git commit -m "Deploy to staging"
           
           # Create Heroku app (ignore if exists)
-          heroku create your-event-app-staging || echo "App already exists"
+          /usr/local/bin/heroku create your-event-app-staging || echo "App already exists"
           
           # Add Heroku git remote
-          heroku git:remote -a your-event-app-staging
+          /usr/local/bin/heroku git:remote -a your-event-app-staging
           
           # Push to Heroku
           git push heroku main --force
@@ -228,7 +234,7 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
-          heroku config:set \
+          /usr/local/bin/heroku config:set \
             DB_HOST="${{ secrets.STAGING_DB_HOST }}" \
             DB_USER="${{ secrets.STAGING_DB_USER }}" \
             DB_PASSWORD="${{ secrets.STAGING_DB_PASSWORD }}" \
@@ -263,13 +269,19 @@ jobs:
 
       - name: Setup Heroku CLI
         run: |
-          # Install Heroku CLI via snap (more reliable)
-          sudo snap install --classic heroku
+          # Install Heroku CLI using the official method
+          curl https://cli-assets.heroku.com/install-ubuntu.sh | sh
           
-          # Verify installation
-          heroku --version
+          # Add to PATH and verify installation
+          export PATH="/usr/local/bin:$PATH"
+          echo "/usr/local/bin" >> $GITHUB_PATH
+          /usr/local/bin/heroku --version
           
-          # Login to Heroku
+          # Login to Heroku using environment variable
+          export HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
+          
+          # Create .netrc for git operations
           cat > ~/.netrc <<EOF
           machine api.heroku.com
             login ${{ secrets.HEROKU_EMAIL }}
@@ -281,7 +293,7 @@ jobs:
           chmod 600 ~/.netrc
           
           # Test authentication
-          heroku auth:whoami
+          /usr/local/bin/heroku auth:whoami
 
       - name: Deploy to Heroku Production
         run: |
@@ -298,10 +310,10 @@ jobs:
           git commit -m "Deploy to production"
           
           # Create Heroku app (ignore if exists)
-          heroku create your-event-app-production || echo "App already exists"
+          /usr/local/bin/heroku create your-event-app-production || echo "App already exists"
           
           # Add Heroku git remote
-          heroku git:remote -a your-event-app-production
+          /usr/local/bin/heroku git:remote -a your-event-app-production
           
           # Push to Heroku
           git push heroku main --force
@@ -310,7 +322,7 @@ jobs:
           
       - name: Configure Heroku Environment Variables
         run: |
-          heroku config:set \
+          /usr/local/bin/heroku config:set \
             DB_HOST="${{ secrets.PRODUCTION_DB_HOST }}" \
             DB_USER="${{ secrets.PRODUCTION_DB_USER }}" \
             DB_PASSWORD="${{ secrets.PRODUCTION_DB_PASSWORD }}" \
