@@ -1040,19 +1040,21 @@ app.get('/api/events', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const eventsQuery = await pool.query(`
-      SELECT e.event_id as event_id, e.event_name as event_name, e.event_date as event_date, 
-             e.ticket_price as ticket_price, e.max_attendees as max_attendees, 
+      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
+             e.price as ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
-             e.image_url as image_url, e.description, e.venue_name as venue_name, 
-             e.venue_address as venue_address, e.event_type as category,
+             e.image_url as image_url, e.description, e.location as venue_name, 
+             e.venue_details as venue_address, e.event_type as category,
              o.full_name as organizer_name, o.company_name as company_name,
-             COUNT(r.registration_id) as registration_count
+             COUNT(r.id) as registration_count
       FROM events e
-      LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
-      LEFT JOIN eventregistrations r ON e.event_id = r.event_id
+      LEFT JOIN organizers o ON e.organizer_id = o.id
+      LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.status = $1
-      GROUP BY e.event_id, o.full_name, o.company_name
-      ORDER BY e.event_date ASC
+      GROUP BY e.id, e.title, e.date, e.price, e.capacity, e.status, e.created_at, 
+               e.image_url, e.description, e.location, e.venue_details, e.event_type,
+               o.full_name, o.company_name
+      ORDER BY e.date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 
