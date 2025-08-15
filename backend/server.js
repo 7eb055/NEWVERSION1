@@ -244,6 +244,90 @@ app.get('/api/debug/schema', async (req, res) => {
   }
 });
 
+// Emergency migration endpoint - USE WITH CAUTION
+app.post('/api/debug/migrate-schema', async (req, res) => {
+  try {
+    console.log('🔄 Running schema alignment migration...');
+    
+    // Add missing columns to organizers table
+    await pool.query(`
+      DO $$ 
+      BEGIN
+        -- Add organizer_id as alias for id
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'organizers' AND column_name = 'organizer_id') THEN
+          ALTER TABLE organizers ADD COLUMN organizer_id INTEGER;
+          UPDATE organizers SET organizer_id = id;
+        END IF;
+        
+        -- Add full_name as alias for name
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'organizers' AND column_name = 'full_name') THEN
+          ALTER TABLE organizers ADD COLUMN full_name VARCHAR(255);
+          UPDATE organizers SET full_name = name;
+        END IF;
+        
+        -- Add company_name as alias for company
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'organizers' AND column_name = 'company_name') THEN
+          ALTER TABLE organizers ADD COLUMN company_name VARCHAR(255);
+          UPDATE organizers SET company_name = company;
+        END IF;
+      END
+      $$;
+    `);
+    
+    // Add missing columns to events table
+    await pool.query(`
+      DO $$ 
+      BEGIN
+        -- Add event_id as alias for id
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'events' AND column_name = 'event_id') THEN
+          ALTER TABLE events ADD COLUMN event_id INTEGER;
+          UPDATE events SET event_id = id;
+        END IF;
+        
+        -- Add event_name as alias for name
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'events' AND column_name = 'event_name') THEN
+          ALTER TABLE events ADD COLUMN event_name VARCHAR(255);
+          UPDATE events SET event_name = name;
+        END IF;
+        
+        -- Add event_description as alias for description
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'events' AND column_name = 'event_description') THEN
+          ALTER TABLE events ADD COLUMN event_description TEXT;
+          UPDATE events SET event_description = description;
+        END IF;
+        
+        -- Add max_attendees if it doesn't exist
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                      WHERE table_name = 'events' AND column_name = 'max_attendees') THEN
+          ALTER TABLE events ADD COLUMN max_attendees INTEGER DEFAULT 100;
+        END IF;
+      END
+      $$;
+    `);
+    
+    console.log('✅ Schema alignment completed successfully!');
+    res.json({ 
+      message: 'Schema alignment completed successfully',
+      success: true,
+      timestamp: new Date().toISOString()
+    });
+    
+  } catch (error) {
+    console.error('❌ Schema alignment failed:', error);
+    res.status(500).json({ 
+      error: 'Schema alignment failed', 
+      details: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // Basic Routes
 // Serve frontend for all non-API routes
 app.get('/', (req, res) => {
