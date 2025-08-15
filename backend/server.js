@@ -808,7 +808,7 @@ app.get('/api/events', async (req, res) => {
     const offset = (page - 1) * limit;
 
     const eventsQuery = await pool.query(`
-      SELECT e.id as event_id, e.title as event_name, e.start_date as event_date, 
+      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
              e.ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
              e.image as image_url, e.description, e.venue as venue_name, 
@@ -820,7 +820,7 @@ app.get('/api/events', async (req, res) => {
       LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.status = $1
       GROUP BY e.id, o.name, o.company_name
-      ORDER BY e.start_date ASC
+      ORDER BY e.date ASC
       LIMIT $2 OFFSET $3
     `, [status, limit, offset]);
 
@@ -837,7 +837,7 @@ app.get('/api/events/:eventId/details', async (req, res) => {
     const { eventId } = req.params;
 
     const eventQuery = await pool.query(`
-      SELECT e.id as event_id, e.title as event_name, e.start_date as event_date, 
+      SELECT e.id as event_id, e.title as event_name, e.date as event_date, 
              e.ticket_price, e.capacity as max_attendees, 
              e.status, e.created_at,
              e.image as image_url, e.description, e.venue as venue_name, 
