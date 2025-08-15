@@ -162,12 +162,46 @@ app.get('/', (req, res) => {
 });
 
 // Health check route (JSON API)
-app.get('/health', (req, res) => {
-  res.json({ 
-    message: 'Event Management API is running',
-    status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
+app.get('/health', async (req, res) => {
+  try {
+    // Test database connection
+    const dbResult = await pool.query('SELECT 1 as test');
+    const dbHealthy = dbResult.rows.length > 0;
+    
+    // Check if events table exists (indicates successful schema initialization)
+    let schemaInitialized = false;
+    try {
+      await pool.query('SELECT 1 FROM events LIMIT 1');
+      schemaInitialized = true;
+    } catch (error) {
+      schemaInitialized = false;
+    }
+    
+    res.json({ 
+      message: 'Event Management API is running',
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      database: {
+        connected: dbHealthy,
+        schemaInitialized: schemaInitialized
+      },
+      environment: process.env.NODE_ENV,
+      deploymentVersion: '2025-08-15-heroku-schema-fix'
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: 'Health check failed',
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error.message,
+      database: {
+        connected: false,
+        schemaInitialized: false
+      },
+      environment: process.env.NODE_ENV,
+      deploymentVersion: '2025-08-15-heroku-schema-fix'
+    });
+  }
 });
 
 // Admin Routes
