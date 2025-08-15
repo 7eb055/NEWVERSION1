@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-// Script to fix production database schema
+// Script to align production database schema with code expectations
 const { Pool } = require('pg');
 require('dotenv').config();
 
@@ -14,41 +14,43 @@ async function runMigration() {
   });
 
   try {
-    console.log('🔄 Starting database schema migration...');
+    console.log('🔄 Starting database schema alignment...');
     
-    // Read the migration SQL file
+    // Read the alignment SQL file
     const migrationSQL = fs.readFileSync(
-      path.join(__dirname, 'fix-production-schema.sql'), 
+      path.join(__dirname, 'align-production-schema.sql'), 
       'utf8'
     );
 
     // Execute the migration
     await pool.query(migrationSQL);
     
-    console.log('✅ Database schema migration completed successfully!');
+    console.log('✅ Database schema alignment completed successfully!');
     
-    // Verify the schema by checking key tables
+    // Verify the schema by checking key columns
     const organizersColumns = await pool.query(`
       SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'organizers' AND table_schema = 'public'
-      ORDER BY ordinal_position
+      AND column_name IN ('organizer_id', 'full_name', 'company_name', 'user_id')
+      ORDER BY column_name
     `);
     
     const eventsColumns = await pool.query(`
       SELECT column_name, data_type 
       FROM information_schema.columns 
       WHERE table_name = 'events' AND table_schema = 'public'
-      ORDER BY ordinal_position
+      AND column_name IN ('event_id', 'event_name', 'event_description', 'max_attendees')
+      ORDER BY column_name
     `);
     
-    console.log('📊 Organizers table columns:', organizersColumns.rows.length);
-    console.log('📊 Events table columns:', eventsColumns.rows.length);
+    console.log('📊 New organizers columns added:', organizersColumns.rows.map(r => r.column_name));
+    console.log('📊 New events columns added:', eventsColumns.rows.map(r => r.column_name));
     
-    console.log('\n✅ Migration completed! Your database schema should now be fixed.');
+    console.log('\n✅ Schema alignment completed! Your database should now work with your code.');
     
   } catch (error) {
-    console.error('❌ Migration failed:', error.message);
+    console.error('❌ Schema alignment failed:', error.message);
     console.error('Full error:', error);
     process.exit(1);
   } finally {
