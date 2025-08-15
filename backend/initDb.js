@@ -24,7 +24,40 @@ async function initializeDatabase() {
     `);
 
     if (result.rows.length > 0) {
-      console.log('✅ Database tables already exist, checking for missing columns...');
+      console.log('✅ Database tables already exist, checking for missing tables and columns...');
+      
+      // Check if attendees table exists and create it if missing
+      console.log('🔄 Checking for attendees table...');
+      
+      try {
+        const attendeesTableCheck = await pool.query(`
+          SELECT table_name 
+          FROM information_schema.tables 
+          WHERE table_schema = 'public' AND table_name = 'attendees'
+        `);
+        
+        if (attendeesTableCheck.rows.length === 0) {
+          console.log('📝 Creating missing attendees table...');
+          
+          // Create attendees table
+          await pool.query(`
+            CREATE TABLE public.attendees (
+              attendee_id SERIAL PRIMARY KEY,
+              user_id integer NOT NULL,
+              name character varying(100) NOT NULL,
+              phone character varying(20),
+              full_name character varying(200),
+              created_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP,
+              updated_at timestamp without time zone DEFAULT CURRENT_TIMESTAMP
+            )
+          `);
+          console.log('✅ Attendees table created successfully');
+        } else {
+          console.log('✅ Attendees table already exists');
+        }
+      } catch (attendeesError) {
+        console.error('⚠️ Attendees table creation warning:', attendeesError.message);
+      }
       
       // Check if users table has authentication columns and add them if missing
       console.log('🔄 Checking for authentication columns in users table...');
@@ -89,3 +122,16 @@ async function initializeDatabase() {
 }
 
 module.exports = { initializeDatabase };
+
+// Execute if this file is run directly
+if (require.main === module) {
+  initializeDatabase()
+    .then(() => {
+      console.log('🎉 Database initialization completed successfully');
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('💥 Database initialization failed:', error);
+      process.exit(1);
+    });
+}
