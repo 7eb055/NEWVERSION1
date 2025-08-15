@@ -1201,7 +1201,7 @@ router.put('/profile', authenticateToken, async (req, res) => {
              notification_preferences = $8, updated_at = CURRENT_TIMESTAMP
          WHERE user_id = $9`,
         [
-          full_name,
+          `${first_name} ${last_name}`,
           phone,
           date_of_birth,
           gender,
