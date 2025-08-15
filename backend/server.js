@@ -70,6 +70,14 @@ app.use(express.json());
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Serve frontend static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Handle favicon.ico requests to avoid 404s
+app.get('/favicon.ico', (req, res) => {
+  res.status(204).end();
+});
+
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
 // Middleware to verify JWT token
@@ -128,20 +136,16 @@ const authorizeOrganizer = async (req, res, next) => {
 };
 
 // Basic Routes
-// Root route for API health check
+// Serve frontend for all non-API routes
 app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// Health check route (JSON API)
+app.get('/health', (req, res) => {
   res.json({ 
     message: 'Event Management API is running',
     status: 'healthy',
-    timestamp: new Date().toISOString()
-  });
-});
-
-// Health check route
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK',
-    service: 'Event Management API',
     timestamp: new Date().toISOString()
   });
 });
@@ -4906,6 +4910,16 @@ app.use('/api/admin', adminRoutes);
 
 // Mount payment routes
 app.use('/api/payments', paymentRoutes);
+
+// Catch-all handler for frontend routing (must be last)
+app.get('*', (req, res) => {
+  // Only serve frontend for non-API routes
+  if (!req.path.startsWith('/api/')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    res.status(404).json({ message: 'API endpoint not found' });
+  }
+});
 
 // Start server only if not in test mode
 if (process.env.NODE_ENV !== 'test') {
