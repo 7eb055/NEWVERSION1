@@ -4358,7 +4358,8 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT user_id, email, password, role_type as role, account_status, created_at, is_email_verified
+      `SELECT id as user_id, email, password, role, is_active as account_status, created_at, 
+              COALESCE(is_suspended, false) as is_email_verified
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4483,7 +4484,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4495,15 +4496,13 @@ app.post('/api/auth/register', async (req, res) => {
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create user with email verification fields
+    // Create user with basic fields available in production schema
     const userResult = await pool.query(
       `INSERT INTO users (
-        email, password, role_type, 
-        email_verification_token, email_verification_expires,
-        account_status
-      ) VALUES ($1, $2, $3, $4, $5, $6) 
-      RETURNING user_id, email, role_type as role, created_at`,
-      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires, 'pending']
+        name, email, password, role
+      ) VALUES ($1, $2, $3, $4) 
+      RETURNING id as user_id, email, role, created_at`,
+      [email.split('@')[0], email, hashedPassword, role_type || 'attendee']
     );
 
     const newUser = userResult.rows[0];
