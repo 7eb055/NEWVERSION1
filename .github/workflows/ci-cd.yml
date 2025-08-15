@@ -174,7 +174,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+        
       - name: Download frontend build
         uses: actions/download-artifact@v4
         with:
@@ -195,11 +195,12 @@ jobs:
           which heroku
           heroku --version
           
+          # Unshallow the git repository for Heroku
+          git fetch --all --unshallow
+          
           # Login to Heroku using environment variable
           export HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}
-          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV
-          
-          # Create .netrc for git operations
+          echo "HEROKU_API_KEY=${{ secrets.HEROKU_API_KEY }}" >> $GITHUB_ENV          # Create .netrc for git operations
           cat > ~/.netrc <<EOF
           machine api.heroku.com
             login ${{ secrets.HEROKU_EMAIL }}
