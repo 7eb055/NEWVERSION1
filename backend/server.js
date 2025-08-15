@@ -186,7 +186,7 @@ app.get('/health', async (req, res) => {
         schemaInitialized: schemaInitialized
       },
       environment: process.env.NODE_ENV,
-      deploymentVersion: '2025-08-15-heroku-schema-fix'
+      deploymentVersion: '2025-08-15-table-fix-v2'
     });
   } catch (error) {
     res.status(500).json({
@@ -199,7 +199,7 @@ app.get('/health', async (req, res) => {
         schemaInitialized: false
       },
       environment: process.env.NODE_ENV,
-      deploymentVersion: '2025-08-15-heroku-schema-fix'
+      deploymentVersion: '2025-08-15-table-fix-v2'
     });
   }
 });
