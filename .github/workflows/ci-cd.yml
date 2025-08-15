@@ -245,7 +245,6 @@ jobs:
             PAYSTACK_SECRET_KEY="${{ secrets.STAGING_PAYSTACK_SECRET_KEY }}" \
             NODE_ENV=production \
             --app your-event-app-staging
-            --app your-event-app-staging
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
 
