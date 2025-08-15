@@ -814,10 +814,10 @@ app.get('/api/events', async (req, res) => {
              e.image as image_url, e.description, e.venue as venue_name, 
              e.location as venue_address, e.event_type as category,
              o.name as organizer_name, o.company_name,
-             COUNT(t.id) as registration_count
+             COUNT(r.id) as registration_count
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.id
-      LEFT JOIN tickets t ON e.id = t.event_id
+      LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.status = $1
       GROUP BY e.id, o.name, o.company_name
       ORDER BY e.start_date ASC
@@ -843,10 +843,10 @@ app.get('/api/events/:eventId/details', async (req, res) => {
              e.image as image_url, e.description, e.venue as venue_name, 
              e.location as venue_address, e.event_type as category,
              o.name as organizer_name, o.company_name, o.phone as organizer_phone,
-             COUNT(t.id) as registration_count
+             COUNT(r.id) as registration_count
       FROM events e
       LEFT JOIN organizers o ON e.organizer_id = o.id
-      LEFT JOIN tickets t ON e.id = t.event_id
+      LEFT JOIN registrations r ON e.id = r.event_id
       WHERE e.id = $1
       GROUP BY e.id, o.name, o.company_name, o.phone
     `, [eventId]);
