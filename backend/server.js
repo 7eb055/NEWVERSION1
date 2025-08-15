@@ -59,6 +59,12 @@ if (process.env.NODE_ENV !== 'test') {
     } else {
       console.log('✅ Connected to PostgreSQL database');
       release();
+      
+      // Initialize database schema if needed (Heroku deployment)
+      if (process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging') {
+        const { initializeDatabase } = require('./initDb');
+        initializeDatabase().catch(console.error);
+      }
     }
   });
 }
