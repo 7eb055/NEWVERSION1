@@ -4362,7 +4362,6 @@ app.post('/api/auth/register', async (req, res) => {
         const fullName = req.body.fullName || req.body.companyName || email.split('@')[0];
         const phone = req.body.phone || null;
         const companyName = req.body.companyName || null;
-        const contactPerson = req.body.contactPerson || fullName;
         const location = req.body.location || null;
 
         // Create organizer profile
