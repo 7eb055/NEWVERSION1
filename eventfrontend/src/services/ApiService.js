@@ -5,7 +5,7 @@ import axios from 'axios';
 import AuthTokenService from './AuthTokenService';
 
 class ApiService {
-  constructor(baseURL = 'http://localhost:5001') {
+  constructor(baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001') {
     this.baseURL = baseURL;
     this.axiosInstance = this.createAxiosInstance();
   }
