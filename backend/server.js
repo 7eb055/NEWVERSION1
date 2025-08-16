@@ -4345,7 +4345,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4362,7 +4362,7 @@ app.post('/api/auth/register', async (req, res) => {
       `INSERT INTO users (
         email, password, role, name, email_verification_token, email_verification_expires
       ) VALUES ($1, $2, $3, $4, $5, $6) 
-      RETURNING id as user_id, email, role as role_type, created_at`,
+      RETURNING user_id, email, role as role_type, created_at`,
       [email, hashedPassword, role_type || 'attendee', email.split('@')[0], emailVerificationToken, emailVerificationExpires]
     );
 
