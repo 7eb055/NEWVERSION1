@@ -4355,6 +4355,32 @@ app.post('/api/auth/register', async (req, res) => {
 
     const newUser = userResult.rows[0];
 
+    // If user is registering as an organizer, create organizer profile
+    if (role_type === 'organizer') {
+      try {
+        // Extract organizer-specific data from request
+        const fullName = req.body.fullName || req.body.companyName || email.split('@')[0];
+        const phone = req.body.phone || null;
+        const companyName = req.body.companyName || null;
+        const contactPerson = req.body.contactPerson || fullName;
+        const location = req.body.location || null;
+
+        // Create organizer profile
+        await pool.query(
+          `INSERT INTO organizers (
+            user_id, full_name, phone, company_name, 
+            business_address, created_at, updated_at
+          ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+          [newUser.user_id, fullName, phone, companyName, location]
+        );
+
+        console.log('✅ Organizer profile created for user:', newUser.user_id);
+      } catch (organizerError) {
+        console.error('⚠️ Failed to create organizer profile:', organizerError);
+        // Don't fail the registration, just log the error
+      }
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       { 
@@ -4384,6 +4410,42 @@ app.post('/api/auth/register', async (req, res) => {
 
   } catch (error) {
     console.error('Registration error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// Create organizer profile for existing user
+app.post('/api/auth/setup-organizer', authenticateToken, async (req, res) => {
+  try {
+    const { fullName, phone, companyName, businessAddress, jobTitle } = req.body;
+
+    // Check if user already has organizer profile
+    const existingOrganizer = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [req.user.user_id]
+    );
+
+    if (existingOrganizer.rows.length > 0) {
+      return res.status(409).json({ message: 'Organizer profile already exists' });
+    }
+
+    // Create organizer profile
+    const organizerResult = await pool.query(
+      `INSERT INTO organizers (
+        user_id, full_name, phone, company_name, 
+        business_address, job_title, created_at, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+      RETURNING organizer_id, full_name, company_name`,
+      [req.user.user_id, fullName, phone, companyName, businessAddress, jobTitle]
+    );
+
+    res.status(201).json({
+      message: 'Organizer profile created successfully',
+      organizer: organizerResult.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Setup organizer error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
