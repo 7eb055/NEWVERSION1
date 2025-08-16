@@ -42,7 +42,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
         setLoading(true);
         
         // Fetch real ticket types from the public API
-        const response = await axios.get(`http://localhost:5001/api/events/${eventId}/ticket-types/public`);
+        const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/ticket-types/public`);
         
         if (response.data && response.data.ticketTypes) {
           setTickets(response.data.ticketTypes);
@@ -104,7 +104,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
       if (!token) return;
 
       // Initialize payment with Paystack
-      const paymentResponse = await axios.post(`http://localhost:5001/api/payments/initialize`, {
+      const paymentResponse = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/payments/initialize`, {
         event_id: eventId,
         ticket_type_id: selectedTicket.ticket_type_id,
         ticket_quantity: quantity
@@ -134,7 +134,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
             // Check payment status
             try {
               const statusResponse = await axios.get(
-                `http://localhost:5001/api/payments/status/${reference}`,
+                `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/payments/status/${reference}`,
                 {
                   headers: {
                     'Authorization': `Bearer ${token}`
