@@ -1246,7 +1246,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
       // Check if user exists
       const userCheck = await client.query(
-        'SELECT id as user_id FROM users WHERE email = $1',
+        'SELECT user_id FROM users WHERE email = $1',
         [attendeeEmail]
       );
 
