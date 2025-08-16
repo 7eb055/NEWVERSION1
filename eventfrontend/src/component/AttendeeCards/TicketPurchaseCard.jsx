@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AuthTokenService from '../../services/AuthTokenService';
+import { getErrorMessage, handleAuthError } from '../../utils/errorHandling';
 import './AttendeeCards.css';
 
 const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurchase }) => {
@@ -47,16 +48,15 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
       onPurchase(data.registration);
     } catch (error) {
       console.error('Error purchasing ticket:', error);
-      let errorMessage = 'An error occurred while purchasing the ticket';
       
-      if (error.message.includes('403') || error.message.includes('Forbidden')) {
-        errorMessage = 'Access denied. Please make sure you are logged in properly.';
-      } else if (error.message.includes('401') || error.message.includes('Unauthorized')) {
-        errorMessage = 'Your session has expired. Please log in again.';
-      } else if (error.message) {
-        errorMessage = error.message;
+      // Handle authentication errors
+      const authErrorMessage = handleAuthError(error);
+      if (authErrorMessage) {
+        return; // handleAuthError redirects for auth issues
       }
       
+      // Handle other errors with consistent messaging
+      const errorMessage = getErrorMessage(error, 'An error occurred while purchasing the ticket');
       alert(errorMessage);
     }
   };
