@@ -494,7 +494,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role = $1 WHERE id = $2',
+      'UPDATE users SET role_type = $1 WHERE user_id = $2',
       [role_type, userId]
     );
 
@@ -521,7 +521,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const { userId } = req.params;
 
     // Get user details before deletion for logging
-    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    const userResult = await pool.query('SELECT email FROM users WHERE user_id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -529,7 +529,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const userEmail = userResult.rows[0].email;
 
     // Delete user (this should cascade delete related records)
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE user_id = $1', [userId]);
 
     // Log this action
     try {
@@ -1592,7 +1592,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Check if user exists
     const userCheck = await client.query(
-      'SELECT id as user_id FROM users WHERE email = $1',
+      'SELECT user_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -4336,7 +4336,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4347,9 +4347,9 @@ app.post('/api/auth/register', async (req, res) => {
     // Create user with basic fields (production schema compatibility)
     const userResult = await pool.query(
       `INSERT INTO users (
-        email, password, role, name
+        email, password, role_type, username
       ) VALUES ($1, $2, $3, $4) 
-      RETURNING id as user_id, email, role as role_type, created_at`,
+      RETURNING user_id, email, role_type, created_at`,
       [email, hashedPassword, role_type || 'attendee', email.split('@')[0]]
     );
 
@@ -4372,8 +4372,8 @@ app.post('/api/auth/register', async (req, res) => {
       user: {
         user_id: newUser.user_id,
         email: newUser.email,
-        role: newUser.role,
-        primary_role: newUser.role,
+        role: newUser.role_type,
+        primary_role: newUser.role_type,
         roles: [],
         created_at: newUser.created_at,
         is_email_verified: false,
@@ -4458,7 +4458,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
     // Find user by email
     const userQuery = await pool.query(
-      'SELECT id as user_id, email FROM users WHERE email = $1',
+      'SELECT user_id, email FROM users WHERE email = $1',
       [email]
     );
 
