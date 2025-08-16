@@ -167,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -708,7 +708,7 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
     case 'delete':
       if (target === 'users') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-        await pool.query(`DELETE FROM users WHERE id IN (${placeholders})`, ids);
+        await pool.query(`DELETE FROM users WHERE user_id IN (${placeholders})`, ids);
         result.message = `Deleted ${ids.length} users`;
       } else if (target === 'events') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -1070,7 +1070,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
     if (attendeeQuery.rows.length === 0) {
       // Get user info to create attendee record
       const userQuery = await client.query(
-        'SELECT email FROM users WHERE id = $1',
+        'SELECT email FROM users WHERE user_id = $1',
         [req.user.user_id]
       );
       
@@ -4171,8 +4171,8 @@ app.post('/api/notifications', authenticateToken, async (req, res) => {
 
     // Only allow admins to create notifications for other users
     if (user_id && user_id !== req.user.user_id) {
-      const userRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.user_id]);
-      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role !== 'admin') {
+      const userRoleCheck = await pool.query('SELECT role_type FROM users WHERE user_id = $1', [req.user.user_id]);
+      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role_type !== 'admin') {
         return res.status(403).json({ message: 'Only admins can create notifications for other users' });
       }
     }
@@ -4211,7 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, password, role as role_type, is_suspended, created_at
+      `SELECT user_id, email, password, role_type, account_status, created_at
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4224,7 +4224,7 @@ app.post('/api/auth/login', async (req, res) => {
     const userData = userQuery.rows[0];
 
     // Check if user account is suspended
-    if (userData.is_suspended) {
+    if (userData.account_status === 'suspended') {
       return res.status(401).json({ 
         message: 'Your account has been suspended. Please contact support.',
         isSuspended: true
@@ -4347,10 +4347,10 @@ app.post('/api/auth/register', async (req, res) => {
     // Create user with basic fields (production schema compatibility)
     const userResult = await pool.query(
       `INSERT INTO users (
-        email, password, role_type, username
-      ) VALUES ($1, $2, $3, $4) 
+        email, password, role_type
+      ) VALUES ($1, $2, $3) 
       RETURNING user_id, email, role_type, created_at`,
-      [email, hashedPassword, role_type || 'attendee', email.split('@')[0]]
+      [email, hashedPassword, role_type || 'attendee']
     );
 
     const newUser = userResult.rows[0];
@@ -4516,7 +4516,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
-      'SELECT id as user_id, email, role as role_type, created_at FROM users WHERE id = $1',
+      'SELECT user_id, email, role_type, created_at FROM users WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -4934,7 +4934,7 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
     if (attendeeQuery.rows.length === 0) {
       // If user is not in attendees table, create a basic entry
       const userQuery = await pool.query(
-        'SELECT email FROM users WHERE id = $1',
+        'SELECT email FROM users WHERE user_id = $1',
         [req.user.user_id]
       );
       
