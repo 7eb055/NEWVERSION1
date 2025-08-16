@@ -11,6 +11,8 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showResendVerification, setShowResendVerification] = useState(false);
+  const [resendEmail, setResendEmail] = useState('');
 
   // Check if user is already authenticated
   useEffect(() => {
@@ -104,8 +106,12 @@ const Login = () => {
         const errorData = error.response.data;
         
         if (error.response.status === 401) {
-          if (errorData.message?.includes('verify') || errorData.requiresVerification) {
+          if (errorData.requiresEmailVerification || errorData.message?.toLowerCase().includes('verify')) {
             setError('Please verify your email before logging in. Check your inbox for the verification link.');
+            setShowResendVerification(true);
+            setResendEmail(email.trim());
+          } else if (errorData.isSuspended) {
+            setError('Your account has been suspended. Please contact support.');
           } else {
             setError('Invalid email or password. Please try again.');
           }
@@ -119,6 +125,26 @@ const Login = () => {
       } else {
         setError('An unexpected error occurred. Please try again.');
       }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!resendEmail) return;
+
+    setIsLoading(true);
+    try {
+      const response = await apiService.resendVerificationEmail(resendEmail);
+      if (response.success) {
+        setError('');
+        setShowResendVerification(false);
+        alert('Verification email sent successfully! Please check your inbox.');
+      }
+    } catch (error) {
+      console.error('Resend verification error:', error);
+      const errorMessage = error.response?.data?.message || 'Failed to resend verification email.';
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -146,6 +172,27 @@ const Login = () => {
             {error && (
               <div className="error-message">
                 {error}
+                {showResendVerification && (
+                  <div style={{ marginTop: '10px' }}>
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      className="resend-verification-btn"
+                      style={{
+                        background: '#007bff',
+                        color: 'white',
+                        border: 'none',
+                        padding: '8px 16px',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        fontSize: '14px'
+                      }}
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Sending...' : 'Resend Verification Email'}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

@@ -5,7 +5,7 @@ import axios from 'axios';
 import AuthTokenService from './AuthTokenService';
 
 class ApiService {
-  constructor(baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001') {
+  constructor(baseURL = 'http://localhost:5001') {
     this.baseURL = baseURL;
     this.axiosInstance = this.createAxiosInstance();
   }
@@ -137,6 +137,11 @@ class ApiService {
         status: error.response?.status
       };
     }
+  }
+
+  // Alias for better naming consistency
+  async resendVerificationEmail(email) {
+    return this.resendVerification(email);
   }
 
   async forgotPassword(email) {

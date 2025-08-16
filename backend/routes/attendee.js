@@ -3,10 +3,13 @@ const router = express.Router();
 const { Pool } = require('pg');
 const authenticateToken = require('../middleware/auth');
 
-// Database connection - Use DATABASE_URL for Heroku compatibility
+// Database connection
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
 });
 
 // Test endpoint to check authentication
@@ -1405,17 +1408,14 @@ router.get('/tickets', authenticateToken, async (req, res) => {
       const user = userResult.rows[0];
       const fullName = user.email.split('@')[0] || 'Attendee';
       
-      // Use UPSERT to handle race conditions
       const newAttendeeResult = await pool.query(
         `INSERT INTO attendees (user_id, full_name) 
-         VALUES ($1, $2) 
-         ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name
-         RETURNING attendee_id`,
+         VALUES ($1, $2) RETURNING attendee_id`,
         [userId, fullName]
       );
       
       attendeeId = newAttendeeResult.rows[0].attendee_id;
-      console.log('Auto-created attendee ID:', attendeeId);
+      console.log('Created new attendee profile with ID:', attendeeId);
     } else {
       attendeeId = attendeeResult.rows[0].attendee_id;
       console.log('Found existing attendee ID:', attendeeId);

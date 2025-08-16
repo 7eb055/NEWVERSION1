@@ -167,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -494,7 +494,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role_type = $1 WHERE user_id = $2',
+      'UPDATE users SET role = $1 WHERE id = $2',
       [role_type, userId]
     );
 
@@ -521,7 +521,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const { userId } = req.params;
 
     // Get user details before deletion for logging
-    const userResult = await pool.query('SELECT email FROM users WHERE user_id = $1', [userId]);
+    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -529,7 +529,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const userEmail = userResult.rows[0].email;
 
     // Delete user (this should cascade delete related records)
-    await pool.query('DELETE FROM users WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
     // Log this action
     try {
@@ -708,7 +708,7 @@ app.post('/api/admin/bulk-actions', authenticateToken, authorizeAdmin, async (re
     case 'delete':
       if (target === 'users') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
-        await pool.query(`DELETE FROM users WHERE user_id IN (${placeholders})`, ids);
+        await pool.query(`DELETE FROM users WHERE id IN (${placeholders})`, ids);
         result.message = `Deleted ${ids.length} users`;
       } else if (target === 'events') {
         const placeholders = ids.map((_, i) => `$${i + 1}`).join(',');
@@ -1070,7 +1070,7 @@ app.post('/api/events/:eventId/register', authenticateToken, async (req, res) =>
     if (attendeeQuery.rows.length === 0) {
       // Get user info to create attendee record
       const userQuery = await client.query(
-        'SELECT email FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE id = $1',
         [req.user.user_id]
       );
       
@@ -1246,7 +1246,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
       // Check if user exists
       const userCheck = await client.query(
-        'SELECT user_id FROM users WHERE email = $1',
+        'SELECT id as user_id FROM users WHERE email = $1',
         [attendeeEmail]
       );
 
@@ -1592,7 +1592,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Check if user exists
     const userCheck = await client.query(
-      'SELECT user_id FROM users WHERE email = $1',
+      'SELECT id as user_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -4171,8 +4171,8 @@ app.post('/api/notifications', authenticateToken, async (req, res) => {
 
     // Only allow admins to create notifications for other users
     if (user_id && user_id !== req.user.user_id) {
-      const userRoleCheck = await pool.query('SELECT role_type FROM users WHERE user_id = $1', [req.user.user_id]);
-      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role_type !== 'admin') {
+      const userRoleCheck = await pool.query('SELECT role FROM users WHERE id = $1', [req.user.user_id]);
+      if (userRoleCheck.rows.length === 0 || userRoleCheck.rows[0].role !== 'admin') {
         return res.status(403).json({ message: 'Only admins can create notifications for other users' });
       }
     }
@@ -4211,7 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT user_id, email, password, role_type, account_status, created_at
+      `SELECT id as user_id, email, password, role as role_type, is_suspended, created_at, is_email_verified, account_status
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4224,10 +4224,19 @@ app.post('/api/auth/login', async (req, res) => {
     const userData = userQuery.rows[0];
 
     // Check if user account is suspended
-    if (userData.account_status === 'suspended') {
+    if (userData.is_suspended) {
       return res.status(401).json({ 
         message: 'Your account has been suspended. Please contact support.',
         isSuspended: true
+      });
+    }
+
+    // Check if email is verified
+    if (!userData.is_email_verified) {
+      return res.status(401).json({ 
+        message: 'Please verify your email address before logging in. Check your inbox for verification email.',
+        requiresEmailVerification: true,
+        email: userData.email
       });
     }
 
@@ -4336,7 +4345,7 @@ app.post('/api/auth/register', async (req, res) => {
     }
 
     // Check if user already exists
-    const existingUser = await pool.query('SELECT user_id FROM users WHERE email = $1', [email]);
+    const existingUser = await pool.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existingUser.rows.length > 0) {
       return res.status(409).json({ message: 'User already exists' });
     }
@@ -4344,56 +4353,36 @@ app.post('/api/auth/register', async (req, res) => {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate email verification token
+    const emailVerificationToken = crypto.randomBytes(32).toString('hex');
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Create user with basic fields (production schema compatibility)
     const userResult = await pool.query(
       `INSERT INTO users (
-        email, password, role_type
-      ) VALUES ($1, $2, $3) 
-      RETURNING user_id, email, role_type, created_at`,
-      [email, hashedPassword, role_type || 'attendee']
+        email, password, role, name, email_verification_token, email_verification_expires
+      ) VALUES ($1, $2, $3, $4, $5, $6) 
+      RETURNING id as user_id, email, role as role_type, created_at`,
+      [email, hashedPassword, role_type || 'attendee', email.split('@')[0], emailVerificationToken, emailVerificationExpires]
     );
 
     const newUser = userResult.rows[0];
 
-    // If user is registering as an organizer, create organizer profile
-    if (role_type === 'organizer') {
-      try {
-        // Extract organizer-specific data from request
-        const fullName = req.body.fullName || req.body.companyName || email.split('@')[0];
-        const phone = req.body.phone || null;
-        const companyName = req.body.companyName || null;
-        const location = req.body.location || null;
-
-        // Create organizer profile
-        await pool.query(
-          `INSERT INTO organizers (
-            user_id, full_name, phone, company_name, 
-            business_address, created_at, updated_at
-          ) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
-          [newUser.user_id, fullName, phone, companyName, location]
-        );
-
-        console.log('✅ Organizer profile created for user:', newUser.user_id);
-      } catch (organizerError) {
-        console.error('⚠️ Failed to create organizer profile:', organizerError);
-        // Don't fail the registration, just log the error
-      }
+    // Send verification email
+    try {
+      await emailService.sendVerificationEmail(
+        email, 
+        emailVerificationToken, 
+        email.split('@')[0]
+      );
+      console.log('Verification email sent successfully to:', email);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Continue with registration even if email fails
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { 
-        user_id: newUser.user_id, 
-        email: newUser.email, 
-        role: newUser.role_type
-      },
-      JWT_SECRET,
-      { expiresIn: '24h' }
-    );
-
     res.status(201).json({
-      message: 'User registered successfully.',
-      token,
+      message: 'Registration successful! Please check your email to verify your account before logging in.',
       user: {
         user_id: newUser.user_id,
         email: newUser.email,
@@ -4413,42 +4402,6 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-// Create organizer profile for existing user
-app.post('/api/auth/setup-organizer', authenticateToken, async (req, res) => {
-  try {
-    const { fullName, phone, companyName, businessAddress, jobTitle } = req.body;
-
-    // Check if user already has organizer profile
-    const existingOrganizer = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
-      [req.user.user_id]
-    );
-
-    if (existingOrganizer.rows.length > 0) {
-      return res.status(409).json({ message: 'Organizer profile already exists' });
-    }
-
-    // Create organizer profile
-    const organizerResult = await pool.query(
-      `INSERT INTO organizers (
-        user_id, full_name, phone, company_name, 
-        business_address, job_title, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-      RETURNING organizer_id, full_name, company_name`,
-      [req.user.user_id, fullName, phone, companyName, businessAddress, jobTitle]
-    );
-
-    res.status(201).json({
-      message: 'Organizer profile created successfully',
-      organizer: organizerResult.rows[0]
-    });
-
-  } catch (error) {
-    console.error('Setup organizer error:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-});
-
 // Email verification endpoint
 app.post('/api/auth/verify-email', async (req, res) => {
   try {
@@ -4460,7 +4413,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
     // Find user with this verification token
     const userQuery = await pool.query(
-      `SELECT user_id, email, email_verification_expires, is_email_verified 
+      `SELECT id as user_id, email, email_verification_expires, is_email_verified 
        FROM users 
        WHERE email_verification_token = $1`,
       [token]
@@ -4493,7 +4446,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
            account_status = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE user_id = $1`,
+       WHERE id = $1`,
       [user.user_id]
     );
 
@@ -4519,7 +4472,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
     // Find user by email
     const userQuery = await pool.query(
-      'SELECT user_id, email FROM users WHERE email = $1',
+      'SELECT id as user_id, email, is_email_verified FROM users WHERE email = $1',
       [email]
     );
 
@@ -4543,7 +4496,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       `UPDATE users 
        SET email_verification_token = $1, 
            email_verification_expires = $2
-       WHERE user_id = $3`,
+       WHERE id = $3`,
       [emailVerificationToken, emailVerificationExpires, user.user_id]
     );
 
@@ -4577,7 +4530,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
-      'SELECT user_id, email, role_type, created_at FROM users WHERE user_id = $1',
+      'SELECT id as user_id, email, role as role_type, created_at FROM users WHERE id = $1',
       [req.user.user_id]
     );
 
@@ -4995,7 +4948,7 @@ app.get('/api/attendee/dashboard', authenticateToken, async (req, res) => {
     if (attendeeQuery.rows.length === 0) {
       // If user is not in attendees table, create a basic entry
       const userQuery = await pool.query(
-        'SELECT email FROM users WHERE user_id = $1',
+        'SELECT email FROM users WHERE id = $1',
         [req.user.user_id]
       );
       

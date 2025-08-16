@@ -100,11 +100,13 @@ const SignUp = () => {
     setError('');
 
     try {
-      // Prepare data for backend - matching the comprehensive schema
+      // Prepare data for backend - matching the new server's expected fields
       const submitData = {
+        username: formData.fullName,
         email: formData.email,
         password: formData.password,
-        role_type: formData.role  // Use role_type instead of role
+        phone: formData.phone,
+        role: formData.role
       };
 
       // Add organizer-specific fields if role is organizer
@@ -112,9 +114,6 @@ const SignUp = () => {
         submitData.companyName = formData.companyName;
         submitData.contactPerson = formData.contactPerson;
         submitData.location = formData.location;
-        // Store full name temporarily - will be used to create organizer profile later
-        submitData.fullName = formData.fullName;
-        submitData.phone = formData.phone;
       }
 
       // Make API request to the correct endpoint

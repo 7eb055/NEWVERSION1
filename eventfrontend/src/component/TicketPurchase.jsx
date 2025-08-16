@@ -3,7 +3,6 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
 import AuthTokenService from '../services/AuthTokenService';
-import { getErrorMessage, handleAuthError } from '../utils/errorHandling';
 import '../Page/css/TicketPurchase.css';
 
 const TicketPurchase = ({ eventId, eventName, onClose }) => {
@@ -43,7 +42,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
         setLoading(true);
         
         // Fetch real ticket types from the public API
-        const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/ticket-types/public`);
+        const response = await axios.get(`http://localhost:5001/api/events/${eventId}/ticket-types/public`);
         
         if (response.data && response.data.ticketTypes) {
           setTickets(response.data.ticketTypes);
@@ -54,8 +53,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
         setLoading(false);
       } catch (err) {
         console.error('Error fetching ticket types:', err);
-        const errorMessage = getErrorMessage(err, 'Failed to load ticket types. Please try again later.');
-        setError(errorMessage);
+        setError('Failed to load ticket types. Please try again later.');
         setLoading(false);
       }
     };
@@ -106,7 +104,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
       if (!token) return;
 
       // Initialize payment with Paystack
-      const paymentResponse = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/payments/initialize`, {
+      const paymentResponse = await axios.post(`http://localhost:5001/api/payments/initialize`, {
         event_id: eventId,
         ticket_type_id: selectedTicket.ticket_type_id,
         ticket_quantity: quantity
@@ -136,7 +134,7 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
             // Check payment status
             try {
               const statusResponse = await axios.get(
-                `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/payments/status/${reference}`,
+                `http://localhost:5001/api/payments/status/${reference}`,
                 {
                   headers: {
                     'Authorization': `Bearer ${token}`
@@ -174,10 +172,9 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
               }
             } catch (error) {
               console.error('Error checking payment status:', error);
-              const errorMessage = getErrorMessage(error, 'Unable to verify payment status. Please contact support.');
               setNotification({
                 type: 'error',
-                message: errorMessage
+                message: 'Unable to verify payment status. Please contact support.'
               });
             }
           }
@@ -202,16 +199,15 @@ const TicketPurchase = ({ eventId, eventName, onClose }) => {
       
     } catch (err) {
       console.error('Error initiating payment:', err);
+      let errorMessage = 'Failed to initiate payment. Please try again.';
       
-      // Handle authentication errors
-      const authErrorMessage = handleAuthError(err);
-      if (authErrorMessage) {
-        setLoading(false);
-        return; // handleAuthError redirects for auth issues
+      if (err.response?.status === 403) {
+        errorMessage = 'Access denied. Please make sure you are logged in properly.';
+      } else if (err.response?.status === 401) {
+        errorMessage = 'Your session has expired. Please log in again.';
+      } else if (err.response?.data?.message) {
+        errorMessage = err.response.data.message;
       }
-      
-      // Handle other errors with consistent messaging
-      const errorMessage = getErrorMessage(err, 'Failed to initiate payment. Please try again.');
       
       setNotification({
         type: 'error',

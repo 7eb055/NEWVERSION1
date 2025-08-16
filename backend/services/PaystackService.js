@@ -7,11 +7,6 @@ class PaystackService {
     this.publicKey = process.env.PAYSTACK_PUBLIC_KEY;
     this.baseURL = process.env.PAYSTACK_BASE_URL || 'https://api.paystack.co';
     
-    console.log('PaystackService initialized with:');
-    console.log('Secret Key:', this.secretKey ? `${this.secretKey.substring(0, 20)}...` : 'NOT FOUND');
-    console.log('Public Key:', this.publicKey ? `${this.publicKey.substring(0, 20)}...` : 'NOT FOUND');
-    console.log('Base URL:', this.baseURL);
-    
     if (!this.secretKey) {
       console.warn('PAYSTACK_SECRET_KEY not found in environment variables');
     }
