@@ -1405,14 +1405,17 @@ router.get('/tickets', authenticateToken, async (req, res) => {
       const user = userResult.rows[0];
       const fullName = user.email.split('@')[0] || 'Attendee';
       
+      // Use UPSERT to handle race conditions
       const newAttendeeResult = await pool.query(
         `INSERT INTO attendees (user_id, full_name) 
-         VALUES ($1, $2) RETURNING attendee_id`,
+         VALUES ($1, $2) 
+         ON CONFLICT (user_id) DO UPDATE SET full_name = EXCLUDED.full_name
+         RETURNING attendee_id`,
         [userId, fullName]
       );
       
       attendeeId = newAttendeeResult.rows[0].attendee_id;
-      console.log('Created new attendee profile with ID:', attendeeId);
+      console.log('Auto-created attendee ID:', attendeeId);
     } else {
       attendeeId = attendeeResult.rows[0].attendee_id;
       console.log('Found existing attendee ID:', attendeeId);
