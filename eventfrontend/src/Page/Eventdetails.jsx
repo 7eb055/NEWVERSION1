@@ -36,7 +36,7 @@ function EventDetails() {
       try {
         setLoading(true);
         // Use import.meta.env instead of process.env for Vite projects
-        const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/public/events/${eventId}`);
+        const response = await axios.get(`http://localhost:5001/api/public/events/${eventId}`);
         
         console.log('Event data received:', response.data);
         

@@ -4,22 +4,14 @@ const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const authenticateToken = require('../middleware/auth');
 
-// Database connection - Use DATABASE_URL for production, fallback to individual vars for development
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-    : {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-);
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
 
 // ===== NOTIFICATION SETTINGS =====
 
@@ -58,55 +50,10 @@ router.get('/notifications', authenticateToken, async (req, res) => {
 // PUT update notification preferences
 router.put('/notifications', authenticateToken, async (req, res) => {
   try {
+    const { email, sms, event_updates, promotions } = req.body;
+    
     console.log('Updating notification settings for user ID:', req.user.user_id);
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Raw body type:', typeof req.body);
-    console.log('Raw body constructor:', req.body?.constructor?.name);
-    console.log('Is Array?:', Array.isArray(req.body));
-    console.log('Raw body keys:', Object.keys(req.body || {}));
-    
-    // Handle the case where req.body is an array-like object with character indices
-    let parsedBody = req.body;
-    
-    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
-      // Check if this looks like a character-indexed object
-      const keys = Object.keys(req.body);
-      const isCharacterIndexed = keys.length > 0 && keys.every(key => !isNaN(parseInt(key)));
-      
-      if (isCharacterIndexed) {
-        console.log('Detected character-indexed body, reconstructing JSON...');
-        // Reconstruct the string from character indices
-        const jsonString = keys
-          .sort((a, b) => parseInt(a) - parseInt(b))
-          .map(key => req.body[key])
-          .join('');
-        
-        console.log('Reconstructed string:', jsonString);
-        
-        try {
-          parsedBody = JSON.parse(jsonString);
-          console.log('Successfully parsed body:', parsedBody);
-        } catch (e) {
-          console.error('Failed to parse reconstructed JSON:', e);
-          return res.status(400).json({ message: 'Invalid JSON in request body' });
-        }
-      }
-    }
-    
-    // If it's still a string, try to parse it
-    if (typeof parsedBody === 'string') {
-      try {
-        parsedBody = JSON.parse(parsedBody);
-        console.log('Parsed body from string:', parsedBody);
-      } catch (e) {
-        console.error('Failed to parse body as JSON:', e);
-        return res.status(400).json({ message: 'Invalid JSON in request body' });
-      }
-    }
-    
-    console.log('Final parsed body:', parsedBody);
-    
-    const { email, sms, event_updates, promotions } = parsedBody;
+    console.log('New settings:', req.body);
     
     const notificationPrefs = {
       email: email ?? true,
@@ -340,7 +287,7 @@ router.get('/export-data', authenticateToken, async (req, res) => {
     );
     
     const registrationData = await pool.query(
-      `SELECT er.*, e.event_name as event_title, e.event_date as start_date, e.end_time as end_date 
+      `SELECT er.*, e.title as event_title, e.start_date, e.end_date 
        FROM eventregistrations er 
        JOIN events e ON er.event_id = e.event_id 
        JOIN attendees a ON er.attendee_id = a.attendee_id 

@@ -1,28 +1,19 @@
 const { Pool } = require('pg');
 
 // Create and export a new pool for database connection
-// Use DATABASE_URL for production, fallback to individual vars for development
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10
-    }
-    : {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false,
-      connectionTimeoutMillis: 10000,
-      idleTimeoutMillis: 30000,
-      max: 10
-    }
-);
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT || 5432,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? {
+    rejectUnauthorized: false
+  } : false,
+  connectionTimeoutMillis: 10000,
+  idleTimeoutMillis: 30000,
+  max: 10
+});
 
 // Test connection when this module is imported (skip in test mode)
 if (process.env.NODE_ENV !== 'test') {
@@ -30,7 +21,6 @@ if (process.env.NODE_ENV !== 'test') {
     if (err) {
       console.error('Error connecting to database from db module:', err);
       console.error('Database config:', {
-        DATABASE_URL: process.env.DATABASE_URL ? '[SET]' : '[NOT SET]',
         host: process.env.DB_HOST,
         port: process.env.DB_PORT || 5432,
         database: process.env.DB_NAME,

@@ -3,22 +3,14 @@ const router = express.Router();
 const { Pool } = require('pg');
 const authenticateToken = require('../middleware/auth');
 
-// Database connection - Use DATABASE_URL for production, fallback to individual vars for development
-const pool = new Pool(
-  process.env.DATABASE_URL
-    ? {
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-    : {
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 5432,
-      database: process.env.DB_NAME,
-      user: process.env.DB_USER,
-      password: process.env.DB_PASSWORD,
-      ssl: process.env.NODE_ENV === 'production' || process.env.NODE_ENV === 'staging' ? { rejectUnauthorized: false } : false
-    }
-);
+// Database connection
+const pool = new Pool({
+  host: process.env.DB_HOST,
+  port: process.env.DB_PORT,
+  database: process.env.DB_NAME,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+});
 
 // Test endpoint to check authentication
 router.get('/test-auth', authenticateToken, async (req, res) => {
@@ -1437,8 +1429,7 @@ router.get('/tickets', authenticateToken, async (req, res) => {
               e.event_name, e.event_date, e.event_time, e.end_time,
               e.venue_name, e.venue_address, e.image_url, e.description,
               tt.type_name as ticket_type_name, tt.price as ticket_price,
-              COALESCE(o.organizer_name, o.full_name, 'Event Organizer') as organizer_name, 
-              o.company_name,
+              o.full_name as organizer_name, o.company_name,
               CASE 
                 WHEN al.check_in_time IS NOT NULL THEN true 
                 ELSE false 
@@ -1449,9 +1440,9 @@ router.get('/tickets', authenticateToken, async (req, res) => {
               END as has_feedback
        FROM eventregistrations er
        JOIN events e ON er.event_id = e.event_id
-       LEFT JOIN organizers o ON e.organizer_id = o.organizer_id
+       JOIN organizers o ON e.organizer_id = o.organizer_id
        LEFT JOIN tickettypes tt ON er.ticket_type_id = tt.ticket_type_id
-       LEFT JOIN attendance_log al ON er.registration_id = al.registration_id
+       LEFT JOIN attendancelogs al ON er.registration_id = al.registration_id
        LEFT JOIN eventfeedback ef ON e.event_id = ef.event_id AND ef.attendee_id = er.attendee_id
        WHERE er.attendee_id = $1
        ORDER BY e.event_date DESC`,

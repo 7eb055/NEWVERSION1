@@ -113,23 +113,7 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// Debug middleware to log all requests
-app.use((req, res, next) => {
-  if (req.path.includes('/api/settings/notifications') && req.method === 'PUT') {
-    console.log('=== MIDDLEWARE DEBUG ===');
-    console.log('Content-Type:', req.headers['content-type']);
-    console.log('Content-Length:', req.headers['content-length']);
-    console.log('Raw body type:', typeof req.body);
-    console.log('Raw body keys:', Object.keys(req.body || {}));
-    console.log('Is Array?:', Array.isArray(req.body));
-    console.log('Body constructor:', req.body?.constructor?.name);
-    console.log('========================');
-  }
-  next();
-});
+app.use(express.json());
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -183,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -510,7 +494,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role_type = $1 WHERE user_id = $2',
+      'UPDATE users SET role = $1 WHERE id = $2',
       [role_type, userId]
     );
 
@@ -537,7 +521,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const { userId } = req.params;
 
     // Get user details before deletion for logging
-    const userResult = await pool.query('SELECT email FROM users WHERE user_id = $1', [userId]);
+    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -545,7 +529,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const userEmail = userResult.rows[0].email;
 
     // Delete user (this should cascade delete related records)
-    await pool.query('DELETE FROM users WHERE user_id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
 
     // Log this action
     try {
@@ -1262,7 +1246,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
       // Check if user exists
       const userCheck = await client.query(
-        'SELECT user_id FROM users WHERE email = $1',
+        'SELECT id as user_id FROM users WHERE email = $1',
         [attendeeEmail]
       );
 
@@ -4227,7 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT user_id, email, password, role_type, created_at, is_email_verified, account_status, is_suspended
+      `SELECT user_id, email, password, role_type, created_at, is_email_verified, account_status
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4239,13 +4223,14 @@ app.post('/api/auth/login', async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Check if user account is suspended
-    if (userData.is_suspended) {
-      return res.status(401).json({ 
-        message: 'Your account has been suspended. Please contact support.',
-        isSuspended: true
-      });
-    }
+    // Check if user account is suspended (feature will be added later)
+    // Note: is_suspended column doesn't exist in production database yet
+    // if (userData.is_suspended) {
+    //   return res.status(401).json({ 
+    //     message: 'Your account has been suspended. Please contact support.',
+    //     isSuspended: true
+    //   });
+    // }
 
     // Check if email is verified
     if (!userData.is_email_verified) {
@@ -4343,33 +4328,10 @@ app.post('/api/auth/login', async (req, res) => {
 // Register user
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { 
-      username, 
-      email, 
-      password, 
-      phone, 
-      role = 'attendee',
-      companyName,
-      contactPerson,
-      location
-    } = req.body;
-
-    console.log('Registration request received:', {
-      username,
-      email,
-      role,
-      phone,
-      hasCompanyName: !!companyName,
-      hasContactPerson: !!contactPerson,
-      hasLocation: !!location
-    });
+    const { email, password, role_type = 'attendee' } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
-    }
-
-    if (!username) {
-      return res.status(400).json({ message: 'Full name is required' });
     }
 
     // Validate email format
@@ -4381,15 +4343,6 @@ app.post('/api/auth/register', async (req, res) => {
     // Validate password strength
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long' });
-    }
-
-    // Validate organizer-specific fields
-    if (role === 'organizer') {
-      if (!companyName || !contactPerson || !location) {
-        return res.status(400).json({ 
-          message: 'Company name, contact person, and location are required for organizers' 
-        });
-      }
     }
 
     // Check if user already exists
@@ -4405,84 +4358,44 @@ app.post('/api/auth/register', async (req, res) => {
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Start transaction
-    const client = await pool.connect();
+    // Create user with basic fields (production schema compatibility)
+    const userResult = await pool.query(
+      `INSERT INTO users (
+        email, password, role_type, email_verification_token, email_verification_expires
+      ) VALUES ($1, $2, $3, $4, $5) 
+      RETURNING user_id, email, role_type, created_at`,
+      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires]
+    );
+
+    const newUser = userResult.rows[0];
+
+    // Send verification email
     try {
-      await client.query('BEGIN');
-
-      // Create user with required fields (matching actual schema)
-      const userResult = await client.query(
-        `INSERT INTO users (
-          email, password, role_type, 
-          email_verification_token, email_verification_expires
-        ) VALUES ($1, $2, $3, $4, $5) 
-        RETURNING user_id, email, role_type, created_at`,
-        [email, hashedPassword, role, emailVerificationToken, emailVerificationExpires]
+      await emailService.sendVerificationEmail(
+        email, 
+        emailVerificationToken, 
+        email.split('@')[0]
       );
-
-      const newUser = userResult.rows[0];
-      console.log('Created user:', { user_id: newUser.user_id, role: newUser.role_type });
-
-      // Create role-specific profile
-      if (role === 'organizer') {
-        // Create organizer profile with required fields
-        const organizerResult = await client.query(
-          `INSERT INTO organizers (
-            user_id, full_name, phone, company_name
-          ) VALUES ($1, $2, $3, $4) 
-          RETURNING organizer_id`,
-          [newUser.user_id, username, phone, companyName]
-        );
-        console.log('Created organizer profile:', organizerResult.rows[0]);
-      } else {
-        // Create attendee profile (default)
-        const attendeeResult = await client.query(
-          `INSERT INTO attendees (
-            user_id, full_name, phone
-          ) VALUES ($1, $2, $3) 
-          RETURNING attendee_id`,
-          [newUser.user_id, username, phone]
-        );
-        console.log('Created attendee profile:', attendeeResult.rows[0]);
-      }
-
-      await client.query('COMMIT');
-
-      // Send verification email
-      try {
-        await emailService.sendVerificationEmail(
-          email, 
-          emailVerificationToken, 
-          username
-        );
-        console.log('Verification email sent successfully to:', email);
-      } catch (emailError) {
-        console.error('Failed to send verification email:', emailError);
-        // Continue with registration even if email fails
-      }
-
-      res.status(201).json({
-        message: 'Registration successful! Please check your email to verify your account before logging in.',
-        user: {
-          user_id: newUser.user_id,
-          username: username,
-          email: newUser.email,
-          role: newUser.role_type,
-          primary_role: newUser.role_type,
-          roles: [],
-          created_at: newUser.created_at,
-          is_email_verified: false,
-          account_status: 'pending'
-        },
-        requiresEmailVerification: true
-      });
-
-    } catch (transactionError) {
-      await client.query('ROLLBACK');
-      throw transactionError;
-    } finally {
-      client.release();
+      console.log('Verification email sent successfully to:', email);
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      // Continue with registration even if email fails
     }
+
+    res.status(201).json({
+      message: 'Registration successful! Please check your email to verify your account before logging in.',
+      user: {
+        user_id: newUser.user_id,
+        email: newUser.email,
+        role: newUser.role_type,
+        primary_role: newUser.role_type,
+        roles: [],
+        created_at: newUser.created_at,
+        is_email_verified: false,
+        account_status: 'pending'
+      },
+      requiresEmailVerification: true
+    });
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -4534,7 +4447,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
            account_status = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE user_id = $1`,
+       WHERE id = $1`,
       [user.user_id]
     );
 
