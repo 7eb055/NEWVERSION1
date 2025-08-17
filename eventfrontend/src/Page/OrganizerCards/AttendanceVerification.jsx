@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import AttendeeListingService from '../../services/attendeeListingService';
@@ -76,7 +76,7 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
   // };
 
   // Load attendees for the selected event using the new comprehensive attendee listing API
-  const loadAttendees = async () => {
+  const loadAttendees = useCallback(async () => {
     if (!selectedEvent) return;
     
     setLoading(true);
@@ -99,10 +99,10 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEvent, API_URL]);
 
     // Load attendance statistics using the new comprehensive stats API
-  const loadAttendanceStats = async () => {
+  const loadAttendanceStats = useCallback(async () => {
     if (!selectedEvent) return;
     
     try {
@@ -171,10 +171,10 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
         setError('Failed to load attendance statistics');
       }
     }
-  };
+  }, [selectedEvent, API_URL]);
 
   // Load scan history
-  const loadScanHistory = async () => {
+  const loadScanHistory = useCallback(async () => {
     if (!selectedEvent) return;
     
     try {
@@ -206,7 +206,7 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
     } catch (error) {
       console.error('Error loading scan history:', error);
     }
-  };
+  }, [selectedEvent, API_URL, events]);
 
   // Handle QR code scanning
   const handleQRScan = async () => {

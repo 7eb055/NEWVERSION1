@@ -37,7 +37,7 @@ const TicketingManagement = ({ events = [] }) => {
       if (activeTab === 'sales') loadSalesData();
       if (activeTab === 'registrations') loadRegistrations();
     }
-  }, [selectedEventId, activeTab]);
+  }, [selectedEventId, activeTab, loadRegistrations, loadSalesData, loadTicketTypes]);
 
   // Remove this function since we're using events prop
   // const loadUserEvents = async () => {

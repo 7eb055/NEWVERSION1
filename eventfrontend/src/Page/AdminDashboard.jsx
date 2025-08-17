@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../services/AuthTokenService';
 import Header from '../component/header';
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
     if (activeTab === 'reports') fetchReports();
     }, [activeTab, reportPeriod, fetchReports]);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = AuthTokenService.getToken();
@@ -84,9 +84,9 @@ const AdminDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [API_BASE]);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
       const token = AuthTokenService.getToken();
       const params = new URLSearchParams({
@@ -111,9 +111,9 @@ const AdminDashboard = () => {
       setError('Failed to fetch users');
       console.error(err);
     }
-  };
+  }, [API_BASE, userPagination.page, userFilters]);
 
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       const token = AuthTokenService.getToken();
       const params = new URLSearchParams(eventFilters);
@@ -127,9 +127,9 @@ const AdminDashboard = () => {
       setError('Failed to fetch events');
       console.error(err);
     }
-  };
+  }, [API_BASE, eventFilters]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     try {
       const token = AuthTokenService.getToken();
       const params = new URLSearchParams(logFilters);
@@ -143,9 +143,9 @@ const AdminDashboard = () => {
       setError('Failed to fetch logs');
       console.error(err);
     }
-  };
+  }, [API_BASE, logFilters]);
 
-  const fetchSystemHealth = async () => {
+  const fetchSystemHealth = useCallback(async () => {
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(`${API_BASE}/api/admin/system-health`, {
@@ -157,9 +157,9 @@ const AdminDashboard = () => {
       setError('Failed to fetch system health');
       console.error(err);
     }
-  };
+  }, [API_BASE]);
 
-  const fetchReports = async () => {
+  const fetchReports = useCallback(async () => {
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(`${API_BASE}/api/admin/reports?period=${reportPeriod}`, {
@@ -171,7 +171,7 @@ const AdminDashboard = () => {
       setError('Failed to fetch reports');
       console.error(err);
     }
-  };
+  }, [API_BASE, reportPeriod]);
 
   const handleUserAction = async (action, userId, data = {}) => {
     try {

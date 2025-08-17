@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import "./css/Eventdetails.css";
 import Header from "../component/header";
@@ -69,7 +69,7 @@ function Attendee() {
   const [loadingTickets, setLoadingTickets] = useState(false);
 
   // Helper function to get auth token
-  const getAuthToken = () => {
+  const getAuthToken = useCallback(() => {
     const token = AuthTokenService.getToken();
     console.log('=== TOKEN DEBUG ===');
     console.log('AuthTokenService token:', token ? 'Found' : 'Not found');
@@ -78,10 +78,10 @@ function Attendee() {
     console.log('All localStorage keys:', Object.keys(localStorage));
     console.log('==================');
     return token;
-  };
+  }, []);
 
   // Helper function to make API calls with auth
-  const makeAuthenticatedRequest = async (url, options = {}) => {
+  const makeAuthenticatedRequest = useCallback(async (url, options = {}) => {
     const token = getAuthToken();
     const defaultHeaders = {
       'Content-Type': 'application/json',
@@ -95,10 +95,10 @@ function Attendee() {
         ...options.headers
       }
     });
-  };
+  }, [getAuthToken]);
 
   // Fetch available events
-  const fetchEvents = async () => {
+  const fetchEvents = useCallback(async () => {
     try {
       // Construct URL with search parameters
       let url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/public/events`);
@@ -127,10 +127,10 @@ function Attendee() {
     } catch (error) {
       console.error('Error fetching events:', error);
     }
-  };
+  }, [searchTerm, selectedCategory, pagination.page, pagination.limit]);
 
   // Fetch user's tickets from backend
-  const fetchMyTickets = async () => {
+  const fetchMyTickets = useCallback(async () => {
     try {
       console.log('Fetching tickets...');
       const token = getAuthToken();
@@ -189,10 +189,10 @@ function Attendee() {
       console.error('Error fetching tickets:', error);
       setMyTickets([]);
     }
-  };
+  }, [getAuthToken, makeAuthenticatedRequest]);
 
   // Fetch user profile from backend
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = useCallback(async () => {
     try {
       console.log('Fetching user profile...');
       const token = getAuthToken();
@@ -215,10 +215,10 @@ function Attendee() {
     } catch (error) {
       console.error('Error fetching profile:', error);
     }
-  };
+  }, [getAuthToken, makeAuthenticatedRequest]);
 
   // Fetch notifications from backend
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       console.log('Fetching notifications...');
       const token = getAuthToken();
@@ -254,10 +254,10 @@ function Attendee() {
       console.error('Error fetching notifications:', error);
       setNotifications([]);
     }
-  };
+  }, [getAuthToken, makeAuthenticatedRequest]);
 
   // Fetch notification statistics
-  const fetchNotificationStats = async () => {
+  const fetchNotificationStats = useCallback(async () => {
     try {
       const response = await makeAuthenticatedRequest('/api/attendee/notifications/stats');
       
@@ -277,7 +277,7 @@ function Attendee() {
     } catch (error) {
       console.error('Error fetching notification stats:', error);
     }
-  };
+  }, [makeAuthenticatedRequest]);
 
   // Load data on component mount
   useEffect(() => {
@@ -311,7 +311,7 @@ function Attendee() {
     };
 
     loadData();
-  }, [searchTerm, selectedCategory, pagination.page]); // Re-fetch when search term, category, or page changes
+  }, [fetchEvents, fetchMyTickets, fetchNotifications, fetchNotificationStats, fetchUserProfile, makeAuthenticatedRequest]); // Re-fetch when search term, category, or page changes
 
   // Handle page change
   const handlePageChange = (newPage) => {
