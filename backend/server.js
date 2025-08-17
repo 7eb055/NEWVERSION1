@@ -1541,6 +1541,429 @@ app.get('/api/companies', authenticateToken, async (req, res) => {
   }
 });
 
+// ===== TEAM MANAGEMENT ENDPOINTS =====
+
+// GET team members
+app.get('/api/team', authenticateToken, async (req, res) => {
+  try {
+    const teamQuery = await pool.query(`
+      SELECT 
+        u.user_id, u.email, u.username, u.role, u.created_at, u.is_active,
+        o.first_name, o.last_name, o.phone, o.department, o.position, 
+        o.hire_date, o.salary, o.status, o.permissions, o.profile_image,
+        o.bio, o.skills, o.emergency_contact, o.address
+      FROM users u
+      LEFT JOIN organizers o ON u.user_id = o.user_id
+      WHERE u.role IN ('organizer', 'admin')
+      ORDER BY u.created_at DESC
+    `);
+
+    res.json({
+      success: true,
+      team: teamQuery.rows
+    });
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST create team member
+app.post('/api/team', authenticateToken, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const {
+      first_name, last_name, email, phone, role, department, position,
+      hire_date, salary, status, permissions, profile_image, bio, skills,
+      emergency_contact, address
+    } = req.body;
+
+    if (!email || !first_name || !last_name) {
+      return res.status(400).json({ message: 'Email, first name, and last name are required' });
+    }
+
+    await client.query('BEGIN');
+
+    // Check if user already exists
+    const userCheck = await client.query(
+      'SELECT user_id FROM users WHERE email = $1',
+      [email]
+    );
+
+    let userId;
+    if (userCheck.rows.length > 0) {
+      userId = userCheck.rows[0].user_id;
+    } else {
+      // Create new user
+      const tempPassword = crypto.randomBytes(8).toString('hex');
+      const hashedPassword = await bcrypt.hash(tempPassword, 10);
+      
+      const userResult = await client.query(
+        'INSERT INTO users (email, password, role, username) VALUES ($1, $2, $3, $4) RETURNING user_id',
+        [email, hashedPassword, role || 'organizer', `${first_name}.${last_name}`.toLowerCase()]
+      );
+      userId = userResult.rows[0].user_id;
+    }
+
+    // Create or update organizer profile
+    const organizerResult = await client.query(`
+      INSERT INTO organizers (
+        user_id, first_name, last_name, phone, department, position,
+        hire_date, salary, status, permissions, profile_image, bio, skills,
+        emergency_contact, address
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ON CONFLICT (user_id) DO UPDATE SET
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        phone = EXCLUDED.phone,
+        department = EXCLUDED.department,
+        position = EXCLUDED.position,
+        hire_date = EXCLUDED.hire_date,
+        salary = EXCLUDED.salary,
+        status = EXCLUDED.status,
+        permissions = EXCLUDED.permissions,
+        profile_image = EXCLUDED.profile_image,
+        bio = EXCLUDED.bio,
+        skills = EXCLUDED.skills,
+        emergency_contact = EXCLUDED.emergency_contact,
+        address = EXCLUDED.address
+      RETURNING organizer_id
+    `, [
+      userId, first_name, last_name, phone, department, position,
+      hire_date, salary, status || 'active', permissions || [],
+      profile_image, bio, skills, emergency_contact, address
+    ]);
+
+    await client.query('COMMIT');
+
+    res.json({
+      success: true,
+      message: 'Team member created successfully',
+      organizer_id: organizerResult.rows[0].organizer_id
+    });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    console.error('Error creating team member:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT update team member
+app.put('/api/team/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      first_name, last_name, phone, department, position,
+      hire_date, salary, status, permissions, profile_image, bio, skills,
+      emergency_contact, address
+    } = req.body;
+
+    const result = await pool.query(`
+      UPDATE organizers SET
+        first_name = $1, last_name = $2, phone = $3, department = $4,
+        position = $5, hire_date = $6, salary = $7, status = $8,
+        permissions = $9, profile_image = $10, bio = $11, skills = $12,
+        emergency_contact = $13, address = $14, updated_at = CURRENT_TIMESTAMP
+      WHERE user_id = $15
+      RETURNING organizer_id
+    `, [
+      first_name, last_name, phone, department, position,
+      hire_date, salary, status, permissions, profile_image, bio, skills,
+      emergency_contact, address, id
+    ]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Team member not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Team member updated successfully'
+    });
+  } catch (error) {
+    console.error('Error updating team member:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// DELETE team member
+app.delete('/api/team/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(
+      'UPDATE organizers SET status = $1 WHERE user_id = $2 RETURNING organizer_id',
+      ['inactive', id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Team member not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Team member deactivated successfully'
+    });
+  } catch (error) {
+    console.error('Error deactivating team member:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ===== SALES REPORT ENDPOINTS =====
+
+// GET sales report data
+app.get('/api/sales/report', authenticateToken, async (req, res) => {
+  try {
+    const { startDate, endDate, eventId, paymentStatus, ticketType } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+
+    if (startDate) {
+      whereClause += ` AND er.registration_date >= $${paramIndex}`;
+      params.push(startDate);
+      paramIndex++;
+    }
+
+    if (endDate) {
+      whereClause += ` AND er.registration_date <= $${paramIndex}`;
+      params.push(endDate);
+      paramIndex++;
+    }
+
+    if (eventId) {
+      whereClause += ` AND er.event_id = $${paramIndex}`;
+      params.push(eventId);
+      paramIndex++;
+    }
+
+    if (paymentStatus) {
+      whereClause += ` AND er.payment_status = $${paramIndex}`;
+      params.push(paymentStatus);
+      paramIndex++;
+    }
+
+    // Sales summary
+    const summaryQuery = await pool.query(`
+      SELECT 
+        COUNT(*) as total_tickets_sold,
+        COUNT(DISTINCT er.event_id) as total_events,
+        SUM(CASE WHEN er.payment_status = 'paid' THEN COALESCE(e.ticket_price, 0) ELSE 0 END) as total_revenue,
+        AVG(CASE WHEN e.ticket_price > 0 THEN e.ticket_price ELSE NULL END) as average_ticket_price,
+        COUNT(CASE WHEN er.payment_status = 'pending' THEN 1 END) as pending_payments
+      FROM eventregistrations er
+      JOIN events e ON er.event_id = e.event_id
+      ${whereClause}
+    `, params);
+
+    // Recent sales
+    const recentSalesQuery = await pool.query(`
+      SELECT 
+        er.registration_id, er.registration_date, er.payment_status,
+        e.event_name, e.ticket_price, a.full_name as attendee_name
+      FROM eventregistrations er
+      JOIN events e ON er.event_id = e.event_id
+      LEFT JOIN attendees a ON er.attendee_id = a.attendee_id
+      ${whereClause}
+      ORDER BY er.registration_date DESC
+      LIMIT 20
+    `, params);
+
+    // Top events by sales
+    const topEventsQuery = await pool.query(`
+      SELECT 
+        e.event_id, e.event_name, e.ticket_price,
+        COUNT(er.registration_id) as tickets_sold,
+        SUM(CASE WHEN er.payment_status = 'paid' THEN COALESCE(e.ticket_price, 0) ELSE 0 END) as revenue
+      FROM events e
+      LEFT JOIN eventregistrations er ON e.event_id = er.event_id
+      ${whereClause.replace('WHERE 1=1', 'WHERE e.event_id IS NOT NULL')}
+      GROUP BY e.event_id, e.event_name, e.ticket_price
+      ORDER BY revenue DESC, tickets_sold DESC
+      LIMIT 10
+    `, params);
+
+    res.json({
+      success: true,
+      summary: summaryQuery.rows[0] || {},
+      recentSales: recentSalesQuery.rows,
+      topEvents: topEventsQuery.rows,
+      salesByPeriod: [],
+      paymentMethods: [],
+      refunds: []
+    });
+  } catch (error) {
+    console.error('Error fetching sales report:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// ===== FEEDBACK ENDPOINTS =====
+
+// GET feedback data
+app.get('/api/feedback', authenticateToken, async (req, res) => {
+  try {
+    const { eventId, rating, category, status } = req.query;
+
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    let paramIndex = 1;
+
+    if (eventId) {
+      whereClause += ` AND f.event_id = $${paramIndex}`;
+      params.push(eventId);
+      paramIndex++;
+    }
+
+    if (rating) {
+      whereClause += ` AND f.rating = $${paramIndex}`;
+      params.push(rating);
+      paramIndex++;
+    }
+
+    if (category) {
+      whereClause += ` AND f.category = $${paramIndex}`;
+      params.push(category);
+      paramIndex++;
+    }
+
+    const feedbackQuery = await pool.query(`
+      SELECT 
+        f.feedback_id, f.event_id, f.rating, f.category, f.feedback_text,
+        f.is_read, f.response, f.created_at, f.updated_at,
+        e.event_name, a.full_name as attendee_name
+      FROM event_feedback f
+      LEFT JOIN events e ON f.event_id = e.event_id
+      LEFT JOIN attendees a ON f.attendee_id = a.attendee_id
+      ${whereClause}
+      ORDER BY f.created_at DESC
+    `, params);
+
+    res.json({
+      success: true,
+      feedback: feedbackQuery.rows
+    });
+  } catch (error) {
+    console.error('Error fetching feedback:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// GET feedback statistics
+app.get('/api/feedback/stats', authenticateToken, async (req, res) => {
+  try {
+    const statsQuery = await pool.query(`
+      SELECT 
+        COUNT(*) as total_feedback,
+        AVG(rating) as average_rating,
+        COUNT(CASE WHEN is_read = false THEN 1 END) as unread_count,
+        COUNT(CASE WHEN rating = 5 THEN 1 END) as five_star,
+        COUNT(CASE WHEN rating = 4 THEN 1 END) as four_star,
+        COUNT(CASE WHEN rating = 3 THEN 1 END) as three_star,
+        COUNT(CASE WHEN rating = 2 THEN 1 END) as two_star,
+        COUNT(CASE WHEN rating = 1 THEN 1 END) as one_star
+      FROM event_feedback
+    `);
+
+    const categoryQuery = await pool.query(`
+      SELECT 
+        category,
+        COUNT(*) as count,
+        AVG(rating) as avg_rating
+      FROM event_feedback
+      WHERE category IS NOT NULL
+      GROUP BY category
+      ORDER BY count DESC
+    `);
+
+    const stats = statsQuery.rows[0] || {};
+    const categories = {};
+    categoryQuery.rows.forEach(row => {
+      categories[row.category] = {
+        count: parseInt(row.count),
+        avg_rating: parseFloat(row.avg_rating)
+      };
+    });
+
+    res.json({
+      success: true,
+      totalFeedback: parseInt(stats.total_feedback) || 0,
+      averageRating: parseFloat(stats.average_rating) || 0,
+      unreadCount: parseInt(stats.unread_count) || 0,
+      categories,
+      sentimentAnalysis: {
+        positive: parseInt(stats.five_star) + parseInt(stats.four_star) || 0,
+        neutral: parseInt(stats.three_star) || 0,
+        negative: parseInt(stats.two_star) + parseInt(stats.one_star) || 0
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching feedback statistics:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// POST respond to feedback
+app.post('/api/feedback/:id/respond', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { response } = req.body;
+
+    if (!response) {
+      return res.status(400).json({ message: 'Response text is required' });
+    }
+
+    const result = await pool.query(`
+      UPDATE event_feedback 
+      SET response = $1, is_read = true, updated_at = CURRENT_TIMESTAMP
+      WHERE feedback_id = $2
+      RETURNING feedback_id
+    `, [response, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Feedback not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Response sent successfully'
+    });
+  } catch (error) {
+    console.error('Error responding to feedback:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
+// PUT mark feedback as read
+app.put('/api/feedback/:id/read', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      UPDATE event_feedback 
+      SET is_read = true, updated_at = CURRENT_TIMESTAMP
+      WHERE feedback_id = $1
+      RETURNING feedback_id
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Feedback not found' });
+    }
+
+    res.json({
+      success: true,
+      message: 'Feedback marked as read'
+    });
+  } catch (error) {
+    console.error('Error marking feedback as read:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+});
+
 // GET all attendees
 app.get('/api/attendees', authenticateToken, async (req, res) => {
   try {

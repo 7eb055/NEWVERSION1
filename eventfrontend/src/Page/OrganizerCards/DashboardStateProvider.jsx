@@ -24,6 +24,9 @@ const DashboardStateProvider = ({ children }) => {
     eventId: 'all',
     dateRange: 'all'
   });
+
+  // UI notification states
+  const [notifications, setNotifications] = useState([]);
   
   // Form data state - Updated to match normalized schema
   const [formData, setFormData] = useState({
@@ -65,6 +68,42 @@ const DashboardStateProvider = ({ children }) => {
     setShowDeleteConfirm(false);
     setSelectedEvent(null);
     setEventToDelete(null);
+  };
+
+  // Helper functions for displaying notifications
+  const showError = (message) => {
+    console.error('Error:', message);
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, type: 'error', message }]);
+    // Auto remove after 5 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 5000);
+  };
+
+  const showSuccess = (message) => {
+    console.log('Success:', message);
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, type: 'success', message }]);
+    // Auto remove after 3 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 3000);
+  };
+
+  const showInfo = (message) => {
+    console.log('Info:', message);
+    const id = Date.now();
+    setNotifications(prev => [...prev, { id, type: 'info', message }]);
+    // Auto remove after 4 seconds
+    setTimeout(() => {
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    }, 4000);
+  };
+
+  // Remove notification manually
+  const removeNotification = (id) => {
+    setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
   // Reset form data to initial state
@@ -154,6 +193,13 @@ const DashboardStateProvider = ({ children }) => {
     // Form data
     formData,
     setFormData,
+    
+    // Notification functions
+    showError,
+    showSuccess,
+    showInfo,
+    notifications,
+    removeNotification,
     
     // Utility functions
     closeAllModals,
