@@ -21,7 +21,7 @@ const EnhancedAttendanceManager = () => {
       const token = AuthTokenService.getToken();
       
       // Load organizer's events
-      const response = await fetch('http://localhost:5001/api/events/my-events', {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       

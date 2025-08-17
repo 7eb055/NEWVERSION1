@@ -3,7 +3,7 @@ import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import './css/EmailVerification.css';
 
-const API_BASE_URL = 'http://localhost:5001/api';
+const API_BASE_URL = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api`;
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
@@ -66,7 +66,7 @@ const EmailVerification = () => {
 
     try {
       setIsLoading(true);
-      const _response = await axios.post('http://localhost:5001/api/auth/resend-verification', {
+      const _response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/resend-verification`, {
         email: email
       });
 
