@@ -61,19 +61,50 @@ router.put('/notifications', authenticateToken, async (req, res) => {
     console.log('Updating notification settings for user ID:', req.user.user_id);
     console.log('Content-Type:', req.headers['content-type']);
     console.log('Raw body type:', typeof req.body);
-    console.log('Raw body:', req.body);
+    console.log('Raw body constructor:', req.body?.constructor?.name);
+    console.log('Is Array?:', Array.isArray(req.body));
+    console.log('Raw body keys:', Object.keys(req.body || {}));
     
-    // Parse the body if it's a string (which it shouldn't be with proper middleware)
+    // Handle the case where req.body is an array-like object with character indices
     let parsedBody = req.body;
-    if (typeof req.body === 'string') {
+    
+    if (req.body && typeof req.body === 'object' && !Array.isArray(req.body)) {
+      // Check if this looks like a character-indexed object
+      const keys = Object.keys(req.body);
+      const isCharacterIndexed = keys.length > 0 && keys.every(key => !isNaN(parseInt(key)));
+      
+      if (isCharacterIndexed) {
+        console.log('Detected character-indexed body, reconstructing JSON...');
+        // Reconstruct the string from character indices
+        const jsonString = keys
+          .sort((a, b) => parseInt(a) - parseInt(b))
+          .map(key => req.body[key])
+          .join('');
+        
+        console.log('Reconstructed string:', jsonString);
+        
+        try {
+          parsedBody = JSON.parse(jsonString);
+          console.log('Successfully parsed body:', parsedBody);
+        } catch (e) {
+          console.error('Failed to parse reconstructed JSON:', e);
+          return res.status(400).json({ message: 'Invalid JSON in request body' });
+        }
+      }
+    }
+    
+    // If it's still a string, try to parse it
+    if (typeof parsedBody === 'string') {
       try {
-        parsedBody = JSON.parse(req.body);
+        parsedBody = JSON.parse(parsedBody);
         console.log('Parsed body from string:', parsedBody);
       } catch (e) {
         console.error('Failed to parse body as JSON:', e);
         return res.status(400).json({ message: 'Invalid JSON in request body' });
       }
     }
+    
+    console.log('Final parsed body:', parsedBody);
     
     const { email, sms, event_updates, promotions } = parsedBody;
     

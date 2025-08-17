@@ -113,7 +113,23 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Debug middleware to log all requests
+app.use((req, res, next) => {
+  if (req.path.includes('/api/settings/notifications') && req.method === 'PUT') {
+    console.log('=== MIDDLEWARE DEBUG ===');
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Content-Length:', req.headers['content-length']);
+    console.log('Raw body type:', typeof req.body);
+    console.log('Raw body keys:', Object.keys(req.body || {}));
+    console.log('Is Array?:', Array.isArray(req.body));
+    console.log('Body constructor:', req.body?.constructor?.name);
+    console.log('========================');
+  }
+  next();
+});
 
 // Serve static files from uploads directory
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
