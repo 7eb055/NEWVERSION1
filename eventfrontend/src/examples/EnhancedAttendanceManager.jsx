@@ -1,7 +1,7 @@
 // Integration Example: AttendanceVerification with Attendee Listing
 // This shows how to use the updated AttendanceVerification component
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AttendanceVerification from './AttendanceVerification';
 import AttendeeListingService from '../../services/attendeeListingService';
 import AuthTokenService from '../../services/AuthTokenService';
@@ -13,13 +13,9 @@ const EnhancedAttendanceManager = () => {
   const [selectedView, setSelectedView] = useState('attendance'); // 'attendance' or 'listing'
 
   // eslint-disable-next-line no-unused-vars
-  const attendeeService = new AttendeeListingService();
+  const attendeeService = useMemo(() => new AttendeeListingService(), []);
 
-  useEffect(() => {
-    loadOrganizerEvents();
-  }, []);
-
-  const loadOrganizerEvents = async () => {
+  const loadOrganizerEvents = useCallback(async () => {
     try {
       setLoading(true);
       const token = AuthTokenService.getToken();
@@ -38,7 +34,11 @@ const EnhancedAttendanceManager = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadOrganizerEvents();
+  }, [loadOrganizerEvents]);
 
   return (
     <div className="enhanced-attendance-manager">
@@ -96,9 +96,9 @@ const EventAttendeeDetails = ({ eventId }) => {
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
 
-  const attendeeService = new AttendeeListingService();
+  const attendeeService = useMemo(() => new AttendeeListingService(), []);
 
-  const loadEventData = async () => {
+  const loadEventData = useCallback(async () => {
     if (!expanded) return;
     
     try {
@@ -122,11 +122,11 @@ const EventAttendeeDetails = ({ eventId }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [expanded, eventId, attendeeService]);
 
   useEffect(() => {
     loadEventData();
-  }, [expanded, eventId]);
+  }, [loadEventData]);
 
   return (
     <div className="event-attendee-details">

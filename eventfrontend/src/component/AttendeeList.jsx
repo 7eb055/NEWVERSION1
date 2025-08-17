@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AttendeeListingService from '../services/attendeeListingService';
 import formatters from '../utils/formatters';
 import './css/AttendeeList.css';
@@ -16,16 +16,9 @@ const AttendeeList = ({ eventId, organizerId, viewType = 'event' }) => {
   });
   const [pagination, setPagination] = useState({});
 
-  const attendeeService = new AttendeeListingService();
+  const attendeeService = useMemo(() => new AttendeeListingService(), []);
 
-  useEffect(() => {
-    loadAttendees();
-    if (viewType === 'event' && eventId) {
-      loadEventStats();
-    }
-  }, [eventId, organizerId, viewType, filters]);
-
-  const loadAttendees = async () => {
+  const loadAttendees = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -49,9 +42,9 @@ const AttendeeList = ({ eventId, organizerId, viewType = 'event' }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [eventId, organizerId, viewType, filters, attendeeService]);
 
-  const loadEventStats = async () => {
+  const loadEventStats = useCallback(async () => {
     try {
       const response = await attendeeService.getEventStats(eventId);
       if (response && response.success) {
@@ -60,7 +53,14 @@ const AttendeeList = ({ eventId, organizerId, viewType = 'event' }) => {
     } catch (err) {
       console.error('Error loading event stats:', err);
     }
-  };
+  }, [eventId, attendeeService]);
+
+  useEffect(() => {
+    loadAttendees();
+    if (viewType === 'event' && eventId) {
+      loadEventStats();
+    }
+  }, [loadAttendees, loadEventStats, viewType, eventId]);
 
   const handleFilterChange = (filterKey, value) => {
     setFilters(prev => ({

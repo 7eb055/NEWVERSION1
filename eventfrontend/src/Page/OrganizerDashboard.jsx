@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; // Uncommented to enable backend API calls
 import './css/OrganizerDashboard.css';
 import AuthTokenService from '../services/AuthTokenService';
@@ -129,17 +129,17 @@ const OrganizerDashboard = () => {
       setUser({ username: 'Demo Organizer' });
       loadMockData();
     }
-  }, []);
+  }, [loadEvents, loadMockData]);
 
   // Recalculate sales data whenever events change
   useEffect(() => {
     if (events.length > 0) {
       loadSalesData(events);
     }
-  }, [events]);
+  }, [events, loadSalesData]);
 
   // Load mock data for UI demonstration
-  const loadMockData = () => {
+  const loadMockData = useCallback(() => {
     // Mock events data - updated to match the normalized schema
     const mockEvents = [
       {
@@ -319,12 +319,12 @@ const OrganizerDashboard = () => {
       2: { averageRating: 5.0, totalReviews: 1, eventName: 'Marketing Workshop' },
       3: { averageRating: 0, totalReviews: 0, eventName: 'Networking Event' }
     });
-  };
+  }, [loadSalesData]);
 
   // Backend API functions - commented out for UI focus
   
   // Load organizer-specific events from API
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = AuthTokenService.getToken();
@@ -357,7 +357,7 @@ const OrganizerDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [loadSalesData]);
 
   // Load companies from API
   const loadCompanies = async () => {
@@ -394,7 +394,7 @@ const OrganizerDashboard = () => {
   };
 
   // Load sales data from organizer-specific events
-  const loadSalesData = async (eventsData = null) => {
+  const loadSalesData = useCallback(async (eventsData = null) => {
     try {
       // Use provided events data or fall back to state
       const eventsToProcess = eventsData || events;
@@ -444,7 +444,7 @@ const OrganizerDashboard = () => {
       console.error('Error calculating sales data:', error);
       setSalesData({ totalIncome: 0, eventSales: [] });
     }
-  };
+  }, [events]);
 
   
 

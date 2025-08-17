@@ -189,7 +189,7 @@ function Attendee() {
       console.error('Error fetching tickets:', error);
       setMyTickets([]);
     }
-  }, [getAuthToken, makeAuthenticatedRequest]);
+  }, [getAuthToken, makeAuthenticatedRequest, userProfile?.full_name]);
 
   // Fetch user profile from backend
   const fetchUserProfile = useCallback(async () => {

@@ -1,5 +1,5 @@
 // FeedbackCard.jsx - Component for event feedback/reviews with popup modal
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import './AttendeeCards.css';
 import FeedbackService from '../../services/FeedbackService';
 import EventReviewsCard from './EventReviewsCard';
@@ -18,15 +18,7 @@ const FeedbackCard = ({ event, onFeedbackSubmitted }) => {
     rating_breakdown: {}
   });
 
-  // Load feedback when component mounts
-  useEffect(() => {
-    if (event?.event_id) {
-      loadFeedback();
-      loadMyFeedback();
-    }
-  }, [event?.event_id]);
-
-  const loadFeedback = async () => {
+  const loadFeedback = useCallback(async () => {
     try {
       const result = await FeedbackService.getEventFeedback(event.event_id, {
         page: 1,
@@ -48,9 +40,9 @@ const FeedbackCard = ({ event, onFeedbackSubmitted }) => {
       console.error('Error loading feedback:', err);
       setError('Error loading feedback');
     }
-  };
+  }, [event.event_id]);
 
-  const loadMyFeedback = async () => {
+  const loadMyFeedback = useCallback(async () => {
     try {
       const result = await FeedbackService.getMyFeedback(event.event_id);
       
@@ -64,7 +56,15 @@ const FeedbackCard = ({ event, onFeedbackSubmitted }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [event.event_id]);
+
+  // Load feedback when component mounts
+  useEffect(() => {
+    if (event?.event_id) {
+      loadFeedback();
+      loadMyFeedback();
+    }
+  }, [event?.event_id, loadFeedback, loadMyFeedback]);
 
   const handleFeedbackSubmittedModal = async () => {
     setSuccess('Thank you for your feedback!');

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import FeedbackService from '../../services/FeedbackService';
 import './AttendeeCards.css';
 
@@ -15,13 +15,7 @@ const EventReviewsCard = ({ event }) => {
   const [pagination, setPagination] = useState({});
   const [includeAnonymous, setIncludeAnonymous] = useState(true);
 
-  useEffect(() => {
-    if (event?.event_id) {
-      loadReviews();
-    }
-  }, [event?.event_id, currentPage, includeAnonymous]);
-
-  const loadReviews = async () => {
+  const loadReviews = useCallback(async () => {
     setLoading(true);
     try {
       const response = await FeedbackService.getEventFeedback(event.event_id, {
@@ -44,7 +38,13 @@ const EventReviewsCard = ({ event }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [event.event_id, currentPage, includeAnonymous, stats]);
+
+  useEffect(() => {
+    if (event?.event_id) {
+      loadReviews();
+    }
+  }, [event?.event_id, loadReviews]);
 
   const renderStars = (rating) => {
     return [...Array(5)].map((_, index) => (

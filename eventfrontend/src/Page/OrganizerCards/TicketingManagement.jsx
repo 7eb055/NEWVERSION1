@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/TicketingManagement.css';
@@ -65,7 +65,7 @@ const TicketingManagement = ({ events = [] }) => {
   //   }
   // };
 
-  const loadTicketTypes = async () => {
+  const loadTicketTypes = useCallback(async () => {
     if (!selectedEventId) return;
     
     setLoading(true);
@@ -82,9 +82,9 @@ const TicketingManagement = ({ events = [] }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEventId]);
 
-  const loadSalesData = async () => {
+  const loadSalesData = useCallback(async () => {
     if (!selectedEventId) return;
     
     setLoading(true);
@@ -115,9 +115,9 @@ const TicketingManagement = ({ events = [] }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEventId]);
 
-  const loadRegistrations = async () => {
+  const loadRegistrations = useCallback(async () => {
     if (!selectedEventId) return;
     
     setLoading(true);
@@ -134,7 +134,7 @@ const TicketingManagement = ({ events = [] }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedEventId]);
 
   const handleTicketFormSubmit = async (e) => {
     e.preventDefault();
