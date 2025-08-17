@@ -4211,7 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT user_id, email, password, role_type, is_suspended, created_at, is_email_verified, account_status
+      `SELECT user_id, email, password, role_type, created_at, is_email_verified, account_status
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4223,13 +4223,14 @@ app.post('/api/auth/login', async (req, res) => {
 
     const userData = userQuery.rows[0];
 
-    // Check if user account is suspended
-    if (userData.is_suspended) {
-      return res.status(401).json({ 
-        message: 'Your account has been suspended. Please contact support.',
-        isSuspended: true
-      });
-    }
+    // Check if user account is suspended (feature will be added later)
+    // Note: is_suspended column doesn't exist in production database yet
+    // if (userData.is_suspended) {
+    //   return res.status(401).json({ 
+    //     message: 'Your account has been suspended. Please contact support.',
+    //     isSuspended: true
+    //   });
+    // }
 
     // Check if email is verified
     if (!userData.is_email_verified) {
