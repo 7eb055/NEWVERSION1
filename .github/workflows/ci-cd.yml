@@ -223,13 +223,13 @@ jobs:
           # Create Heroku app (ignore if exists)
           heroku create your-event-app-staging || echo "App already exists"
           
-          # Set Heroku stack to container
-          heroku stack:set container -a your-event-app-staging || echo "Stack already set to container"
+          # Set Heroku stack to buildpack (Node.js)
+          heroku stack:set heroku-22 -a your-event-app-staging || echo "Stack already set to heroku-22"
           
           # Add Heroku git remote
           heroku git:remote -a your-event-app-staging
           
-          # Deploy using git push (heroku.yml will handle Docker build)
+          # Deploy using git push (Procfile will handle buildpack deployment)
           git push heroku main --force
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
