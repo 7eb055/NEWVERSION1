@@ -2,7 +2,7 @@
   "scripts": {
     "start": "node backend/server.js",
     "build": "cd eventfrontend && npm run build",
-    "heroku-postbuild": "echo 'Installing backend dependencies...' && cd backend && npm install --production && echo 'Installing frontend dependencies...' && cd ../eventfrontend && npm install && npm run build && echo 'Copying frontend build to backend public folder...' && cp -r dist/* ../backend/public/ && echo 'Build completed successfully!'"
+    "heroku-postbuild": "echo 'Installing backend dependencies...' && cd backend && npm install --production && echo 'Installing frontend dependencies...' && cd ../eventfrontend && npm install --include=dev && npm run build && echo 'Copying frontend build to backend public folder...' && cp -r dist/* ../backend/public/ && echo 'Build completed successfully!'"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
