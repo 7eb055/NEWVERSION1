@@ -2,6 +2,8 @@
 
 A comprehensive full-stack event management application with React frontend, Node.js backend, and PostgreSQL database. Features include payment integration (Paystack), email verification, QR code generation, feedback system, and admin dashboard.
 
+<!-- Build trigger: Force rebuild with VITE_API_URL environment variable -->
+
 [![Deploy](https://img.shields.io/badge/Deploy-Ready-brightgreen.svg)](./DEPLOYMENT_GUIDE.md)
 [![GitHub Actions](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-blue.svg)](./.github/workflows/ci-cd.yml)
 [![Docker](https://img.shields.io/badge/Docker-Enabled-blue.svg)](./docker-compose.yml)
@@ -244,5 +246,6 @@ For additional help, please open an issue in the repository.
  
  #   T e s t i n g   w i t h   G i t H u b   s e c r e t s   c o n f i g u r e d 
  
- #   B u i l d   t r i g g e r   0 8 / 1 7 / 2 0 2 5   0 5 : 3 8 : 5 5  
+ #   B u i l d   t r i g g e r   0 8 / 1 7 / 2 0 2 5   0 5 : 3 8 : 5 5 
+ 
  
