@@ -186,7 +186,7 @@ const TicketingModal = () => {
             >
               <option value="">Choose an event</option>
               {events.map((event) => (
-                <option key={event.id} value={event.id}>
+                <option key={event.event_id} value={event.event_id}>
                   {event.event_name} - {new Date(event.event_date).toLocaleDateString()}
                 </option>
               ))}

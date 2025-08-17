@@ -4,6 +4,7 @@ import { useDashboardState } from '../hooks/useDashboardState';
 import { useEventData } from '../hooks/useEventData';
 import Modal from '../Modal';
 import ImageUpload from '../../../component/ImageUpload';
+import ApiService from '../../../services/ApiService';
 import '../CreateEventForm.css';
 
 const CreateEventModal = () => {
@@ -15,7 +16,7 @@ const CreateEventModal = () => {
     resetFormData
   } = useDashboardState();
 
-  const { createEvent, isLoading } = useEventData();
+  const { isLoading } = useEventData();
   const [categories, setCategories] = useState([]);
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -69,11 +70,16 @@ const CreateEventModal = () => {
     setIsSubmitting(true);
 
     try {
-      await createEvent(formData);
-      handleClose(); // Close modal on success
+      const result = await ApiService.createEvent(formData);
+      if (result.success) {
+        console.log('Event created successfully:', result.data);
+        handleClose(); // Close modal on success
+      } else {
+        console.error('Error creating event:', result.error);
+        // You might want to show an error message to the user here
+      }
     } catch (error) {
       console.error('Error creating event:', error);
-      // Error handling is done in the createEvent function
     } finally {
       setIsSubmitting(false);
     }

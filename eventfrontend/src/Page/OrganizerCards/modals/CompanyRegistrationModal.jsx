@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useDashboardState } from '../hooks/useDashboardState';
+import AuthTokenService from '../../../services/AuthTokenService';
 import Modal from '../Modal';
 
 const CompanyRegistrationModal = () => {
@@ -60,11 +61,12 @@ const CompanyRegistrationModal = () => {
     setError('');
 
     try {
+      const token = AuthTokenService.getToken() || localStorage.getItem('token');
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify(companyData)
       });
