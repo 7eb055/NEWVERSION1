@@ -58,10 +58,24 @@ router.get('/notifications', authenticateToken, async (req, res) => {
 // PUT update notification preferences
 router.put('/notifications', authenticateToken, async (req, res) => {
   try {
-    const { email, sms, event_updates, promotions } = req.body;
-    
     console.log('Updating notification settings for user ID:', req.user.user_id);
-    console.log('New settings:', JSON.stringify(req.body, null, 2));
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Raw body type:', typeof req.body);
+    console.log('Raw body:', req.body);
+    
+    // Parse the body if it's a string (which it shouldn't be with proper middleware)
+    let parsedBody = req.body;
+    if (typeof req.body === 'string') {
+      try {
+        parsedBody = JSON.parse(req.body);
+        console.log('Parsed body from string:', parsedBody);
+      } catch (e) {
+        console.error('Failed to parse body as JSON:', e);
+        return res.status(400).json({ message: 'Invalid JSON in request body' });
+      }
+    }
+    
+    const { email, sms, event_updates, promotions } = parsedBody;
     
     const notificationPrefs = {
       email: email ?? true,
