@@ -129,14 +129,14 @@ const OrganizerDashboard = () => {
       setUser({ username: 'Demo Organizer' });
       loadMockData();
     }
-  }, [loadEvents, loadMockData]);
+  }, []); // Remove dependencies to avoid circular dependency
 
   // Recalculate sales data whenever events change
   useEffect(() => {
     if (events.length > 0) {
       loadSalesData(events);
     }
-  }, [events, loadSalesData]);
+  }, [events]); // Remove loadSalesData dependency
 
   // Load mock data for UI demonstration
   const loadMockData = useCallback(() => {
@@ -194,8 +194,7 @@ const OrganizerDashboard = () => {
     
     setEvents(mockEvents);
     
-    // Calculate sales data from mock events
-    loadSalesData(mockEvents);
+    // Sales data will be calculated by useEffect when events change
 
     // Mock companies data
     setCompanies([
@@ -319,7 +318,7 @@ const OrganizerDashboard = () => {
       2: { averageRating: 5.0, totalReviews: 1, eventName: 'Marketing Workshop' },
       3: { averageRating: 0, totalReviews: 0, eventName: 'Networking Event' }
     });
-  }, [loadSalesData]);
+  }, []); // Remove loadSalesData dependency
 
   // Backend API functions - commented out for UI focus
   
@@ -345,8 +344,7 @@ const OrganizerDashboard = () => {
       
       setEvents(loadedEvents);
       
-      // Load sales data immediately after events are loaded
-      loadSalesData(loadedEvents);
+      // Sales data will be loaded by useEffect when events change
       
     } catch (error) {
       console.error('Error loading events:', error);
@@ -357,7 +355,7 @@ const OrganizerDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadSalesData]);
+  }, []); // Remove loadSalesData dependency
 
   // Load companies from API
   const loadCompanies = async () => {
@@ -444,7 +442,7 @@ const OrganizerDashboard = () => {
       console.error('Error calculating sales data:', error);
       setSalesData({ totalIncome: 0, eventSales: [] });
     }
-  }, [events]);
+  }, []); // Remove events dependency to avoid circular dependency
 
   
 
