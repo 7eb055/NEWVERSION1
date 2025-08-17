@@ -1,4 +1,9 @@
 {
+  "scripts": {
+    "start": "node server.js",
+    "docker:start": "npm start",
+    "docker:start-with-migration": "npm run docker:migrate && npm start"
+  },
   "dependencies": {
     "qrcode": "^1.5.4"
   }
