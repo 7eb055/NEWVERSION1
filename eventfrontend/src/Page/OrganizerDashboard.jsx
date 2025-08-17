@@ -131,12 +131,14 @@ const OrganizerDashboard = () => {
     }
   }, [loadEvents, loadMockData]);
 
-  // Recalculate sales data whenever events change
+  // Recalculate sales data whenever events change (but only when using real events, not mock data)
   useEffect(() => {
+    // Only recalculate sales if we have events and they're not from mock data
+    // Mock data handles its own sales calculation in loadMockData
     if (events.length > 0) {
       loadSalesData(events);
     }
-  }, [events, loadSalesData]);
+  }, [events]);
 
   // Load mock data for UI demonstration
   const loadMockData = useCallback(() => {
