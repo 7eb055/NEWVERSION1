@@ -20,13 +20,6 @@ const CreateEventModal = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch categories on component mount
-  useEffect(() => {
-    if (showCreateForm) {
-      fetchCategories();
-    }
-  }, [showCreateForm, fetchCategories]);
-
   const fetchCategories = useCallback(async () => {
     try {
       const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/categories`);
@@ -37,6 +30,13 @@ const CreateEventModal = () => {
       console.error('Error fetching categories:', error);
     }
   }, []);
+
+  // Fetch categories on component mount
+  useEffect(() => {
+    if (showCreateForm) {
+      fetchCategories();
+    }
+  }, [showCreateForm, fetchCategories]);
 
   // Handle modal close
   const handleClose = () => {

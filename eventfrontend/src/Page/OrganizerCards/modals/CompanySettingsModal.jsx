@@ -20,13 +20,6 @@ const CompanySettingsModal = ({ isOpen, onClose }) => {
     status: 'active'
   });
 
-  // Fetch companies on modal open
-  useEffect(() => {
-    if (isOpen) {
-      fetchCompanies();
-    }
-  }, [isOpen, fetchCompanies]);
-
   const fetchCompanies = useCallback(async () => {
     try {
       setLoading(true);
@@ -50,6 +43,13 @@ const CompanySettingsModal = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   }, [showError]);
+
+  // Fetch companies on modal open
+  useEffect(() => {
+    if (isOpen) {
+      fetchCompanies();
+    }
+  }, [isOpen, fetchCompanies]);
 
   const handleCompanySelect = (company) => {
     setSelectedCompany(company);

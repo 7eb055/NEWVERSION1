@@ -31,12 +31,6 @@ const SalesReportModal = ({ isOpen, onClose }) => {
     ticketType: ''
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchSalesData();
-    }
-  }, [isOpen, dateRange, fetchSalesData]);
-
   const fetchSalesData = useCallback(async () => {
     try {
       setLoading(true);
@@ -66,6 +60,12 @@ const SalesReportModal = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   }, [dateRange, filters, showError]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchSalesData();
+    }
+  }, [isOpen, dateRange, fetchSalesData]);
 
   const handleDateRangeChange = (field, value) => {
     setDateRange(prev => ({

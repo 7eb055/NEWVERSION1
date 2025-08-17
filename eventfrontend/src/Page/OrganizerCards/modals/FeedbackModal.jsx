@@ -35,13 +35,6 @@ const FeedbackModal = ({ isOpen, onClose }) => {
     'general'
   ];
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchFeedbacks();
-      fetchFeedbackStats();
-    }
-  }, [isOpen, filters, fetchFeedbacks, fetchFeedbackStats]);
-
   const fetchFeedbacks = useCallback(async () => {
     try {
       setLoading(true);
@@ -88,6 +81,13 @@ const FeedbackModal = ({ isOpen, onClose }) => {
       showError(error.message);
     }
   }, [showError]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchFeedbacks();
+      fetchFeedbackStats();
+    }
+  }, [isOpen, filters, fetchFeedbacks, fetchFeedbackStats]);
 
   const handleFeedbackSelect = (feedback) => {
     setSelectedFeedback(feedback);

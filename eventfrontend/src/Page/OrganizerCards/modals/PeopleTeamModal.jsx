@@ -53,12 +53,6 @@ const PeopleTeamModal = ({ isOpen, onClose }) => {
     'Operations'
   ];
 
-  useEffect(() => {
-    if (isOpen) {
-      fetchTeamMembers();
-    }
-  }, [isOpen, fetchTeamMembers]);
-
   const fetchTeamMembers = useCallback(async () => {
     try {
       setLoading(true);
@@ -82,6 +76,12 @@ const PeopleTeamModal = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   }, [showError]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchTeamMembers();
+    }
+  }, [isOpen, fetchTeamMembers]);
 
   const handleMemberSelect = (member) => {
     setSelectedMember(member);

@@ -28,13 +28,6 @@ const TicketingModal = () => {
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('view'); // 'view' or 'create'
 
-  // Fetch ticket data when event is selected
-  useEffect(() => {
-    if (selectedEvent && showTicketingForm) {
-      fetchTicketData();
-    }
-  }, [selectedEvent, showTicketingForm, fetchTicketData]);
-
   const fetchTicketData = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEvent}/tickets`, {
@@ -51,6 +44,13 @@ const TicketingModal = () => {
       console.error('Error fetching ticket data:', error);
     }
   }, [selectedEvent]);
+
+  // Fetch ticket data when event is selected
+  useEffect(() => {
+    if (selectedEvent && showTicketingForm) {
+      fetchTicketData();
+    }
+  }, [selectedEvent, showTicketingForm, fetchTicketData]);
 
   // Handle input changes for new ticket type
   const handleTicketInputChange = (e) => {

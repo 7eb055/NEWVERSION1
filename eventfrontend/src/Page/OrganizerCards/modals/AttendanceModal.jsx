@@ -24,13 +24,6 @@ const AttendanceModal = () => {
   const [success, setSuccess] = useState('');
   const [activeTab, setActiveTab] = useState('view'); // 'view', 'checkin', 'qr'
 
-  // Fetch attendance data when event is selected
-  useEffect(() => {
-    if (selectedEvent && showAttendanceForm) {
-      fetchAttendanceData();
-    }
-  }, [selectedEvent, showAttendanceForm, fetchAttendanceData]);
-
   const fetchAttendanceData = useCallback(async () => {
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEvent}/attendance`, {
@@ -47,6 +40,13 @@ const AttendanceModal = () => {
       console.error('Error fetching attendance data:', error);
     }
   }, [selectedEvent]);
+
+  // Fetch attendance data when event is selected
+  useEffect(() => {
+    if (selectedEvent && showAttendanceForm) {
+      fetchAttendanceData();
+    }
+  }, [selectedEvent, showAttendanceForm, fetchAttendanceData]);
 
   // Handle modal close
   const handleClose = () => {
