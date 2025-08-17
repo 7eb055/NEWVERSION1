@@ -167,7 +167,7 @@ const authorizeAdmin = (req, res, next) => {
 const authorizeOrganizer = async (req, res, next) => {
   try {
     const organizerQuery = await pool.query(
-      'SELECT id as organizer_id FROM organizers WHERE user_id = $1',
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
       [req.user.user_id]
     );
 
@@ -1246,7 +1246,7 @@ app.post('/api/events/:eventId/manual-registration', authenticateToken, async (r
 
       // Check if user exists
       const userCheck = await client.query(
-        'SELECT id as user_id FROM users WHERE email = $1',
+        'SELECT user_id FROM users WHERE email = $1',
         [attendeeEmail]
       );
 
@@ -1592,7 +1592,7 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 
     // Check if user exists
     const userCheck = await client.query(
-      'SELECT id as user_id FROM users WHERE email = $1',
+      'SELECT user_id FROM users WHERE email = $1',
       [email]
     );
 
@@ -2960,7 +2960,7 @@ app.post('/api/events/:eventId/attendance/manual', authenticateToken, async (req
       let attendeeId;
 
       const existingUserQuery = await client.query(
-        'SELECT id as user_id FROM users WHERE email = $1',
+        'SELECT user_id FROM users WHERE email = $1',
         [email]
       );
 
