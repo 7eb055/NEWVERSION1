@@ -26,8 +26,8 @@ import Footer from '../component/footer';
 
 const OrganizerDashboard = () => {
   // Minimal state for success/error messages (will be moved to provider later)
-  const [success, setSuccess] = useState('');
-  const [error, setError] = useState('');
+  const [success] = useState('');
+  const [error] = useState('');
   
   // Temporary user info (will come from auth context later)
   const user = { username: 'Organizer' };
