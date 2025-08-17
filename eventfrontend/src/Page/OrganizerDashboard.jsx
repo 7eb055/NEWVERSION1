@@ -127,57 +127,28 @@ const OrganizerDashboard = () => {
     } else {
       setError('Please log in to view your dashboard');
     }
-  }, [loadEvents]);
+  }, []); // TEMPORARILY DISABLED loadEvents dependency for debugging
 
-  // Recalculate sales data whenever events change (but only if not already calculated by loadEvents)
+  // Recalculate sales data whenever events change - TEMPORARILY DISABLED FOR DEBUGGING
   useEffect(() => {
-    if (events.length > 0) {
-      // Only recalculate if we have events that weren't just loaded by loadEvents
-      // loadEvents already calls loadSalesData, so we avoid double calculation
-      const hasRecentlyLoaded = Date.now() - (window.lastEventsLoadTime || 0) < 1000;
-      if (!hasRecentlyLoaded) {
-        loadSalesData(events);
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events]); // loadSalesData intentionally omitted to avoid circular dependency
+    console.log('🔧 useEffect for events change called - currently disabled for debugging');
+    // TODO: Re-enable this step by step
+    // if (events.length > 0) {
+    //   const hasRecentlyLoaded = Date.now() - (window.lastEventsLoadTime || 0) < 1000;
+    //   if (!hasRecentlyLoaded) {
+    //     loadSalesData(events);
+    //   }
+    // }
+  }, []); // TEMPORARILY DISABLED events dependency for debugging
 
-  // Load organizer-specific events from API
+  // Load organizer-specific events from API - TEMPORARILY DISABLED FOR DEBUGGING
   const loadEvents = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      let loadedEvents = [];
-      if (response.data && Array.isArray(response.data.events)) {
-        loadedEvents = response.data.events;
-      } else if (response.data && Array.isArray(response.data)) {
-        loadedEvents = response.data;
-      } else {
-        loadedEvents = [];
-      }
-      
-      setEvents(loadedEvents);
-      
-      // Load sales data immediately after events are loaded
-      loadSalesData(loadedEvents);
-      
-    } catch (error) {
-      console.error('Error loading events:', error);
-      setError('Failed to load events. Please try again.');
-      // Fallback to empty array on error
-      setEvents([]);
-      setSalesData({ totalIncome: 0, eventSales: [] });
-    } finally {
-      setIsLoading(false);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove loadSalesData dependency to avoid circular dependency
+    console.log('🔧 loadEvents called - currently disabled for debugging');
+    // TODO: Re-enable this function step by step
+    setIsLoading(false);
+    setEvents([]);
+    setSalesData({ totalIncome: 0, eventSales: [] });
+  }, []); // Empty dependency array - safe
 
   // Load companies from API
   const loadCompanies = async () => {
@@ -213,59 +184,12 @@ const OrganizerDashboard = () => {
     }
   };
 
-  // Load sales data from organizer-specific events
+  // Load sales data from organizer-specific events - TEMPORARILY DISABLED FOR DEBUGGING
   const loadSalesData = useCallback(async (eventsData = null) => {
-    try {
-      // Use provided events data or fall back to state
-      const eventsToProcess = eventsData || events;
-      
-      console.log('📊 Loading sales data from events:', eventsToProcess);
-      
-      // Calculate sales data from loaded events
-      let totalIncome = 0;
-      const eventSales = [];
-
-      eventsToProcess.forEach(event => {
-        // Ensure we have numeric values
-        const registrationCount = parseInt(event.registration_count || 0);
-        const ticketPrice = parseFloat(event.ticket_price || 0);
-        const revenue = registrationCount * ticketPrice;
-        
-        totalIncome += revenue;
-        
-        eventSales.push({
-          eventId: event.event_id,
-          eventName: event.event_name,
-          ticketsSold: registrationCount,
-          revenue: revenue,
-          ticketPrice: ticketPrice
-        });
-      });
-
-      const salesData = {
-        totalIncome,
-        eventSales
-      };
-
-      console.log('💰 Calculated sales data:', salesData);
-
-      setSalesData(salesData);
-      
-      // Cache sales data in localStorage for persistence (with user ID to avoid conflicts)
-      try {
-        const user = AuthTokenService.getUser();
-        const cacheKey = user?.user_id ? `organizer_sales_data_${user.user_id}` : 'organizer_sales_data';
-        localStorage.setItem(cacheKey, JSON.stringify(salesData));
-      } catch (err) {
-        console.warn('Could not cache sales data:', err);
-      }
-      
-    } catch (error) {
-      console.error('Error calculating sales data:', error);
-      setSalesData({ totalIncome: 0, eventSales: [] });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Remove events dependency since eventsData is passed as parameter
+    console.log('� loadSalesData called - currently disabled for debugging', eventsData);
+    // TODO: Re-enable this function step by step
+    setSalesData({ totalIncome: 0, eventSales: [] });
+  }, []); // Empty dependency array - safe
 
   
 
