@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import './OrganizerCards/css/OrganizerMasterTheme.css';
 import './css/OrganizerDashboard.css';
 
 // Import new modular components

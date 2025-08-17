@@ -1,0 +1,389 @@
+/* ====================================
+   ORGANIZER THEME CONFIGURATION
+   Master Color & Style Control Center
+   ==================================== */
+
+/*
+  🎨 THEME CUSTOMIZATION GUIDE
+  
+  This file controls ALL colors and themes for the organizer section.
+  Simply modify the CSS variables below to change the entire design.
+  
+  🔵 CURRENT THEME: Modern Aqua-Blue-Green
+  
+  📝 HOW TO CHANGE THEMES:
+  1. Modify the color values below
+  2. Save the file - changes apply instantly
+  3. No need to modify individual component files
+  
+  🎯 THEME PRESETS INCLUDED:
+  - Modern Aqua-Blue-Green (current)
+  - Professional Navy-Blue
+  - Vibrant Purple-Pink
+  - Clean Minimal Gray
+  - Nature Green-Brown
+  
+  Scroll down to see all preset themes!
+*/
+
+/* ===================================
+   🌊 CURRENT ACTIVE THEME
+   Modern Aqua-Blue-Green Design
+   =================================== */
+
+:root {
+  /* 🎨 PRIMARY BRAND COLORS */
+  --org-primary: #4522d0;           /* Main brand color - Cyan/Aqua */
+  --org-primary-light: #26c6da;     /* Light variation */
+  --org-primary-dark: #00acc1;      /* Dark variation */
+  --org-primary-ultra-light: #e0f7fa; /* Very light background */
+  
+  /* 🔵 SECONDARY COLORS */
+  --org-secondary: #614de1;         /* Complementary blue */
+  --org-secondary-light: #80deea;   /* Light blue accents */
+  --org-secondary-dark: #26c6da;    /* Medium blue */
+  
+  /* 🌿 ACCENT COLORS (Green) */
+  --org-accent: #c27fbe;            /* Fresh green for success */
+  --org-accent-light: #66bb6a;      /* Light green */
+  --org-accent-dark: #43a047;       /* Dark green */
+  --org-accent-ultra-light: #e8f5e8; /* Light green background */
+  
+  /* 🐚 TERTIARY COLORS (Teal) */
+  --org-tertiary: #009688;          /* Rich teal */
+  --org-tertiary-light: #26a69a;    /* Light teal */
+  --org-tertiary-dark: #00796b;     /* Dark teal */
+  
+  /* ⚫ NEUTRAL COLORS */
+  --org-white: #ffffff;
+  --org-light-gray: #f8fafb;
+  --org-medium-gray: #ecf0f1;
+  --org-dark-gray: #546e7a;
+  --org-text-primary: #263238;      /* Main text color */
+  --org-text-secondary: #455a64;    /* Secondary text */
+  --org-text-muted: #78909c;        /* Muted text */
+  
+  /* 🚦 STATUS COLORS */
+  --org-success: #4caf50;
+  --org-success-light: #c8e6c9;
+  --org-warning: #ff9800;
+  --org-warning-light: #ffe0b2;
+  --org-error: #f44336;
+  --org-error-light: #ffcdd2;
+  --org-info: #2196f3;
+  --org-info-light: #bbdefb;
+}
+
+/* ===================================
+   🔄 QUICK THEME SWITCHER
+   
+   To change themes, comment out the current theme above
+   and uncomment one of the themes below:
+   =================================== */
+
+/* 
+💼 THEME 2: Professional Navy-Blue
+Uncomment below to activate:
+
+:root {
+  --org-primary: #1e3a8a;
+  --org-primary-light: #3b82f6;
+  --org-primary-dark: #1e40af;
+  --org-primary-ultra-light: #eff6ff;
+  
+  --org-secondary: #3b82f6;
+  --org-secondary-light: #60a5fa;
+  --org-secondary-dark: #2563eb;
+  
+  --org-accent: #059669;
+  --org-accent-light: #10b981;
+  --org-accent-dark: #047857;
+  --org-accent-ultra-light: #ecfdf5;
+  
+  --org-tertiary: #0891b2;
+  --org-tertiary-light: #0ea5e9;
+  --org-tertiary-dark: #0e7490;
+  
+  --org-white: #ffffff;
+  --org-light-gray: #f8fafc;
+  --org-medium-gray: #e2e8f0;
+  --org-dark-gray: #475569;
+  --org-text-primary: #1e293b;
+  --org-text-secondary: #334155;
+  --org-text-muted: #64748b;
+  
+  --org-success: #059669;
+  --org-success-light: #bbf7d0;
+  --org-warning: #d97706;
+  --org-warning-light: #fed7aa;
+  --org-error: #dc2626;
+  --org-error-light: #fecaca;
+  --org-info: #0284c7;
+  --org-info-light: #bae6fd;
+}
+*/
+
+/* 
+🟣 THEME 3: Vibrant Purple-Pink
+Uncomment below to activate:
+
+:root {
+  --org-primary: #7c3aed;
+  --org-primary-light: #a855f7;
+  --org-primary-dark: #6d28d9;
+  --org-primary-ultra-light: #f3e8ff;
+  
+  --org-secondary: #ec4899;
+  --org-secondary-light: #f472b6;
+  --org-secondary-dark: #db2777;
+  
+  --org-accent: #10b981;
+  --org-accent-light: #34d399;
+  --org-accent-dark: #059669;
+  --org-accent-ultra-light: #ecfdf5;
+  
+  --org-tertiary: #8b5cf6;
+  --org-tertiary-light: #a78bfa;
+  --org-tertiary-dark: #7c3aed;
+  
+  --org-white: #ffffff;
+  --org-light-gray: #faf5ff;
+  --org-medium-gray: #e9d5ff;
+  --org-dark-gray: #6b21a8;
+  --org-text-primary: #1f2937;
+  --org-text-secondary: #374151;
+  --org-text-muted: #6b7280;
+  
+  --org-success: #10b981;
+  --org-success-light: #bbf7d0;
+  --org-warning: #f59e0b;
+  --org-warning-light: #fed7aa;
+  --org-error: #ef4444;
+  --org-error-light: #fecaca;
+  --org-info: #3b82f6;
+  --org-info-light: #bfdbfe;
+}
+*/
+
+/* 
+⚪ THEME 4: Clean Minimal Gray
+Uncomment below to activate:
+
+:root {
+  --org-primary: #374151;
+  --org-primary-light: #6b7280;
+  --org-primary-dark: #1f2937;
+  --org-primary-ultra-light: #f9fafb;
+  
+  --org-secondary: #6b7280;
+  --org-secondary-light: #9ca3af;
+  --org-secondary-dark: #4b5563;
+  
+  --org-accent: #059669;
+  --org-accent-light: #10b981;
+  --org-accent-dark: #047857;
+  --org-accent-ultra-light: #ecfdf5;
+  
+  --org-tertiary: #0891b2;
+  --org-tertiary-light: #0ea5e9;
+  --org-tertiary-dark: #0e7490;
+  
+  --org-white: #ffffff;
+  --org-light-gray: #f9fafb;
+  --org-medium-gray: #e5e7eb;
+  --org-dark-gray: #374151;
+  --org-text-primary: #111827;
+  --org-text-secondary: #374151;
+  --org-text-muted: #6b7280;
+  
+  --org-success: #059669;
+  --org-success-light: #bbf7d0;
+  --org-warning: #d97706;
+  --org-warning-light: #fed7aa;
+  --org-error: #dc2626;
+  --org-error-light: #fecaca;
+  --org-info: #0284c7;
+  --org-info-light: #bae6fd;
+}
+*/
+
+/* 
+🌿 THEME 5: Nature Green-Brown
+Uncomment below to activate:
+
+:root {
+  --org-primary: #065f46;
+  --org-primary-light: #059669;
+  --org-primary-dark: #064e3b;
+  --org-primary-ultra-light: #ecfdf5;
+  
+  --org-secondary: #0891b2;
+  --org-secondary-light: #06b6d4;
+  --org-secondary-dark: #0e7490;
+  
+  --org-accent: #ca8a04;
+  --org-accent-light: #eab308;
+  --org-accent-dark: #a16207;
+  --org-accent-ultra-light: #fefce8;
+  
+  --org-tertiary: #92400e;
+  --org-tertiary-light: #d97706;
+  --org-tertiary-dark: #78350f;
+  
+  --org-white: #ffffff;
+  --org-light-gray: #f7fef5;
+  --org-medium-gray: #d6f5d6;
+  --org-dark-gray: #365314;
+  --org-text-primary: #1f2937;
+  --org-text-secondary: #374151;
+  --org-text-muted: #6b7280;
+  
+  --org-success: #16a34a;
+  --org-success-light: #bbf7d0;
+  --org-warning: #d97706;
+  --org-warning-light: #fed7aa;
+  --org-error: #dc2626;
+  --org-error-light: #fecaca;
+  --org-info: #0284c7;
+  --org-info-light: #bae6fd;
+}
+*/
+
+/* ===================================
+   📝 CUSTOM THEME TEMPLATE
+   
+   Copy this template to create your own theme:
+   =================================== */
+
+/*
+🎨 CUSTOM THEME: [Your Theme Name]
+Uncomment and modify below:
+
+:root {
+  --org-primary: #YOUR_COLOR;
+  --org-primary-light: #YOUR_COLOR;
+  --org-primary-dark: #YOUR_COLOR;
+  --org-primary-ultra-light: #YOUR_COLOR;
+  
+  --org-secondary: #YOUR_COLOR;
+  --org-secondary-light: #YOUR_COLOR;
+  --org-secondary-dark: #YOUR_COLOR;
+  
+  --org-accent: #YOUR_COLOR;
+  --org-accent-light: #YOUR_COLOR;
+  --org-accent-dark: #YOUR_COLOR;
+  --org-accent-ultra-light: #YOUR_COLOR;
+  
+  --org-tertiary: #YOUR_COLOR;
+  --org-tertiary-light: #YOUR_COLOR;
+  --org-tertiary-dark: #YOUR_COLOR;
+  
+  --org-white: #ffffff;
+  --org-light-gray: #YOUR_COLOR;
+  --org-medium-gray: #YOUR_COLOR;
+  --org-dark-gray: #YOUR_COLOR;
+  --org-text-primary: #YOUR_COLOR;
+  --org-text-secondary: #YOUR_COLOR;
+  --org-text-muted: #YOUR_COLOR;
+  
+  --org-success: #YOUR_COLOR;
+  --org-success-light: #YOUR_COLOR;
+  --org-warning: #YOUR_COLOR;
+  --org-warning-light: #YOUR_COLOR;
+  --org-error: #YOUR_COLOR;
+  --org-error-light: #YOUR_COLOR;
+  --org-info: #YOUR_COLOR;
+  --org-info-light: #YOUR_COLOR;
+}
+*/
+
+/* ===================================
+   🔧 ADVANCED CUSTOMIZATION
+   Gradients, Shadows & Effects
+   =================================== */
+
+/* These automatically use the colors defined above */
+:root {
+  /* 🌈 GRADIENTS - Auto-generated from theme colors */
+  --org-gradient-primary: linear-gradient(135deg, var(--org-primary) 0%, var(--org-secondary) 100%);
+  --org-gradient-secondary: linear-gradient(135deg, var(--org-secondary) 0%, var(--org-accent) 100%);
+  --org-gradient-accent: linear-gradient(135deg, var(--org-accent) 0%, var(--org-tertiary) 100%);
+  --org-gradient-subtle: linear-gradient(135deg, var(--org-primary-ultra-light) 0%, var(--org-accent-ultra-light) 100%);
+  --org-gradient-hero: linear-gradient(135deg, var(--org-primary-dark) 0%, var(--org-tertiary) 50%, var(--org-accent) 100%);
+  
+  /* ✨ SHADOWS - Auto-tinted with primary color */
+  --org-shadow-light: 0 2px 8px rgba(0, 188, 212, 0.1);
+  --org-shadow-medium: 0 4px 16px rgba(0, 188, 212, 0.15);
+  --org-shadow-heavy: 0 8px 32px rgba(0, 188, 212, 0.2);
+  --org-shadow-hover: 0 6px 24px rgba(0, 188, 212, 0.25);
+  
+  /* 📐 DESIGN TOKENS - Keep consistent across themes */
+  --org-radius-sm: 8px;
+  --org-radius-md: 12px;
+  --org-radius-lg: 16px;
+  --org-radius-xl: 24px;
+  
+  --org-spacing-xs: 0.5rem;
+  --org-spacing-sm: 1rem;
+  --org-spacing-md: 1.5rem;
+  --org-spacing-lg: 2rem;
+  --org-spacing-xl: 3rem;
+  
+  --org-font-family: 'Inter', 'Segoe UI', 'Roboto', sans-serif;
+  --org-font-size-xs: 0.75rem;
+  --org-font-size-sm: 0.875rem;
+  --org-font-size-base: 1rem;
+  --org-font-size-lg: 1.125rem;
+  --org-font-size-xl: 1.25rem;
+  --org-font-size-2xl: 1.5rem;
+  --org-font-size-3xl: 2rem;
+  --org-font-size-4xl: 2.5rem;
+  
+  --org-transition-fast: 0.15s ease-in-out;
+  --org-transition-medium: 0.3s ease-in-out;
+  --org-transition-slow: 0.5s ease-in-out;
+}
+
+/* ===================================
+   💡 USAGE INSTRUCTIONS
+   =================================== */
+
+/*
+🎯 HOW TO USE THIS FILE:
+
+1. CHANGING THEMES:
+   - Uncomment one of the preset themes above
+   - Or create your own using the custom template
+   - Save the file and see instant changes
+
+2. CUSTOMIZING EXISTING THEME:
+   - Modify individual color values in the active theme
+   - All components automatically update
+
+3. ADDING NEW THEMES:
+   - Copy any existing theme
+   - Change the colors to your preference
+   - Add a descriptive comment
+
+4. ADVANCED CUSTOMIZATION:
+   - Modify gradients, shadows, spacing, or typography
+   - These affect the entire organizer section
+
+5. TESTING THEMES:
+   - Switch between themes to see instant previews
+   - No need to restart the application
+
+📁 FILES AFFECTED BY THIS THEME:
+   - All OrganizerCards components
+   - All organizer dashboard elements
+   - Modals, buttons, forms, cards
+   - Stats, charts, and data displays
+
+🔧 DEVELOPMENT NOTES:
+   - This file should be imported first in OrganizerMasterTheme.css
+   - Individual component CSS files reference these variables
+   - Changes here override all component-specific styles
+   - Perfect for client customization and white-labeling
+
+Happy theming! 🎨
+*/

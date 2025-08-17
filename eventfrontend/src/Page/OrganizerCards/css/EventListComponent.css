@@ -1,22 +1,39 @@
-/* EventListComponent Styles */
+/* Modern Aqua-Blue-Green Event List Component */
 .event-list-component {
-  margin-bottom: 2rem;
+  margin-bottom: var(--org-spacing-xl);
+  animation: fadeInUp var(--org-transition-medium);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 2px solid var(--primary-color);
+  margin-bottom: var(--org-spacing-md);
+  padding-bottom: var(--org-spacing-sm);
+  border-bottom: 3px solid var(--org-primary);
+  position: relative;
+}
+
+.section-header::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 0;
+  width: 100px;
+  height: 3px;
+  background: var(--org-gradient-secondary);
+  border-radius: 2px;
 }
 
 .section-header h2 {
-  color: var(--text-primary);
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: var(--org-text-primary);
+  font-size: var(--org-font-size-2xl);
+  font-weight: 700;
   margin: 0;
+  background: var(--org-gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 /* Loading and Error States */
@@ -25,18 +42,21 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1rem;
+  padding: var(--org-spacing-xl) var(--org-spacing-sm);
   text-align: center;
+  background: var(--org-white);
+  border-radius: var(--org-radius-lg);
+  box-shadow: var(--org-shadow-light);
 }
 
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid #f3f3f3;
-  border-top: 4px solid var(--primary-color);
+  border: 4px solid var(--org-primary-ultra-light);
+  border-top: 4px solid var(--org-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
+  margin-bottom: var(--org-spacing-sm);
 }
 
 @keyframes spin {
@@ -45,8 +65,9 @@
 }
 
 .error-message {
-  color: var(--error-color);
-  margin-bottom: 1rem;
+  color: var(--org-error);
+  margin-bottom: var(--org-spacing-sm);
+  font-weight: 600;
 }
 
 .retry-button {

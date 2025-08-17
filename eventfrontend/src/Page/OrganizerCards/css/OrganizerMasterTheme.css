@@ -1,0 +1,381 @@
+/* ====================================
+   ORGANIZER DASHBOARD MASTER THEME
+   Modern Aqua-Blue-Green Design System
+   ==================================== */
+
+/* Import theme configuration - modify OrganizerThemeConfig.css to change colors */
+@import './OrganizerThemeConfig.css';
+
+/* Import comprehensive modal styles */
+@import './ComprehensiveModals.css';
+
+/* Import dashboard modal trigger styles */
+@import './DashboardModalTriggers.css';
+
+/* Base Dashboard Styles */
+.organizer-dashboard {
+  background: var(--org-gradient-subtle);
+  min-height: 100vh;
+  font-family: var(--org-font-family);
+  color: var(--org-text-primary);
+  position: relative;
+}
+
+.organizer-dashboard::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(0, 188, 212, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(76, 175, 80, 0.03) 0%, transparent 50%),
+    radial-gradient(circle at 40% 60%, rgba(77, 208, 225, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Dashboard Header */
+.dashboard-header {
+  background: var(--org-gradient-hero);
+  color: var(--org-white);
+  padding: var(--org-spacing-xl) var(--org-spacing-lg);
+  border-radius: 0 0 var(--org-radius-xl) var(--org-radius-xl);
+  margin-bottom: var(--org-spacing-lg);
+  box-shadow: var(--org-shadow-medium);
+  position: relative;
+  z-index: 1;
+}
+
+.dashboard-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 30% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 40%),
+    radial-gradient(circle at 70% 70%, rgba(255, 255, 255, 0.05) 0%, transparent 40%);
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.header-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.dashboard-title {
+  font-size: var(--org-font-size-4xl);
+  font-weight: 700;
+  margin: 0 0 var(--org-spacing-sm) 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-title i {
+  margin-right: var(--org-spacing-sm);
+  color: var(--org-accent);
+  text-shadow: none;
+}
+
+.dashboard-subtitle {
+  font-size: var(--org-font-size-lg);
+  font-weight: 400;
+  margin: 0;
+  opacity: 0.95;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Main Dashboard Content */
+.dashboard-main {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 var(--org-spacing-lg);
+  position: relative;
+  z-index: 1;
+}
+
+/* Messages */
+.message {
+  padding: var(--org-spacing-md);
+  border-radius: var(--org-radius-md);
+  margin-bottom: var(--org-spacing-md);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  box-shadow: var(--org-shadow-light);
+  animation: slideInDown var(--org-transition-medium);
+}
+
+.message i {
+  margin-right: var(--org-spacing-sm);
+  font-size: var(--org-font-size-lg);
+}
+
+.success-message {
+  background: linear-gradient(135deg, var(--org-success-light) 0%, rgba(200, 230, 201, 0.8) 100%);
+  color: var(--org-success);
+  border-left: 4px solid var(--org-success);
+}
+
+.error-message {
+  background: linear-gradient(135deg, var(--org-error-light) 0%, rgba(255, 205, 210, 0.8) 100%);
+  color: var(--org-error);
+  border-left: 4px solid var(--org-error);
+}
+
+/* Card Base Styles */
+.org-card {
+  background: var(--org-white);
+  border-radius: var(--org-radius-lg);
+  box-shadow: var(--org-shadow-light);
+  border: 1px solid rgba(0, 188, 212, 0.1);
+  transition: all var(--org-transition-medium);
+  position: relative;
+  overflow: hidden;
+}
+
+.org-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: var(--org-gradient-primary);
+  opacity: 0;
+  transition: opacity var(--org-transition-fast);
+}
+
+.org-card:hover {
+  box-shadow: var(--org-shadow-hover);
+  transform: translateY(-2px);
+}
+
+.org-card:hover::before {
+  opacity: 1;
+}
+
+/* Button Styles */
+.org-btn {
+  padding: var(--org-spacing-sm) var(--org-spacing-md);
+  border: none;
+  border-radius: var(--org-radius-md);
+  font-family: var(--org-font-family);
+  font-weight: 600;
+  font-size: var(--org-font-size-base);
+  cursor: pointer;
+  transition: all var(--org-transition-fast);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--org-spacing-xs);
+}
+
+.org-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left var(--org-transition-medium);
+}
+
+.org-btn:hover::before {
+  left: 100%;
+}
+
+.org-btn-primary {
+  background: var(--org-gradient-primary);
+  color: var(--org-white);
+  box-shadow: var(--org-shadow-light);
+}
+
+.org-btn-primary:hover {
+  box-shadow: var(--org-shadow-medium);
+  transform: translateY(-1px);
+}
+
+.org-btn-secondary {
+  background: var(--org-gradient-secondary);
+  color: var(--org-white);
+  box-shadow: var(--org-shadow-light);
+}
+
+.org-btn-accent {
+  background: var(--org-gradient-accent);
+  color: var(--org-white);
+  box-shadow: var(--org-shadow-light);
+}
+
+.org-btn-outline {
+  background: transparent;
+  color: var(--org-primary);
+  border: 2px solid var(--org-primary);
+}
+
+.org-btn-outline:hover {
+  background: var(--org-primary);
+  color: var(--org-white);
+}
+
+/* Form Styles */
+.org-form-group {
+  margin-bottom: var(--org-spacing-md);
+}
+
+.org-label {
+  display: block;
+  margin-bottom: var(--org-spacing-xs);
+  font-weight: 600;
+  color: var(--org-text-secondary);
+  font-size: var(--org-font-size-sm);
+}
+
+.org-input, .org-textarea, .org-select {
+  width: 100%;
+  padding: var(--org-spacing-sm);
+  border: 2px solid var(--org-medium-gray);
+  border-radius: var(--org-radius-sm);
+  font-family: var(--org-font-family);
+  font-size: var(--org-font-size-base);
+  transition: all var(--org-transition-fast);
+  background: var(--org-white);
+}
+
+.org-input:focus, .org-textarea:focus, .org-select:focus {
+  outline: none;
+  border-color: var(--org-primary);
+  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.1);
+}
+
+/* Table Styles */
+.org-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: var(--org-spacing-md);
+}
+
+.org-table th,
+.org-table td {
+  padding: var(--org-spacing-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--org-medium-gray);
+}
+
+.org-table th {
+  background: var(--org-gradient-subtle);
+  font-weight: 600;
+  color: var(--org-text-secondary);
+  font-size: var(--org-font-size-sm);
+}
+
+.org-table tr:hover {
+  background: rgba(0, 188, 212, 0.02);
+}
+
+/* Animations */
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-header {
+    padding: var(--org-spacing-lg) var(--org-spacing-md);
+    border-radius: 0 0 var(--org-radius-lg) var(--org-radius-lg);
+  }
+  
+  .dashboard-title {
+    font-size: var(--org-font-size-3xl);
+  }
+  
+  .dashboard-subtitle {
+    font-size: var(--org-font-size-base);
+  }
+  
+  .dashboard-main {
+    padding: 0 var(--org-spacing-md);
+  }
+  
+  .org-btn {
+    padding: var(--org-spacing-xs) var(--org-spacing-sm);
+    font-size: var(--org-font-size-sm);
+  }
+}
+
+/* Print Styles */
+@media print {
+  .organizer-dashboard {
+    background: var(--org-white) !important;
+  }
+  
+  .dashboard-header {
+    background: var(--org-primary) !important;
+    box-shadow: none !important;
+  }
+  
+  .org-card {
+    box-shadow: none !important;
+    border: 1px solid var(--org-medium-gray) !important;
+  }
+}

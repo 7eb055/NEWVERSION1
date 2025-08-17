@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
+import './OrganizerCards/css/OrganizerMasterTheme.css';
 import './css/OrganizerDashboard.css';
+import './OrganizerCards/css/ModularModals.css';
 
 // Import new modular components
 import EventDataProvider from './OrganizerCards/EventDataProvider';
@@ -8,17 +10,11 @@ import EventListComponent from './OrganizerCards/EventListComponent';
 import DashboardStatsComponent from './OrganizerCards/DashboardStatsComponent';
 import ActionButtonsComponent from './OrganizerCards/ActionButtonsComponent';
 
-// Import legacy components (temporarily)
-import {
-  CreateEventForm,
-  CompanyRegistration,
-  CompanyManagement,
-  PeopleRegistration,
-  ManualEventRegistration,
-  TicketingManagement,
-  AttendanceVerification,
-  Modal
-} from './OrganizerCards';
+// Import modular modal manager
+import ModalManager from './OrganizerCards/ModalManager';
+
+// Import comprehensive modal manager
+import DashboardModalsManager from './OrganizerCards/components/DashboardModalsManager';
 
 // Import header and footer
 import Header from '../component/header';
@@ -68,7 +64,7 @@ const OrganizerDashboard = () => {
           )}
 
           {/* Main Dashboard Content - New Modular Components */}
-          <div className="dashboard-content">
+         
             <div className="dashboard-main">
               {/* Quick Actions Section */}
               <ActionButtonsComponent />
@@ -76,14 +72,19 @@ const OrganizerDashboard = () => {
               {/* Dashboard Statistics */}
               <DashboardStatsComponent />
               
+              {/* Comprehensive Modal Triggers */}
+              <DashboardModalsManager />
+              
               {/* Events List */}
               <EventListComponent />
             </div>
-          </div>
+          
 
           {/* TODO: Legacy Modal Components - Need to be refactored into modular components */}
-          {/* These modals will be moved to their respective components later */}
+          {/* ✅ COMPLETED: All legacy modals have been refactored into modular components */}
           
+          {/* Modular Modal Manager - Handles all modal rendering */}
+          <ModalManager />
         </div>
 
         {/* Global Footer */}

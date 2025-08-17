@@ -1,0 +1,252 @@
+/* Dashboard Modal Triggers */
+.dashboard-modal-triggers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--org-spacing-lg);
+  margin: var(--org-spacing-lg) 0;
+}
+
+.modal-trigger-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--org-spacing-md);
+  padding: var(--org-spacing-lg);
+  background: var(--org-surface-primary);
+  border: 1px solid var(--org-border-color);
+  border-radius: var(--org-border-radius);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  min-height: 100px;
+  position: relative;
+  overflow: hidden;
+}
+
+.modal-trigger-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  transition: all 0.3s ease;
+}
+
+.modal-trigger-btn:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--org-shadow-lg);
+  border-color: var(--org-primary);
+}
+
+.modal-trigger-btn:hover::before {
+  height: 6px;
+}
+
+/* Company Modal Trigger */
+.company-btn::before {
+  background: var(--org-primary);
+}
+
+.company-btn:hover {
+  background: linear-gradient(135deg, var(--org-primary-light), var(--org-surface-primary));
+}
+
+.company-btn .trigger-icon {
+  background: var(--org-primary);
+}
+
+/* People Modal Trigger */
+.people-btn::before {
+  background: var(--org-accent);
+}
+
+.people-btn:hover {
+  background: linear-gradient(135deg, var(--org-accent-light), var(--org-surface-primary));
+}
+
+.people-btn .trigger-icon {
+  background: var(--org-accent);
+}
+
+/* Sales Modal Trigger */
+.sales-btn::before {
+  background: var(--org-success);
+}
+
+.sales-btn:hover {
+  background: linear-gradient(135deg, var(--org-success-light), var(--org-surface-primary));
+}
+
+.sales-btn .trigger-icon {
+  background: var(--org-success);
+}
+
+/* Feedback Modal Trigger */
+.feedback-btn::before {
+  background: var(--org-info);
+}
+
+.feedback-btn:hover {
+  background: linear-gradient(135deg, var(--org-info-light), var(--org-surface-primary));
+}
+
+.feedback-btn .trigger-icon {
+  background: var(--org-info);
+}
+
+/* Trigger Icon */
+.trigger-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--org-surface-primary);
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  transition: all 0.3s ease;
+}
+
+.modal-trigger-btn:hover .trigger-icon {
+  transform: scale(1.1);
+  box-shadow: var(--org-shadow-md);
+}
+
+/* Trigger Content */
+.trigger-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--org-spacing-xs);
+}
+
+.trigger-content h4 {
+  margin: 0;
+  color: var(--org-text-primary);
+  font-weight: 600;
+  font-size: 1.2rem;
+}
+
+.trigger-content p {
+  margin: 0;
+  color: var(--org-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* Trigger Arrow */
+.trigger-arrow {
+  color: var(--org-text-tertiary);
+  font-size: 1.2rem;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.modal-trigger-btn:hover .trigger-arrow {
+  color: var(--org-text-primary);
+  transform: translateX(4px);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dashboard-modal-triggers {
+    grid-template-columns: 1fr;
+    gap: var(--org-spacing-md);
+  }
+  
+  .modal-trigger-btn {
+    min-height: 80px;
+    padding: var(--org-spacing-md);
+  }
+  
+  .trigger-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 1.3rem;
+  }
+  
+  .trigger-content h4 {
+    font-size: 1.1rem;
+  }
+  
+  .trigger-content p {
+    font-size: 0.8rem;
+  }
+}
+
+/* Active State */
+.modal-trigger-btn:active {
+  transform: translateY(-2px);
+  box-shadow: var(--org-shadow-md);
+}
+
+/* Focus State for Accessibility */
+.modal-trigger-btn:focus {
+  outline: 2px solid var(--org-primary);
+  outline-offset: 2px;
+}
+
+/* Animation for trigger buttons */
+@keyframes triggerPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
+.modal-trigger-btn:hover {
+  animation: triggerPulse 2s infinite;
+}
+
+/* Trigger Button Grid Alternative Layout */
+.dashboard-modal-triggers.compact {
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--org-spacing-md);
+}
+
+.dashboard-modal-triggers.compact .modal-trigger-btn {
+  min-height: 80px;
+  padding: var(--org-spacing-md);
+}
+
+.dashboard-modal-triggers.compact .trigger-icon {
+  width: 50px;
+  height: 50px;
+  font-size: 1.3rem;
+}
+
+/* Quick Stats on Trigger Buttons */
+.trigger-stats {
+  display: flex;
+  gap: var(--org-spacing-sm);
+  margin-top: var(--org-spacing-xs);
+}
+
+.trigger-stat {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  background: var(--org-surface-secondary);
+  color: var(--org-text-secondary);
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.company-btn .trigger-stat {
+  background: var(--org-primary-light);
+  color: var(--org-primary);
+}
+
+.people-btn .trigger-stat {
+  background: var(--org-accent-light);
+  color: var(--org-accent);
+}
+
+.sales-btn .trigger-stat {
+  background: var(--org-success-light);
+  color: var(--org-success);
+}
+
+.feedback-btn .trigger-stat {
+  background: var(--org-info-light);
+  color: var(--org-info);
+}
