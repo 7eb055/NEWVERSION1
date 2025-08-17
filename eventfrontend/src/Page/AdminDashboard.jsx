@@ -48,27 +48,27 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+    }, [fetchDashboardData]);
 
   useEffect(() => {
     if (activeTab === 'users') fetchUsers();
-  }, [activeTab, userFilters, userPagination.page]);
+    }, [activeTab, userFilters, userPagination.page, fetchUsers]);
 
   useEffect(() => {
     if (activeTab === 'events') fetchEvents();
-  }, [activeTab, eventFilters]);
+    }, [activeTab, eventFilters, fetchEvents]);
 
   useEffect(() => {
     if (activeTab === 'logs') fetchLogs();
-  }, [activeTab, logFilters]);
+    }, [activeTab, logFilters, fetchLogs]);
 
   useEffect(() => {
     if (activeTab === 'system') fetchSystemHealth();
-  }, [activeTab]);
+    }, [activeTab, fetchSystemHealth]);
 
   useEffect(() => {
     if (activeTab === 'reports') fetchReports();
-  }, [activeTab, reportPeriod]);
+    }, [activeTab, reportPeriod, fetchReports]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);

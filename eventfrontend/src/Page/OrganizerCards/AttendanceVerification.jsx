@@ -49,7 +49,7 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
       setAttendanceStats({});
       setScanHistory([]);
     }
-  }, [selectedEvent]);
+  }, [selectedEvent, loadAttendees, loadAttendanceStats, loadScanHistory]);
 
   // Remove this function since we're using events prop
   // const loadUserEvents = async () => {
@@ -428,7 +428,7 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
     if (selectedEvent) {
       loadAttendees();
     }
-  }, [filterStatus, searchTerm]);
+  }, [filterStatus, searchTerm, loadAttendees, selectedEvent]);
 
   return (
     <div className="attendance-verification">

@@ -4211,7 +4211,7 @@ app.post('/api/auth/login', async (req, res) => {
 
     // Find user by email and get their profile info
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, password, role as role_type, is_suspended, created_at, is_email_verified, account_status
+      `SELECT user_id, email, password, role_type, is_suspended, created_at, is_email_verified, account_status
        FROM users 
        WHERE email = $1`,
       [email]
@@ -4360,10 +4360,10 @@ app.post('/api/auth/register', async (req, res) => {
     // Create user with basic fields (production schema compatibility)
     const userResult = await pool.query(
       `INSERT INTO users (
-        email, password, role, name, email_verification_token, email_verification_expires
-      ) VALUES ($1, $2, $3, $4, $5, $6) 
-      RETURNING user_id, email, role as role_type, created_at`,
-      [email, hashedPassword, role_type || 'attendee', email.split('@')[0], emailVerificationToken, emailVerificationExpires]
+        email, password, role_type, email_verification_token, email_verification_expires
+      ) VALUES ($1, $2, $3, $4, $5) 
+      RETURNING user_id, email, role_type, created_at`,
+      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires]
     );
 
     const newUser = userResult.rows[0];
@@ -4413,7 +4413,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
 
     // Find user with this verification token
     const userQuery = await pool.query(
-      `SELECT id as user_id, email, email_verification_expires, is_email_verified 
+  `SELECT user_id, email, email_verification_expires, is_email_verified 
        FROM users 
        WHERE email_verification_token = $1`,
       [token]
@@ -4472,7 +4472,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 
     // Find user by email
     const userQuery = await pool.query(
-      'SELECT id as user_id, email, is_email_verified FROM users WHERE email = $1',
+  'SELECT user_id, email, is_email_verified FROM users WHERE email = $1',
       [email]
     );
 
@@ -4530,7 +4530,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
 app.get('/api/auth/profile', authenticateToken, async (req, res) => {
   try {
     const userQuery = await pool.query(
-      'SELECT id as user_id, email, role as role_type, created_at FROM users WHERE id = $1',
+  'SELECT user_id, email, role_type, created_at FROM users WHERE user_id = $1',
       [req.user.user_id]
     );
 

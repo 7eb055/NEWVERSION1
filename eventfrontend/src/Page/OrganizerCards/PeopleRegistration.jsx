@@ -29,11 +29,10 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
   // Fetch companies when component mounts
   useEffect(() => {
     fetchCompanies();
-    
     // If in edit mode, populate form with initial data
     if (editMode && initialData) {
-      setFormData({
-        ...formData,
+      setFormData(prevFormData => ({
+        ...prevFormData,
         ...initialData,
         // Parse JSON strings if needed
         social_media_links: typeof initialData.social_media_links === 'string' 
@@ -42,7 +41,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
         notification_preferences: typeof initialData.notification_preferences === 'string'
           ? JSON.parse(initialData.notification_preferences || '{}')
           : initialData.notification_preferences || {}
-      });
+      }));
     }
   }, [editMode, initialData]);
 
