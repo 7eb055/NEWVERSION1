@@ -33,7 +33,7 @@ RUN npm ci --only=production && \
 # Copy built frontend from previous stage
 COPY --from=frontend-builder /frontend/dist ./public
 
-# Copy backend application code
+# Copy backend application code (this will include package.json again, but that's ok)
 COPY backend/ ./
 
 # Create necessary directories
