@@ -58,8 +58,8 @@ const OrganizerDashboard = () => {
   const [eventRegistrations, setEventRegistrations] = useState([]);
   
   // Feedback and Reviews state
-  const [feedbackData, setFeedbackData] = useState([]);
-  const [feedbackSummary, setFeedbackSummary] = useState({});
+  const [feedbackData, _setFeedbackData] = useState([]);
+  const [feedbackSummary, _setFeedbackSummary] = useState({});
   const [feedbackFilter, setFeedbackFilter] = useState({
     eventId: 'all',
     dateRange: 'all'
@@ -120,211 +120,22 @@ const OrganizerDashboard = () => {
         console.warn('Could not restore cached sales data:', err);
       }
       
-      // Load real data if authenticated
+      // Load real data from backend
       loadEvents(); // This will also load sales data
       loadCompanies();
       loadAttendees();
     } else {
-      // Fallback to mock data if no authenticated user
-      setUser({ username: 'Demo Organizer' });
-      loadMockData();
+      setError('Please log in to view your dashboard');
     }
-  }, [loadEvents, loadMockData]);
+  }, [loadEvents]);
 
-  // Recalculate sales data whenever events change (but only when using real events, not mock data)
+  // Recalculate sales data whenever events change
   useEffect(() => {
-    // Only recalculate sales if we have events and they're not from mock data
-    // Mock data handles its own sales calculation in loadMockData
     if (events.length > 0) {
       loadSalesData(events);
     }
-  }, [events]);
+  }, [events, loadSalesData]);
 
-  // Load mock data for UI demonstration
-  const loadMockData = useCallback(() => {
-    // Mock events data - updated to match the normalized schema
-    const mockEvents = [
-      {
-        event_id: 1,
-        event_name: 'Tech Conference 2025',
-        event_date: '2025-02-15T09:00:00Z',
-        venue_name: 'Convention Center Downtown',
-        venue_address: '123 Main St, New York, NY',
-        description: 'Annual technology conference featuring latest trends in AI, blockchain, and web development.',
-        category: 'Technology',
-        event_type: 'Conference',
-        max_attendees: 500,
-        ticket_price: 50.00,
-        registration_count: 150, // Add registration count for sales calculation
-        image_url: 'https://example.com/tech-conf.jpg',
-        status: 'published',
-        is_public: true
-      },
-      {
-        event_id: 2,
-        event_name: 'Marketing Workshop',
-        event_date: '2025-03-22T14:00:00Z',
-        venue_name: 'Business Hub',
-        venue_address: '456 Business Ave, Chicago, IL',
-        description: 'Interactive workshop on digital marketing strategies and social media management.',
-        category: 'Business',
-        event_type: 'Workshop',
-        max_attendees: 100,
-        ticket_price: 75.00,
-        registration_count: 85, // Add registration count for sales calculation
-        image_url: 'https://example.com/marketing-workshop.jpg',
-        status: 'published',
-        is_public: true
-      },
-      {
-        event_id: 3,
-        event_name: 'Networking Event',
-        event_date: '2025-04-10T18:00:00Z',
-        venue_name: 'Rooftop Lounge',
-        venue_address: '789 Skyview Rd, San Francisco, CA',
-        description: 'Professional networking event for entrepreneurs and business leaders.',
-        category: 'Networking',
-        event_type: 'Networking',
-        max_attendees: 200,
-        ticket_price: 25.00,
-        registration_count: 200, // Add registration count for sales calculation
-        image_url: 'https://example.com/networking-event.jpg',
-        status: 'published',
-        is_public: true
-      }
-    ];
-    
-    setEvents(mockEvents);
-    
-    // Calculate sales data from mock events
-    loadSalesData(mockEvents);
-
-    // Mock companies data
-    setCompanies([
-      {
-        id: 1,
-        name: 'TechVision Solutions',
-        type: 'vendor',
-        category: 'Technology',
-        email: 'contact@techvision.com',
-        phone: '+1-555-0123',
-        address: '123 Tech Street, Silicon Valley, CA',
-        registeredAt: '2025-01-10T08:00:00Z',
-        status: 'active'
-      },
-      {
-        id: 2,
-        name: 'Global Sponsors Inc',
-        type: 'sponsor',
-        category: 'Marketing',
-        email: 'partnerships@globalsponsors.com',
-        phone: '+1-555-0456',
-        address: '456 Business Ave, New York, NY',
-        registeredAt: '2025-01-15T10:30:00Z',
-        status: 'active'
-      }
-    ]);
-
-    // Mock people data
-    setPeople([
-      {
-        id: 1,
-        name: 'Dr. Sarah Chen',
-        email: 'sarah.chen@example.com',
-        phone: '+1-555-1111',
-        role: 'speaker',
-        company: 'AI Research Institute',
-        bio: 'Leading AI researcher and keynote speaker',
-        registeredAt: '2025-01-12T14:20:00Z',
-        status: 'confirmed'
-      },
-      {
-        id: 2,
-        name: 'Michael Johnson',
-        email: 'michael.j@vipguest.com',
-        phone: '+1-555-2222',
-        role: 'vip',
-        company: 'Fortune 500 CEO',
-        bio: 'Technology industry executive',
-        registeredAt: '2025-01-14T09:15:00Z',
-        status: 'confirmed'
-      }
-    ]);
-
-    // Mock event registrations data
-    setEventRegistrations([
-      {
-        id: 1,
-        eventId: 1,
-        eventName: 'Tech Conference 2025',
-        attendeeName: 'John Smith',
-        attendeeEmail: 'john.smith@company.com',
-        attendeePhone: '+1-555-3333',
-        ticketType: 'VIP',
-        registrationType: 'manual',
-        registeredBy: 'Demo Organizer',
-        registeredAt: '2025-01-16T11:00:00Z',
-        status: 'confirmed'
-      },
-      {
-        id: 2,
-        eventId: 2,
-        eventName: 'Marketing Workshop',
-        attendeeName: 'Emily Rodriguez',
-        attendeeEmail: 'emily.r@marketing.com',
-        attendeePhone: '+1-555-4444',
-        ticketType: 'Standard',
-        registrationType: 'bulk',
-        registeredBy: 'Demo Organizer',
-        registeredAt: '2025-01-17T15:30:00Z',
-        status: 'confirmed'
-      }
-    ]);
-
-    // Mock feedback data
-    setFeedbackData([
-      {
-        id: 1,
-        eventId: 1,
-        eventName: 'Tech Conference 2025',
-        attendeeName: 'John Smith',
-        attendeeEmail: 'john@example.com',
-        rating: 5,
-        comment: 'Excellent event! Very informative speakers and great networking opportunities.',
-        submittedAt: '2025-01-15T10:30:00Z'
-      },
-      {
-        id: 2,
-        eventId: 1,
-        eventName: 'Tech Conference 2025',
-        attendeeName: 'Sarah Johnson',
-        attendeeEmail: 'sarah@example.com',
-        rating: 4,
-        comment: 'Good content but the venue was a bit crowded. Overall enjoyed it.',
-        submittedAt: '2025-01-16T14:22:00Z'
-      },
-      {
-        id: 3,
-        eventId: 2,
-        eventName: 'Marketing Workshop',
-        attendeeName: 'Mike Davis',
-        attendeeEmail: 'mike@example.com',
-        rating: 5,
-        comment: 'Amazing workshop! Learned practical strategies I can implement immediately.',
-        submittedAt: '2025-01-12T09:15:00Z'
-      }
-    ]);
-
-    // Mock feedback summary
-    setFeedbackSummary({
-      1: { averageRating: 4.5, totalReviews: 2, eventName: 'Tech Conference 2025' },
-      2: { averageRating: 5.0, totalReviews: 1, eventName: 'Marketing Workshop' },
-      3: { averageRating: 0, totalReviews: 0, eventName: 'Networking Event' }
-    });
-  }, [loadSalesData]);
-
-  // Backend API functions - commented out for UI focus
-  
   // Load organizer-specific events from API
   const loadEvents = useCallback(async () => {
     setIsLoading(true);
@@ -446,7 +257,7 @@ const OrganizerDashboard = () => {
       console.error('Error calculating sales data:', error);
       setSalesData({ totalIncome: 0, eventSales: [] });
     }
-  }, []);
+  }, [events]);
 
   
 
@@ -596,7 +407,7 @@ const OrganizerDashboard = () => {
     return true;
   };
 
-  // Registration & User Management Functions (UI Demo Mode)
+  // Registration & User Management Functions
   const handleCompanyRegistration = async (companyData) => {
     try {
       setIsLoading(true);
