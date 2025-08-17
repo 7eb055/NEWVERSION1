@@ -61,7 +61,7 @@ router.put('/notifications', authenticateToken, async (req, res) => {
     const { email, sms, event_updates, promotions } = req.body;
     
     console.log('Updating notification settings for user ID:', req.user.user_id);
-    console.log('New settings:', req.body);
+    console.log('New settings:', JSON.stringify(req.body, null, 2));
     
     const notificationPrefs = {
       email: email ?? true,
@@ -295,7 +295,7 @@ router.get('/export-data', authenticateToken, async (req, res) => {
     );
     
     const registrationData = await pool.query(
-      `SELECT er.*, e.title as event_title, e.start_date, e.end_date 
+      `SELECT er.*, e.event_name as event_title, e.event_date as start_date, e.end_time as end_date 
        FROM eventregistrations er 
        JOIN events e ON er.event_id = e.event_id 
        JOIN attendees a ON er.attendee_id = a.attendee_id 
