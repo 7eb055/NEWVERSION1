@@ -494,7 +494,7 @@ app.put('/api/admin/users/:userId/role', authenticateToken, authorizeAdmin, asyn
     }
 
     await pool.query(
-      'UPDATE users SET role = $1 WHERE id = $2',
+      'UPDATE users SET role_type = $1 WHERE user_id = $2',
       [role_type, userId]
     );
 
@@ -521,7 +521,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const { userId } = req.params;
 
     // Get user details before deletion for logging
-    const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [userId]);
+    const userResult = await pool.query('SELECT email FROM users WHERE user_id = $1', [userId]);
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
@@ -529,7 +529,7 @@ app.delete('/api/admin/users/:userId', authenticateToken, authorizeAdmin, async 
     const userEmail = userResult.rows[0].email;
 
     // Delete user (this should cascade delete related records)
-    await pool.query('DELETE FROM users WHERE id = $1', [userId]);
+    await pool.query('DELETE FROM users WHERE user_id = $1', [userId]);
 
     // Log this action
     try {
@@ -4446,7 +4446,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
            account_status = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE id = $1`,
+       WHERE user_id = $1`,
       [user.user_id]
     );
 
