@@ -6,12 +6,24 @@ export default defineConfig({
   plugins: [react()],
   esbuild: {
     loader: 'jsx',
-    // Disable minification issues with variable names
+    // Disable minification completely to prevent variable conflicts
     keepNames: true,
+    minifyIdentifiers: false,
+    minifySyntax: false,
+    minifyWhitespace: false,
   },
   build: {
-    // Use esbuild for minification with safer settings
-    minify: 'esbuild',
+    // Disable minification completely for debugging
+    minify: false,
+    // More conservative chunk splitting
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          axios: ['axios'],
+        }
+      }
+    }
   },
   optimizeDeps: {
     esbuildOptions: {
@@ -19,6 +31,7 @@ export default defineConfig({
         '.js': 'jsx',
       },
       keepNames: true,
+      minifyIdentifiers: false,
     },
   },
 })
