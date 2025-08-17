@@ -4496,7 +4496,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       `UPDATE users 
        SET email_verification_token = $1, 
            email_verification_expires = $2
-       WHERE user_id = $3`,
+       WHERE id = $3`,
       [emailVerificationToken, emailVerificationExpires, user.user_id]
     );
 
