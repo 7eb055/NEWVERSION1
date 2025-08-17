@@ -128,7 +128,7 @@ function Attendee() {
       console.error('Error fetching events:', error);
     }
   };
-  }, [fetchEvents, fetchMyTickets, fetchNotifications, fetchNotificationStats, fetchUserProfile, makeAuthenticatedRequest]);
+
   // Fetch user's tickets from backend
   const fetchMyTickets = async () => {
     try {
