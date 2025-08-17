@@ -1,8 +1,8 @@
 {
   "scripts": {
-    "start": "node server.js",
-    "docker:start": "npm start",
-    "docker:start-with-migration": "npm run docker:migrate && npm start"
+    "start": "cd backend && npm start",
+    "build": "cd eventfrontend && npm run build",
+    "heroku-postbuild": "cd eventfrontend && npm install && npm run build && cp -r dist/* ../backend/public/"
   },
   "dependencies": {
     "qrcode": "^1.5.4"
