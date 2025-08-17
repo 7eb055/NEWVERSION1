@@ -6,6 +6,10 @@ WORKDIR /frontend
 COPY eventfrontend/package*.json ./
 RUN npm ci
 COPY eventfrontend/ ./
+
+# Set the API URL for production build
+ENV VITE_API_URL=https://your-event-app-production-1c49193922fb.herokuapp.com
+
 RUN npm run build
 
 # Backend stage
