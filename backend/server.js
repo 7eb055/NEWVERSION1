@@ -4343,10 +4343,33 @@ app.post('/api/auth/login', async (req, res) => {
 // Register user
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, role_type = 'attendee' } = req.body;
+    const { 
+      username, 
+      email, 
+      password, 
+      phone, 
+      role = 'attendee',
+      companyName,
+      contactPerson,
+      location
+    } = req.body;
+
+    console.log('Registration request received:', {
+      username,
+      email,
+      role,
+      phone,
+      hasCompanyName: !!companyName,
+      hasContactPerson: !!contactPerson,
+      hasLocation: !!location
+    });
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
+    }
+
+    if (!username) {
+      return res.status(400).json({ message: 'Full name is required' });
     }
 
     // Validate email format
@@ -4358,6 +4381,15 @@ app.post('/api/auth/register', async (req, res) => {
     // Validate password strength
     if (password.length < 6) {
       return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    // Validate organizer-specific fields
+    if (role === 'organizer') {
+      if (!companyName || !contactPerson || !location) {
+        return res.status(400).json({ 
+          message: 'Company name, contact person, and location are required for organizers' 
+        });
+      }
     }
 
     // Check if user already exists
@@ -4373,44 +4405,84 @@ app.post('/api/auth/register', async (req, res) => {
     const emailVerificationToken = crypto.randomBytes(32).toString('hex');
     const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
-    // Create user with basic fields (production schema compatibility)
-    const userResult = await pool.query(
-      `INSERT INTO users (
-        email, password, role_type, email_verification_token, email_verification_expires
-      ) VALUES ($1, $2, $3, $4, $5) 
-      RETURNING user_id, email, role_type, created_at`,
-      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires]
-    );
-
-    const newUser = userResult.rows[0];
-
-    // Send verification email
+    // Start transaction
+    const client = await pool.connect();
     try {
-      await emailService.sendVerificationEmail(
-        email, 
-        emailVerificationToken, 
-        email.split('@')[0]
-      );
-      console.log('Verification email sent successfully to:', email);
-    } catch (emailError) {
-      console.error('Failed to send verification email:', emailError);
-      // Continue with registration even if email fails
-    }
+      await client.query('BEGIN');
 
-    res.status(201).json({
-      message: 'Registration successful! Please check your email to verify your account before logging in.',
-      user: {
-        user_id: newUser.user_id,
-        email: newUser.email,
-        role: newUser.role_type,
-        primary_role: newUser.role_type,
-        roles: [],
-        created_at: newUser.created_at,
-        is_email_verified: false,
-        account_status: 'pending'
-      },
-      requiresEmailVerification: true
-    });
+      // Create user with required fields (matching actual schema)
+      const userResult = await client.query(
+        `INSERT INTO users (
+          email, password, role_type, 
+          email_verification_token, email_verification_expires
+        ) VALUES ($1, $2, $3, $4, $5) 
+        RETURNING user_id, email, role_type, created_at`,
+        [email, hashedPassword, role, emailVerificationToken, emailVerificationExpires]
+      );
+
+      const newUser = userResult.rows[0];
+      console.log('Created user:', { user_id: newUser.user_id, role: newUser.role_type });
+
+      // Create role-specific profile
+      if (role === 'organizer') {
+        // Create organizer profile with required fields
+        const organizerResult = await client.query(
+          `INSERT INTO organizers (
+            user_id, full_name, phone, company_name
+          ) VALUES ($1, $2, $3, $4) 
+          RETURNING organizer_id`,
+          [newUser.user_id, username, phone, companyName]
+        );
+        console.log('Created organizer profile:', organizerResult.rows[0]);
+      } else {
+        // Create attendee profile (default)
+        const attendeeResult = await client.query(
+          `INSERT INTO attendees (
+            user_id, full_name, phone
+          ) VALUES ($1, $2, $3) 
+          RETURNING attendee_id`,
+          [newUser.user_id, username, phone]
+        );
+        console.log('Created attendee profile:', attendeeResult.rows[0]);
+      }
+
+      await client.query('COMMIT');
+
+      // Send verification email
+      try {
+        await emailService.sendVerificationEmail(
+          email, 
+          emailVerificationToken, 
+          username
+        );
+        console.log('Verification email sent successfully to:', email);
+      } catch (emailError) {
+        console.error('Failed to send verification email:', emailError);
+        // Continue with registration even if email fails
+      }
+
+      res.status(201).json({
+        message: 'Registration successful! Please check your email to verify your account before logging in.',
+        user: {
+          user_id: newUser.user_id,
+          username: username,
+          email: newUser.email,
+          role: newUser.role_type,
+          primary_role: newUser.role_type,
+          roles: [],
+          created_at: newUser.created_at,
+          is_email_verified: false,
+          account_status: 'pending'
+        },
+        requiresEmailVerification: true
+      });
+
+    } catch (transactionError) {
+      await client.query('ROLLBACK');
+      throw transactionError;
+    } finally {
+      client.release();
+    }
 
   } catch (error) {
     console.error('Registration error:', error);
