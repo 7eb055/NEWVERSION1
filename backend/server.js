@@ -1717,7 +1717,7 @@ app.delete('/api/team/:id', authenticateToken, async (req, res) => {
 // GET sales report data
 app.get('/api/sales/report', authenticateToken, async (req, res) => {
   try {
-    const { startDate, endDate, eventId, paymentStatus, ticketType } = req.query;
+    const { startDate, endDate, eventId, paymentStatus } = req.query;
 
     let whereClause = 'WHERE 1=1';
     const params = [];
@@ -1807,7 +1807,7 @@ app.get('/api/sales/report', authenticateToken, async (req, res) => {
 // GET feedback data
 app.get('/api/feedback', authenticateToken, async (req, res) => {
   try {
-    const { eventId, rating, category, status } = req.query;
+    const { eventId, rating, category } = req.query;
 
     let whereClause = 'WHERE 1=1';
     const params = [];
