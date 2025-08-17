@@ -129,12 +129,18 @@ const OrganizerDashboard = () => {
     }
   }, [loadEvents]);
 
-  // Recalculate sales data whenever events change
+  // Recalculate sales data whenever events change (but only if not already calculated by loadEvents)
   useEffect(() => {
     if (events.length > 0) {
-      loadSalesData(events);
+      // Only recalculate if we have events that weren't just loaded by loadEvents
+      // loadEvents already calls loadSalesData, so we avoid double calculation
+      const hasRecentlyLoaded = Date.now() - (window.lastEventsLoadTime || 0) < 1000;
+      if (!hasRecentlyLoaded) {
+        loadSalesData(events);
+      }
     }
-  }, [events, loadSalesData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events]); // loadSalesData intentionally omitted to avoid circular dependency
 
   // Load organizer-specific events from API
   const loadEvents = useCallback(async () => {
@@ -170,7 +176,8 @@ const OrganizerDashboard = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [loadSalesData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Remove loadSalesData dependency to avoid circular dependency
 
   // Load companies from API
   const loadCompanies = async () => {
@@ -257,7 +264,8 @@ const OrganizerDashboard = () => {
       console.error('Error calculating sales data:', error);
       setSalesData({ totalIncome: 0, eventSales: [] });
     }
-  }, [events]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Remove events dependency since eventsData is passed as parameter
 
   
 
