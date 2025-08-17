@@ -5,23 +5,23 @@ import { EventDataContext } from './contexts/EventDataContext';
 
 // EventDataProvider component that manages all event-related data and API calls
 const EventDataProvider = ({ children }) => {
-  // Core state
-  const [events, setEvents] = useState([]);
-  const [companies, setCompanies] = useState([]);
-  const [people, setPeople] = useState([]);
-  const [eventRegistrations, setEventRegistrations] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
+  // Core state - explicit initialization to prevent TDZ issues
+  const [events, setEvents] = useState(() => []);
+  const [companies, setCompanies] = useState(() => []);
+  const [people, setPeople] = useState(() => []);
+  const [eventRegistrations, setEventRegistrations] = useState(() => []);
+  const [isLoading, setIsLoading] = useState(() => false);
+  const [error, setError] = useState(() => '');
+  const [success, setSuccess] = useState(() => '');
   
-  // Sales data state
-  const [salesData, setSalesData] = useState({
+  // Sales data state - explicit initialization
+  const [salesData, setSalesData] = useState(() => ({
     totalIncome: 0,
     eventSales: []
-  });
+  }));
   
-  // User data
-  const [user, setUser] = useState(null);
+  // User data - explicit initialization
+  const [user, setUser] = useState(() => null);
 
   // Initialize user data from localStorage
   useEffect(() => {

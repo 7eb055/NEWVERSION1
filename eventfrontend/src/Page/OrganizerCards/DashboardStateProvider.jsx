@@ -3,21 +3,21 @@ import { DashboardStateContext } from './contexts/DashboardStateContext';
 
 // DashboardStateProvider component that manages all UI state
 const DashboardStateProvider = ({ children }) => {
-  // Modal and form visibility state
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showCompanyForm, setShowCompanyForm] = useState(false);
-  const [showCompanyManagement, setShowCompanyManagement] = useState(false);
-  const [showPeopleForm, setShowPeopleForm] = useState(false);
-  const [showRegistrationForm, setShowRegistrationForm] = useState(false);
-  const [showTicketingForm, setShowTicketingForm] = useState(false);
-  const [showAttendanceForm, setShowAttendanceForm] = useState(false);
+  // Modal and form visibility state - explicit initialization to prevent TDZ issues
+  const [showCreateForm, setShowCreateForm] = useState(() => false);
+  const [showCompanyForm, setShowCompanyForm] = useState(() => false);
+  const [showCompanyManagement, setShowCompanyManagement] = useState(() => false);
+  const [showPeopleForm, setShowPeopleForm] = useState(() => false);
+  const [showRegistrationForm, setShowRegistrationForm] = useState(() => false);
+  const [showTicketingForm, setShowTicketingForm] = useState(() => false);
+  const [showAttendanceForm, setShowAttendanceForm] = useState(() => false);
   
-  // Event management state
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [showEventDetails, setShowEventDetails] = useState(false);
-  const [showEditForm, setShowEditForm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [eventToDelete, setEventToDelete] = useState(null);
+  // Event management state - explicit initialization
+  const [selectedEvent, setSelectedEvent] = useState(() => null);
+  const [showEventDetails, setShowEventDetails] = useState(() => false);
+  const [showEditForm, setShowEditForm] = useState(() => false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(() => false);
+  const [eventToDelete, setEventToDelete] = useState(() => null);
   
   // Feedback and filtering state
   const [feedbackFilter, setFeedbackFilter] = useState({
