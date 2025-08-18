@@ -4802,7 +4802,7 @@ app.post('/api/auth/register', async (req, res) => {
     if (userRole === 'organizer') {
       try {
         await pool.query(
-          `INSERT INTO organizers (user_id, organizer_name, company_name, contact_person, location, phone)
+          `INSERT INTO organizers (user_id, organizer_name, company_name, full_name, business_address, phone)
            VALUES ($1, $2, $3, $4, $5, $6)`,
           [newUser.user_id, username || email.split('@')[0], companyName, contactPerson, location, phone]
         );
