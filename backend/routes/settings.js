@@ -275,7 +275,7 @@ router.get('/security', authenticateToken, async (req, res) => {
     const userIdColumn = schema.userIdColumn;
     
     // Build query based on available columns
-    let selectColumns = ['created_at'];
+    const selectColumns = ['created_at'];
     if (schema.hasTwoFactorEnabled) selectColumns.push('two_factor_enabled');
     if (schema.hasPasswordChangedAt) selectColumns.push('password_changed_at');
     
@@ -422,7 +422,7 @@ router.get('/export-data', authenticateToken, async (req, res) => {
     const userIdColumn = schema.userIdColumn;
     
     // Build user query based on available columns
-    let userSelectColumns = [userIdColumn, 'email', 'created_at', 'last_login'];
+    const userSelectColumns = [userIdColumn, 'email', 'created_at', 'last_login'];
     if (schema.hasRoleType) userSelectColumns.push('role_type');
     if (schema.hasProfileVisibility) userSelectColumns.push('profile_visibility');
     
@@ -520,9 +520,7 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
     
     // Instead of hard delete, we'll deactivate the account
     // Build dynamic query based on available columns
-    let updateColumns = [];
-    let updateValues = [];
-    let valueIndex = 2; // Start at 2 since $1 is user_id
+    const updateColumns = [];
     
     // Always try to mark as deleted if possible
     updateColumns.push('deleted_at = NOW()');
