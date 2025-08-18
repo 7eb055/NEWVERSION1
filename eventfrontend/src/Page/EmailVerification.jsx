@@ -23,7 +23,7 @@ const EmailVerification = () => {
       }
 
       try {
-        const response = await axios.post(`${API_BASE_URL}/api/auth/verify-email`, {
+        const response = await axios.post(`${API_BASE_URL}/auth/verify-email`, {
           token: token
         });
         

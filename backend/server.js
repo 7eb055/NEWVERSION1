@@ -10,10 +10,10 @@ require('dotenv').config();
 
 // Import routes
 const attendeeRoutes = require('./routes/attendee');
-const ticketingRoutes = require('./routes/ticketing');
+// const ticketingRoutes = require('./routes/ticketing'); // Temporarily disabled - causes early DB connection
 const settingsRoutes = require('./routes/settings');
 const adminRoutes = require('./routes/admin');
-const paymentRoutes = require('./routes/payments');
+// const paymentRoutes = require('./routes/payments'); // Temporarily disabled - causes early DB connection
 
 // Import upload middleware
 const { upload, handleMulterError } = require('./middleware/upload');
@@ -4873,7 +4873,7 @@ app.post('/api/auth/verify-email', async (req, res) => {
            account_status = 'active',
            email_verification_token = NULL,
            email_verification_expires = NULL
-       WHERE id = $1`,
+       WHERE user_id = $1`,
       [user.user_id]
     );
 
@@ -4923,7 +4923,7 @@ app.post('/api/auth/resend-verification', async (req, res) => {
       `UPDATE users 
        SET email_verification_token = $1, 
            email_verification_expires = $2
-       WHERE id = $3`,
+       WHERE user_id = $3`,
       [emailVerificationToken, emailVerificationExpires, user.user_id]
     );
 
@@ -5619,7 +5619,7 @@ app.use('/api/public/events', publicEventsRouter);
 app.use('/api/attendee', attendeeRoutes);
 
 // Mount ticketing routes
-app.use('/api', ticketingRoutes);
+// app.use('/api', ticketingRoutes); // Temporarily disabled - causes early DB connection
 
 // Mount settings routes
 app.use('/api/settings', settingsRoutes);
@@ -5628,7 +5628,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/admin', adminRoutes);
 
 // Mount payment routes
-app.use('/api/payments', paymentRoutes);
+// app.use('/api/payments', paymentRoutes); // Temporarily disabled - causes early DB connection
 
 // Catch-all handler for frontend routing (must be last)
 app.get('*', (req, res) => {
