@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 import './css/footer.css';
 
 const Footer = () => {
@@ -33,7 +34,7 @@ const Footer = () => {
   useEffect(() => {
     const fetchUpcomingEvent = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events?status=published&limit=1`);
+        const response = await fetch(`${API_BASE_URL}/api/events?status=published&limit=1`);
         if (response.ok) {
           const events = await response.json();
           if (events.length > 0) {
@@ -52,7 +53,7 @@ const Footer = () => {
   useEffect(() => {
     const fetchRecentEvents = async () => {
       try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events?status=published&limit=6`);
+        const response = await fetch(`${API_BASE_URL}/api/events?status=published&limit=6`);
         if (response.ok) {
           const events = await response.json();
           setRecentEvents(events);
@@ -73,9 +74,9 @@ const Footer = () => {
         const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
         
         const [eventsRes, attendeesRes, organizersRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events`, { headers }),
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`, { headers }),
-          fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`, { headers })
+          fetch(`${API_BASE_URL}/api/events`, { headers }),
+          fetch(`${API_BASE_URL}/api/attendees`, { headers }),
+          fetch(`${API_BASE_URL}/api/companies`, { headers })
         ]);
 
         const [events, attendees, organizers] = await Promise.all([

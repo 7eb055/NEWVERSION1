@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/PeopleRegistration.css';
+import { API_BASE_URL } from '../config/api';
 
 const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, editMode = false, initialData = null }) => {
   const [isLoading, setIsLoading] = useState(propIsLoading || false);
@@ -55,7 +56,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`,
+        `${API_BASE_URL}/api/companies`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -187,7 +188,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       if (editMode && initialData?.attendee_id) {
         // Update existing attendee
         response = await axios.put(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees/${initialData.attendee_id}`,
+          `${API_BASE_URL}/api/attendees/${initialData.attendee_id}`,
           attendeeData,
           {
             headers: {
@@ -201,7 +202,7 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       } else {
         // Create new attendee
         response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
+          `${API_BASE_URL}/api/attendees`,
           attendeeData,
           {
             headers: {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { API_BASE_URL } from '../config/api';
 
 const EventList = ({ 
   events, 
@@ -49,7 +50,7 @@ const EventList = ({
                 src={
                   event.image_url 
                     ? event.image_url
-                    : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}`
+                    : `${API_BASE_URL}/uploads/images/${event.image_filename}`
                 } 
                 alt={event.event_name}
                 className="event-image"

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AuthTokenService from '../../services/AuthTokenService';
+import { API_BASE_URL } from '../../config/api';
 import './AttendeeCards.css';
 
 const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurchase }) => {
@@ -24,7 +25,7 @@ const TicketPurchaseCard = ({ event, ticketTypes = [], loading = false, onPurcha
         return;
       }
       
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/register`, {
+      const response = await fetch(`${API_BASE_URL}/api/events/${event.event_id}/register`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

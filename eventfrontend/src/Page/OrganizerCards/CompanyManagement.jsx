@@ -4,6 +4,7 @@ import AuthTokenService from '../../services/AuthTokenService';
 import CompanyRegistration from './CompanyRegistration';
 
 import './css/CompanyManagement.css';
+import { API_BASE_URL } from '../config/api';
 
 const CompanyManagement = () => {
   const [companies, setCompanies] = useState([]);
@@ -34,7 +35,7 @@ const CompanyManagement = () => {
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`,
+        `${API_BASE_URL}/api/companies`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -92,7 +93,7 @@ const CompanyManagement = () => {
       const token = AuthTokenService.getToken();
       
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies/${deleteConfirm.id}`,
+        `${API_BASE_URL}/api/companies/${deleteConfirm.id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

@@ -4,6 +4,7 @@ import axios from 'axios';
 import Header from '../component/header';
 import Footer from '../component/footer';
 import TicketPurchase from '../component/TicketPurchase';
+import { API_BASE_URL } from '../config/api';
 import './css/Eventdetails.css';
 
 function EventDetails() {
@@ -36,7 +37,7 @@ function EventDetails() {
       try {
         setLoading(true);
         // Use import.meta.env instead of process.env for Vite projects
-        const response = await axios.get(`http://localhost:5001/api/public/events/${eventId}`);
+        const response = await axios.get(`${API_BASE_URL}/api/public/events/${eventId}`);
         
         console.log('Event data received:', response.data);
         

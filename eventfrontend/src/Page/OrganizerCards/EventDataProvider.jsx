@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import { EventDataContext } from './contexts/EventDataContext';
+import { API_BASE_URL } from '../config/api';
 
 // EventDataProvider component that manages all event-related data and API calls
 const EventDataProvider = ({ children }) => {
@@ -80,7 +81,7 @@ const EventDataProvider = ({ children }) => {
     setIsLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
+      const response = await axios.get(`${API_BASE_URL}/api/events/my-events`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -117,7 +118,7 @@ const EventDataProvider = ({ children }) => {
   const loadCompanies = useCallback(async function loadCompaniesFunction() {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`, {
+      const response = await axios.get(`${API_BASE_URL}/api/companies`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -135,7 +136,7 @@ const EventDataProvider = ({ children }) => {
   const loadAttendees = useCallback(async function loadAttendeesFunction() {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`, {
+      const response = await axios.get(`${API_BASE_URL}/api/attendees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 const PaymentCallback = () => {
   const navigate = useNavigate();
@@ -34,7 +35,7 @@ const PaymentCallback = () => {
 
         // Verify payment with backend
         const response = await axios.post(
-          `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/payments/verify/${paymentReference}`,
+          `${API_BASE_URL}/api/payments/verify/${paymentReference}`,
           {},
           {
             headers: {

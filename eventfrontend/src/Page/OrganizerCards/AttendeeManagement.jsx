@@ -4,6 +4,7 @@ import AuthTokenService from '../../services/AuthTokenService';
 import PeopleRegistration from './PeopleRegistration';
 
 import './css/AttendeeManagement.css';
+import { API_BASE_URL } from '../config/api';
 
 const AttendeeManagement = () => {
   const [attendees, setAttendees] = useState([]);
@@ -36,7 +37,7 @@ const AttendeeManagement = () => {
       }
 
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
+        `${API_BASE_URL}/api/attendees`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -94,7 +95,7 @@ const AttendeeManagement = () => {
       const token = AuthTokenService.getToken();
       
       await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees/${deleteConfirm.id}`,
+        `${API_BASE_URL}/api/attendees/${deleteConfirm.id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`

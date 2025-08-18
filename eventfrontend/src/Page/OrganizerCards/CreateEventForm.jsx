@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import ImageUpload from '../../component/ImageUpload';
 import './CreateEventForm.css';
+import { API_BASE_URL } from '../config/api';
 
 const CreateEventForm = ({
   formData,
@@ -19,7 +20,7 @@ const CreateEventForm = ({
     const fetchData = async () => {
       try {
         // Fetch event categories
-        const categoriesResponse = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/categories`);
+        const categoriesResponse = await axios.get(`${API_BASE_URL}/api/categories`);
         if (categoriesResponse.data) {
           setCategories(categoriesResponse.data);
         }

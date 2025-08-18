@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { API_BASE_URL } from '../config/api';
 import './ImageUpload.css';
 
 const ImageUpload = ({ 
@@ -14,8 +15,6 @@ const ImageUpload = ({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
   const fileInputRef = useRef(null);
-
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
   const handleFileSelect = async (event) => {
     const file = event.target.files[0];

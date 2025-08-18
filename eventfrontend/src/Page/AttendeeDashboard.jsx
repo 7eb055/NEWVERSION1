@@ -11,6 +11,7 @@ import ProfileCard from '../component/AttendeeCards/ProfileCard';
 import NotificationsCard from '../component/AttendeeCards/NotificationsCard';
 import MyTicketsCard from '../component/AttendeeCards/MyTicketsCard';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 function Attendee() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ function Attendee() {
       ...(token && { 'Authorization': `Bearer ${token}` })
     };
 
-    return fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}${url}`, {
+    return fetch(`${API_BASE_URL}${url}`, {
       ...options,
       headers: {
         ...defaultHeaders,
@@ -101,7 +102,7 @@ function Attendee() {
   const fetchEvents = useCallback(async () => {
     try {
       // Construct URL with search parameters
-      let url = new URL(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/public/events`);
+      let url = new URL(`${API_BASE_URL}/api/public/events`);
       
       // Add search parameters if they exist
       if (searchTerm) url.searchParams.append('search', searchTerm);
@@ -329,7 +330,7 @@ function Attendee() {
     
     try {
       // Fetch ticket types for the selected event
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/ticket-types/public`);
+      const response = await fetch(`${API_BASE_URL}/api/events/${event.event_id}/ticket-types/public`);
       
       if (response.ok) {
         const data = await response.json();

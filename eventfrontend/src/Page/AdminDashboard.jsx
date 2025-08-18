@@ -3,6 +3,7 @@ import axios from 'axios';
 import AuthTokenService from '../services/AuthTokenService';
 import Header from '../component/header';
 import Footer from '../component/footer';
+import { API_BASE_URL } from '../config/api';
 import './css/AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -44,7 +45,7 @@ const AdminDashboard = () => {
   const [reports, setReports] = useState(null);
   const [reportPeriod, setReportPeriod] = useState('30');
 
-  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const API_BASE = API_BASE_URL;
 
   useEffect(() => {
     fetchDashboardData();

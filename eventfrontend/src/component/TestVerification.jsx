@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 const TestVerification = () => {
   const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/debug-user/${email}`);
+      const response = await axios.get(`${API_BASE_URL}/api/auth/debug-user/${email}`);
       setDebugInfo(response.data);
     } catch (error) {
       console.error('Debug error:', error);
@@ -34,7 +35,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/debug-token/${token}`);
+      const response = await axios.get(`${API_BASE_URL}/api/auth/debug-token/${token}`);
       setDebugInfo(response.data);
     } catch (error) {
       console.error('Token debug error:', error);
@@ -52,7 +53,7 @@ const TestVerification = () => {
 
     setLoading(true);
     try {
-      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/verify-email`, { token });
+      const response = await axios.post(`${API_BASE_URL}/api/auth/verify-email`, { token });
       setVerificationResult({ success: true, data: response.data });
     } catch (error) {
       console.error('Verification error:', error);

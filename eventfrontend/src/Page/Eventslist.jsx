@@ -5,6 +5,7 @@ import Header from "../component/header";
 import Footer from "../component/footer";
 import TicketPurchaseCard from '../component/AttendeeCards/TicketPurchaseCard';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 function EventListPage() {
   const navigate = useNavigate();
@@ -35,7 +36,7 @@ function EventListPage() {
   const fetchEvents = async () => {
     try {
       setLoading(true);
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events`);
+      const response = await fetch(`${API_BASE_URL}/api/events`);
       if (!response.ok) {
         throw new Error('Failed to fetch events');
       }
@@ -124,7 +125,7 @@ function EventListPage() {
     
     try {
       // Fetch ticket types for the selected event
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${event.event_id}/ticket-types/public`);
+      const response = await fetch(`${API_BASE_URL}/api/events/${event.event_id}/ticket-types/public`);
       
       if (response.ok) {
         const data = await response.json();
@@ -252,7 +253,7 @@ function EventListPage() {
                 <div className="event-image-container">
                   {(event.image_url || event.image_filename) ? (
                     <img 
-                      src={event.image_url || `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}`} 
+                      src={event.image_url || `${API_BASE_URL}/uploads/images/${event.image_filename}`} 
                       alt={event.event_name}
                       className="event-image"
                       onError={(e) => {

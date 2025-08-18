@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/TicketingManagement.css';
+import { API_BASE_URL } from '../config/api';
 
 const TicketingManagement = ({ events = [] }) => {
   const [activeTab, setActiveTab] = useState('ticket-types');
@@ -31,7 +32,7 @@ const TicketingManagement = ({ events = [] }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types`, {
+      const response = await axios.get(`${API_BASE_URL}/api/events/${selectedEventId}/ticket-types`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTicketTypes(response.data.ticketTypes || []);
@@ -50,7 +51,7 @@ const TicketingManagement = ({ events = [] }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-sales`, {
+      const response = await axios.get(`${API_BASE_URL}/api/events/${selectedEventId}/ticket-sales`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -82,7 +83,7 @@ const TicketingManagement = ({ events = [] }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/registrations-detailed`, {
+      const response = await axios.get(`${API_BASE_URL}/api/events/${selectedEventId}/registrations-detailed`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setRegistrations(response.data.registrations || []);
@@ -110,7 +111,7 @@ const TicketingManagement = ({ events = [] }) => {
   //     const token = AuthTokenService.getToken();
   //     console.log('Loading user events with token:', !!token);
   //     
-  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
+  //     const response = await axios.get(`${API_BASE_URL}/api/events/my-events`, {
   //       headers: { Authorization: `Bearer ${token}` }
   //     });
   //     
@@ -141,8 +142,8 @@ const TicketingManagement = ({ events = [] }) => {
     try {
       const token = AuthTokenService.getToken();
       const url = editingTicket 
-        ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types/${editingTicket.ticket_type_id}`
-        : `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types`;
+        ? `${API_BASE_URL}/api/events/${selectedEventId}/ticket-types/${editingTicket.ticket_type_id}`
+        : `${API_BASE_URL}/api/events/${selectedEventId}/ticket-types`;
       
       const method = editingTicket ? 'put' : 'post';
       
@@ -187,7 +188,7 @@ const TicketingManagement = ({ events = [] }) => {
     setLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      await axios.delete(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEventId}/ticket-types/${ticketTypeId}`, {
+      await axios.delete(`${API_BASE_URL}/api/events/${selectedEventId}/ticket-types/${ticketTypeId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('Ticket type deleted successfully');
@@ -203,7 +204,7 @@ const TicketingManagement = ({ events = [] }) => {
   const generateQRCode = async (registrationId) => {
     try {
       const token = AuthTokenService.getToken();
-      await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/registrations/${registrationId}/generate-qr`, {}, {
+      await axios.post(`${API_BASE_URL}/api/registrations/${registrationId}/generate-qr`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setSuccess('QR code generated successfully');

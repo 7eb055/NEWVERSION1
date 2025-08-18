@@ -116,7 +116,7 @@ const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, 
         };
         
         let response;
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+        const baseUrl = API_BASE_URL;
         
         if (editMode && initialData?.company_id) {
           // Update existing company

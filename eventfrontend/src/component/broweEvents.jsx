@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './css/browseEvents.css';
 import EventService from '../services/EventService';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 const BrowseEvents = () => {
   const [selectedDate, setSelectedDate] = useState(null);
@@ -249,7 +250,7 @@ const BrowseEvents = () => {
                   {/* Event Image Header */}
                   <div className="event-image-container">
                     <img 
-                      src={event.image_url || (event.image_filename ? `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/uploads/images/${event.image_filename}` : defaultEventImage)} 
+                      src={event.image_url || (event.image_filename ? `${API_BASE_URL}/uploads/images/${event.image_filename}` : defaultEventImage)} 
                       alt={event.event_name}
                       className="event-image"
                       onError={(e) => {

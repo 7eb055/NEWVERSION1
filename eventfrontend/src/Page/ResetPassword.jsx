@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 import './css/ResetPassword.css';
 
 const ResetPassword = () => {
@@ -102,7 +103,7 @@ const ResetPassword = () => {
         newPassword: newPassword
       };
 
-      const response = await axios.post(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/auth/reset-password`, resetData, {
+      const response = await axios.post(`${API_BASE_URL}/api/auth/reset-password`, resetData, {
         headers: {
           'Content-Type': 'application/json'
         }

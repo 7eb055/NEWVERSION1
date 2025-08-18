@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios'; // Uncommented to enable backend API calls
 import './css/OrganizerDashboard.css';
 import AuthTokenService from '../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 // Import components
 import {
@@ -155,7 +156,7 @@ const OrganizerDashboard = () => {
     setIsLoading(true);
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
+      const response = await axios.get(`${API_BASE_URL}/api/events/my-events`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -228,7 +229,7 @@ const OrganizerDashboard = () => {
   const loadCompanies = async () => {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`, {
+      const response = await axios.get(`${API_BASE_URL}/api/companies`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -245,7 +246,7 @@ const OrganizerDashboard = () => {
   const loadAttendees = async () => {
     try {
       const token = AuthTokenService.getToken();
-      const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`, {
+      const response = await axios.get(`${API_BASE_URL}/api/attendees`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -422,7 +423,7 @@ const OrganizerDashboard = () => {
 
       // Create API request based on whether this is a new company or an update
       let response;
-      const apiUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/companies`;
+      const apiUrl = `${API_BASE_URL}/api/companies`;
       
       if (companyData.company && companyData.company.company_id) {
         // Update existing company
@@ -489,7 +490,7 @@ const OrganizerDashboard = () => {
       }
 
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/attendees`,
+        `${API_BASE_URL}/api/attendees`,
         {
           email: personData.email,
           full_name: personData.full_name || personData.name,
@@ -573,7 +574,7 @@ const OrganizerDashboard = () => {
       };
       
       console.log('📤 Final payload being sent to backend:', payload);
-      console.log('� URL:', `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/manual-registration`);
+      console.log('� URL:', `${API_BASE_URL}/api/events/${eventId}/manual-registration`);
       
       // Validate required fields before sending
       if (!payload.attendeeEmail || !payload.attendeeName || !payload.ticketTypeId) {
@@ -581,7 +582,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/manual-registration`,
+        `${API_BASE_URL}/api/events/${eventId}/manual-registration`,
         payload,
         {
           headers: {
@@ -654,7 +655,7 @@ const OrganizerDashboard = () => {
       
       // Make API call to create event
       const response = await axios.post(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events`, 
+        `${API_BASE_URL}/api/events`, 
         eventData,
         {
           headers: {
@@ -807,7 +808,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.delete(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventToDelete.event_id}`,
+        `${API_BASE_URL}/api/events/${eventToDelete.event_id}`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -864,7 +865,7 @@ const OrganizerDashboard = () => {
       }
       
       const response = await axios.put(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${selectedEvent.event_id}`,
+        `${API_BASE_URL}/api/events/${selectedEvent.event_id}`,
         eventData,
         {
           headers: {

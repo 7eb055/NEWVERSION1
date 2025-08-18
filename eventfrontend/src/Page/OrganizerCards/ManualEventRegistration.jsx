@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   const [formData, setFormData] = useState({
@@ -41,7 +42,7 @@ const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
     try {
       const token = AuthTokenService.getToken();
       const response = await axios.get(
-        `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/${eventId}/ticket-types`,
+        `${API_BASE_URL}/api/events/${eventId}/ticket-types`,
         {
           headers: { Authorization: `Bearer ${token}` }
         }
