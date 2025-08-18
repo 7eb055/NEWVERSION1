@@ -5,6 +5,7 @@ import Header from '../component/header';
 import './css/Settings.css';
 
 const Settings = () => {
+  const [userRole, setUserRole] = useState('');
   const [notifications, setNotifications] = useState({
     email: true,
     sms: false,
@@ -32,6 +33,10 @@ const Settings = () => {
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   useEffect(() => {
+    // Get user role
+    const role = AuthTokenService.getUserRole();
+    setUserRole(role);
+    
     fetchAllSettings();
   }, []);
 
@@ -40,16 +45,34 @@ const Settings = () => {
       setIsLoading(true);
       setError('');
       
-      // Fetch all settings in parallel
-      const [notificationRes, privacyRes, securityRes] = await Promise.all([
-        apiService.getNotificationSettings(),
+      // For organizers, skip notification settings as they don't have attendee records
+      const settingsToFetch = [];
+      
+      if (userRole !== 'organizer') {
+        settingsToFetch.push(apiService.getNotificationSettings());
+      }
+      
+      settingsToFetch.push(
         apiService.getPrivacySettings(),
         apiService.getSecurityInfo()
-      ]);
+      );
       
-      if (notificationRes.success) {
-        setNotifications(notificationRes.data.notifications);
+      // Fetch settings in parallel
+      const results = await Promise.all(settingsToFetch);
+      
+      let resultIndex = 0;
+      
+      // Handle notification settings only for non-organizers
+      if (userRole !== 'organizer') {
+        const notificationRes = results[resultIndex++];
+        if (notificationRes.success) {
+          setNotifications(notificationRes.data.notifications);
+        }
       }
+      
+      // Handle privacy and security settings
+      const privacyRes = results[resultIndex++];
+      const securityRes = results[resultIndex++];
       
       if (privacyRes.success) {
         setPrivacy(privacyRes.data.privacy);
@@ -60,7 +83,7 @@ const Settings = () => {
       }
       
       // Show error if any request failed
-      const errors = [notificationRes, privacyRes, securityRes]
+      const errors = results
         .filter(res => !res.success)
         .map(res => res.error);
       
@@ -265,73 +288,76 @@ const Settings = () => {
       )}
 
       <div className="settings-content">
-        <div className="settings-section">
-          <h3>
-            <i className="fas fa-bell"></i>
-            Notifications
-          </h3>
-          <div className="settings-group">
-            <div className="setting-item">
-              <div className="setting-info">
-                <label>Email Notifications</label>
-                <span>Receive email updates about events and activities</span>
+        {/* Only show notifications section for non-organizers */}
+        {userRole !== 'organizer' && (
+          <div className="settings-section">
+            <h3>
+              <i className="fas fa-bell"></i>
+              Notifications
+            </h3>
+            <div className="settings-group">
+              <div className="setting-item">
+                <div className="setting-info">
+                  <label>Email Notifications</label>
+                  <span>Receive email updates about events and activities</span>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.email}
+                    onChange={(e) => handleNotificationChange('email', e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
               </div>
-              <label className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  checked={notifications.email}
-                  onChange={(e) => handleNotificationChange('email', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <label>Event Updates</label>
-                <span>Get notified about event changes and updates</span>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <label>Event Updates</label>
+                  <span>Get notified about event changes and updates</span>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.event_updates}
+                    onChange={(e) => handleNotificationChange('event_updates', e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
               </div>
-              <label className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  checked={notifications.event_updates}
-                  onChange={(e) => handleNotificationChange('event_updates', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <label>SMS Notifications</label>
-                <span>Receive text message notifications</span>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <label>SMS Notifications</label>
+                  <span>Receive text message notifications</span>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.sms}
+                    onChange={(e) => handleNotificationChange('sms', e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
               </div>
-              <label className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  checked={notifications.sms}
-                  onChange={(e) => handleNotificationChange('sms', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
-            </div>
 
-            <div className="setting-item">
-              <div className="setting-info">
-                <label>Promotional Messages</label>
-                <span>Receive promotional emails and newsletters</span>
+              <div className="setting-item">
+                <div className="setting-info">
+                  <label>Promotional Messages</label>
+                  <span>Receive promotional emails and newsletters</span>
+                </div>
+                <label className="toggle-switch">
+                  <input 
+                    type="checkbox" 
+                    checked={notifications.promotions}
+                    onChange={(e) => handleNotificationChange('promotions', e.target.checked)}
+                  />
+                  <span className="toggle-slider"></span>
+                </label>
               </div>
-              <label className="toggle-switch">
-                <input 
-                  type="checkbox" 
-                  checked={notifications.promotions}
-                  onChange={(e) => handleNotificationChange('promotions', e.target.checked)}
-                />
-                <span className="toggle-slider"></span>
-              </label>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="settings-section">
           <h3>
