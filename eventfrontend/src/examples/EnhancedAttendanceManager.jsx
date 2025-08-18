@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import AttendanceVerification from './AttendanceVerification';
 import AttendeeListingService from '../../services/attendeeListingService';
 import AuthTokenService from '../../services/AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 import formatters from '../../utils/formatters';
 
 const EnhancedAttendanceManager = () => {
@@ -21,7 +22,7 @@ const EnhancedAttendanceManager = () => {
       const token = AuthTokenService.getToken();
       
       // Load organizer's events
-      const response = await fetch('http://localhost:5001/api/events/my-events', {
+      const response = await fetch(`${API_BASE_URL}/api/events/my-events`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       
