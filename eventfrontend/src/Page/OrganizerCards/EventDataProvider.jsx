@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import { EventDataContext } from './contexts/EventDataContext';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 // EventDataProvider component that manages all event-related data and API calls
 const EventDataProvider = ({ children }) => {

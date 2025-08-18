@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 const ManualEventRegistration = ({ events, onSubmit, onCancel, isLoading }) => {
   const [formData, setFormData] = useState({

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import './css/TicketingManagement.css';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 const TicketingManagement = ({ events = [] }) => {
   const [activeTab, setActiveTab] = useState('ticket-types');

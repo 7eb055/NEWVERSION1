@@ -4,7 +4,7 @@ import AuthTokenService from '../../services/AuthTokenService';
 import CompanyRegistration from './CompanyRegistration';
 
 import './css/CompanyManagement.css';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 const CompanyManagement = () => {
   const [companies, setCompanies] = useState([]);

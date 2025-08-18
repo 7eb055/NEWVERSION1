@@ -4,7 +4,7 @@ import AuthTokenService from '../../services/AuthTokenService';
 import PeopleRegistration from './PeopleRegistration';
 
 import './css/AttendeeManagement.css';
-import { API_BASE_URL } from '../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 const AttendeeManagement = () => {
   const [attendees, setAttendees] = useState([]);
