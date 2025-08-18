@@ -1,21 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 const authenticateToken = require('../middleware/auth');
 
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
+// Use the shared database pool from the main server
+let pool;
+
+// Function to set the database pool (called from main server)
+const setPool = (dbPool) => {
+  pool = dbPool;
+};
 
 // Schema compatibility helper
 const getSchemaInfo = async () => {
   try {
+    if (!pool) {
+      throw new Error('Database pool not initialized');
+    }
+    
     // Check if we're using the new schema (user_id) or old schema (id)
     const userTableCheck = await pool.query(`
       SELECT column_name 
@@ -575,4 +577,4 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = { router, setPool };

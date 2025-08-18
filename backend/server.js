@@ -11,7 +11,7 @@ require('dotenv').config();
 // Import routes
 const attendeeRoutes = require('./routes/attendee');
 // const ticketingRoutes = require('./routes/ticketing'); // Temporarily disabled - causes early DB connection
-const settingsRoutes = require('./routes/settings');
+const { router: settingsRoutes, setPool: setSettingsPool } = require('./routes/settings');
 const adminRoutes = require('./routes/admin');
 // const paymentRoutes = require('./routes/payments'); // Temporarily disabled - causes early DB connection
 
@@ -67,6 +67,9 @@ if (process.env.NODE_ENV === 'test') {
       }
   );
 }
+
+// Initialize settings routes with the database pool
+setSettingsPool(pool);
 
 // Initialize notification scheduler - DISABLED
 // const notificationScheduler = new NotificationScheduler();
