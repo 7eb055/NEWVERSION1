@@ -211,7 +211,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     
     // Get current password hash
     const userQuery = await pool.query(
-      'SELECT password_hash FROM users WHERE user_id = $1',
+      'SELECT password FROM users WHERE user_id = $1',
       [req.user.user_id]
     );
     
@@ -220,7 +220,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     }
     
     // Verify current password
-    const isCurrentPasswordValid = await bcrypt.compare(current_password, userQuery.rows[0].password_hash);
+    const isCurrentPasswordValid = await bcrypt.compare(current_password, userQuery.rows[0].password);
     if (!isCurrentPasswordValid) {
       return res.status(400).json({ message: 'Current password is incorrect' });
     }
@@ -231,7 +231,7 @@ router.put('/change-password', authenticateToken, async (req, res) => {
     
     // Update password
     await pool.query(
-      'UPDATE users SET password_hash = $1, password_changed_at = NOW() WHERE user_id = $2',
+      'UPDATE users SET password = $1, password_changed_at = NOW() WHERE user_id = $2',
       [newPasswordHash, req.user.user_id]
     );
     
@@ -287,7 +287,7 @@ router.get('/export-data', authenticateToken, async (req, res) => {
     );
     
     const registrationData = await pool.query(
-      `SELECT er.*, e.title as event_title, e.start_date, e.end_date 
+      `SELECT er.*, e.event_name as event_title, e.event_date as start_date, e.end_date 
        FROM eventregistrations er 
        JOIN events e ON er.event_id = e.event_id 
        JOIN attendees a ON er.attendee_id = a.attendee_id 
@@ -342,7 +342,7 @@ router.delete('/delete-account', authenticateToken, async (req, res) => {
         is_deleted = true, 
         deleted_at = NOW(), 
         email = CONCAT(email, '_DELETED_', user_id),
-        password_hash = NULL
+        password = NULL
        WHERE user_id = $1`,
       [req.user.user_id]
     );

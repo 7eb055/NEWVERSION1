@@ -32,14 +32,6 @@ const Settings = () => {
   });
   const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
-  useEffect(() => {
-    // Get user role
-    const role = AuthTokenService.getUserRole();
-    setUserRole(role);
-    
-    fetchAllSettings();
-  }, [fetchAllSettings]);
-
   const fetchAllSettings = useCallback(async () => {
     try {
       setIsLoading(true);
@@ -97,6 +89,17 @@ const Settings = () => {
       setIsLoading(false);
     }
   }, [userRole]);
+
+  useEffect(() => {
+    // Get user role
+    const role = AuthTokenService.getUserRole();
+    setUserRole(role);
+    
+    // Only fetch settings if we have a user role
+    if (role) {
+      fetchAllSettings();
+    }
+  }, [fetchAllSettings]);
 
   const handleNotificationChange = async (setting, value) => {
     try {
