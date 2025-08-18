@@ -1,16 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { Pool } = require('pg');
 const authenticateToken = require('../middleware/auth');
-
-// Database connection
-const pool = new Pool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-});
+const pool = require('../db');
 
 // Test endpoint to check authentication
 router.get('/test-auth', authenticateToken, async (req, res) => {

@@ -4754,11 +4754,14 @@ app.post('/api/auth/login', async (req, res) => {
 // Register user
 app.post('/api/auth/register', async (req, res) => {
   try {
-    const { email, password, role_type = 'attendee' } = req.body;
+    const { email, password, role_type, role, username, phone, companyName, contactPerson, location } = req.body;
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
     }
+
+    // Accept both 'role' and 'role_type' for flexibility
+    const userRole = role_type || role || 'attendee';
 
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -4790,10 +4793,25 @@ app.post('/api/auth/register', async (req, res) => {
         email, password, role_type, email_verification_token, email_verification_expires
       ) VALUES ($1, $2, $3, $4, $5) 
       RETURNING user_id, email, role_type, created_at`,
-      [email, hashedPassword, role_type || 'attendee', emailVerificationToken, emailVerificationExpires]
+      [email, hashedPassword, userRole, emailVerificationToken, emailVerificationExpires]
     );
 
     const newUser = userResult.rows[0];
+
+    // If registering as organizer, create organizer record
+    if (userRole === 'organizer') {
+      try {
+        await pool.query(
+          `INSERT INTO organizers (user_id, organizer_name, company_name, contact_person, location, phone)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [newUser.user_id, username || email.split('@')[0], companyName, contactPerson, location, phone]
+        );
+        console.log('Organizer record created for user:', newUser.user_id);
+      } catch (organizerError) {
+        console.error('Failed to create organizer record:', organizerError);
+        // Continue anyway - user can be updated later
+      }
+    }
 
     // Send verification email
     try {
