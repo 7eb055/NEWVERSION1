@@ -25,46 +25,6 @@ const TicketingManagement = ({ events = [] }) => {
     benefits: ''
   });
 
-  // Load user's events on component mount - now use events prop
-  // useEffect(() => {
-  //   loadUserEvents();
-  // }, []);
-
-  // Load ticket data when event is selected
-  useEffect(() => {
-    if (selectedEventId) {
-      loadTicketTypes();
-      if (activeTab === 'sales') loadSalesData();
-      if (activeTab === 'registrations') loadRegistrations();
-    }
-  }, [selectedEventId, activeTab, loadRegistrations, loadSalesData, loadTicketTypes]);
-
-  // Remove this function since we're using events prop
-  // const loadUserEvents = async () => {
-  //   try {
-  //     const token = AuthTokenService.getToken();
-  //     console.log('Loading user events with token:', !!token);
-  //     
-  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
-  //       headers: { Authorization: `Bearer ${token}` }
-  //     });
-  //     
-  //     console.log('Events loaded:', response.data);
-  //     setUserEvents(response.data.events || []);
-  //     
-  //     // Add user feedback when no events are found
-  //     if (!response.data.events || response.data.events.length === 0) {
-  //       setError('No events found. Create your first event to start managing tickets.');
-  //     } else {
-  //       setError(''); // Clear any previous errors
-  //     }
-  //   } catch (error) {
-  //     console.error('Error loading events:', error);
-  //     console.error('Error response:', error.response?.data);
-  //     setError(error.response?.data?.message || 'Failed to load events');
-  //   }
-  // };
-
   const loadTicketTypes = useCallback(async () => {
     if (!selectedEventId) return;
     
@@ -94,7 +54,6 @@ const TicketingManagement = ({ events = [] }) => {
         headers: { Authorization: `Bearer ${token}` }
       });
       
-      // Ensure we have the expected data structure with defaults
       const data = {
         summary: {
           totalRevenue: response.data.summary?.totalRevenue || 0,
@@ -135,6 +94,41 @@ const TicketingManagement = ({ events = [] }) => {
       setLoading(false);
     }
   }, [selectedEventId]);
+
+  // Load ticket data when event is selected
+  useEffect(() => {
+    if (selectedEventId) {
+      loadTicketTypes();
+      if (activeTab === 'sales') loadSalesData();
+      if (activeTab === 'registrations') loadRegistrations();
+    }
+  }, [selectedEventId, activeTab, loadRegistrations, loadSalesData, loadTicketTypes]);
+
+  // Remove this function since we're using events prop
+  // const loadUserEvents = async () => {
+  //   try {
+  //     const token = AuthTokenService.getToken();
+  //     console.log('Loading user events with token:', !!token);
+  //     
+  //     const response = await axios.get(`${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api/events/my-events`, {
+  //       headers: { Authorization: `Bearer ${token}` }
+  //     });
+  //     
+  //     console.log('Events loaded:', response.data);
+  //     setUserEvents(response.data.events || []);
+  //     
+  //     // Add user feedback when no events are found
+  //     if (!response.data.events || response.data.events.length === 0) {
+  //       setError('No events found. Create your first event to start managing tickets.');
+  //     } else {
+  //       setError(''); // Clear any previous errors
+  //     }
+  //   } catch (error) {
+  //     console.error('Error loading events:', error);
+  //     console.error('Error response:', error.response?.data);
+  //     setError(error.response?.data?.message || 'Failed to load events');
+  //   }
+  // };
 
   const handleTicketFormSubmit = async (e) => {
     e.preventDefault();

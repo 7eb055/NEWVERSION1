@@ -33,10 +33,98 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
 
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
 
-  // Load organizer's events on component mount - now use events prop
-  // useEffect(() => {
-  //   loadUserEvents();
-  // }, []);
+  // Load attendees for the selected event using the new comprehensive attendee listing API
+  const loadAttendees = useCallback(async () => {
+    if (!selectedEvent) return;
+    
+    setLoading(true);
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendee-listing`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      console.log('📋 Loaded comprehensive attendee data:', response.data);
+      setAttendees(response.data.attendees || []);
+      setError('');
+    } catch (error) {
+      console.error('Error loading attendees:', error);
+      setError('Failed to load attendees');
+      setAttendees([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [selectedEvent, API_URL]);
+
+  // Load attendance statistics using the new comprehensive stats API
+  const loadAttendanceStats = useCallback(async () => {
+    if (!selectedEvent) return;
+    
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendee-stats`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      console.log('📊 Loaded comprehensive stats:', response.data);
+      
+      if (response.data.success) {
+        setAttendanceStats({
+          [selectedEvent]: {
+            registrations: {
+              total: response.data.stats.total_registered,
+              checked_in: response.data.stats.total_checked_in,
+              currently_present: response.data.stats.currently_present
+            },
+            revenue: {
+              collected: 0
+            },
+            attendance_percentage: response.data.stats.attendance_percentage
+          }
+        });
+      }
+    } catch (error) {
+      console.error('Error loading attendance stats:', error);
+      setError('Failed to load attendance statistics');
+    }
+  }, [selectedEvent, API_URL]);
+
+  // Load scan history
+  const loadScanHistory = useCallback(async () => {
+    if (!selectedEvent) return;
+    
+    try {
+      const token = AuthTokenService.getToken();
+      const response = await axios.get(
+        `${API_URL}/api/events/${selectedEvent}/attendance/history`,
+        {
+          headers: { 'Authorization': `Bearer ${token}` }
+        }
+      );
+      
+      const eventName = events.find(e => e.event_id.toString() === selectedEvent.toString())?.event_name || 'Event';
+      
+      const processedHistory = (response.data.history || []).map(record => ({
+        id: record.log_id,
+        attendeeName: record.attendee_name || 'Unknown',
+        scanTime: record.check_in_time,
+        eventName: eventName,
+        qrCode: record.registration_id?.toString() || 'N/A',
+        ticketType: `Standard (Qty: ${record.ticket_quantity || 1})`,
+        scanMethod: record.scan_method || 'Manual'
+      }));
+      
+      setScanHistory(processedHistory);
+    } catch (error) {
+      console.error('Error loading scan history:', error);
+    }
+  }, [selectedEvent, API_URL, events]);
 
   // Load attendees when event is selected
   useEffect(() => {
@@ -74,139 +162,6 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
   //     setLoading(false);
   //   }
   // };
-
-  // Load attendees for the selected event using the new comprehensive attendee listing API
-  const loadAttendees = useCallback(async () => {
-    if (!selectedEvent) return;
-    
-    setLoading(true);
-    try {
-      const token = AuthTokenService.getToken();
-      const response = await axios.get(
-        `${API_URL}/api/events/${selectedEvent}/attendee-listing`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-      
-      console.log('📋 Loaded comprehensive attendee data:', response.data);
-      setAttendees(response.data.attendees || []);
-      setError('');
-    } catch (error) {
-      console.error('Error loading attendees:', error);
-      setError('Failed to load attendees');
-      setAttendees([]);
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedEvent, API_URL]);
-
-    // Load attendance statistics using the new comprehensive stats API
-  const loadAttendanceStats = useCallback(async () => {
-    if (!selectedEvent) return;
-    
-    try {
-      const token = AuthTokenService.getToken();
-      const response = await axios.get(
-        `${API_URL}/api/events/${selectedEvent}/attendee-stats`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-      
-      console.log('📊 Loaded comprehensive stats:', response.data);
-      // Add more detailed logging of the stats structure
-      console.log('📊 Stats data structure:', JSON.stringify(response.data.stats, null, 2));
-      
-      if (response.data.success) {
-        setAttendanceStats({
-
-          [selectedEvent]: {
-            registrations: {
-              total: response.data.stats.total_registered,
-              checked_in: response.data.stats.total_checked_in,
-              currently_present: response.data.stats.currently_present
-            },
-            revenue: {
-              collected: 0 // This would need to be added to the backend
-            },
-            attendance_percentage: response.data.stats.attendance_percentage
-          }
-
-        });
-        // Log the updated state to confirm
-        console.log('📊 Updated attendanceStats for event:', selectedEvent, response.data.stats);
-      }
-    } catch (error) {
-      console.error('Error loading attendance stats:', error);
-      // Try fallback to old endpoint if new one fails
-      try {
-        const token = AuthTokenService.getToken(); // Get token again since it might be undefined in this scope
-        const fallbackResponse = await axios.get(
-          `${API_URL}/api/events/${selectedEvent}/attendance/stats`,
-          {
-            headers: { 'Authorization': `Bearer ${token}` }
-          }
-        );
-
-        
-        console.log('📊 Loaded fallback stats:', fallbackResponse.data);
-        if (fallbackResponse.data.success) {
-          setAttendanceStats({
-            [selectedEvent]: {
-              registrations: {
-                total: fallbackResponse.data.totalRegistered,
-                checked_in: fallbackResponse.data.totalCheckedIn,
-                currently_present: fallbackResponse.data.currentlyPresent
-              },
-              revenue: {
-                collected: 0 // This would need to be added to the backend
-              },
-              attendance_percentage: fallbackResponse.data.attendancePercentage
-            }
-          });
-        }
-      } catch (fallbackError) {
-        console.error('Fallback stats loading also failed:', fallbackError);
-        setError('Failed to load attendance statistics');
-      }
-    }
-  }, [selectedEvent, API_URL]);
-
-  // Load scan history
-  const loadScanHistory = useCallback(async () => {
-    if (!selectedEvent) return;
-    
-    try {
-      const token = AuthTokenService.getToken();
-      const response = await axios.get(
-        `${API_URL}/api/events/${selectedEvent}/attendance/history`,
-        {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-      
-      // Find the selected event name from the events prop
-      const eventName = events.find(e => e.event_id.toString() === selectedEvent.toString())?.event_name || 'Event';
-      
-      // Process the history data to match the expected format for rendering
-      const processedHistory = (response.data.history || []).map(record => ({
-        id: record.log_id,
-        attendeeName: record.attendee_name || 'Unknown',
-        scanTime: record.check_in_time,
-        eventName: eventName,
-        qrCode: record.registration_id?.toString() || 'N/A',
-        ticketType: `Standard (Qty: ${record.ticket_quantity || 1})`,
-        scanMethod: record.scan_method || 'Manual',
-        status: record.check_out_time ? 'checked-out' : 'checked-in',
-        scannedBy: 'Organizer'
-      }));
-      
-      setScanHistory(processedHistory);
-    } catch (error) {
-      console.error('Error loading scan history:', error);
-    }
-  }, [selectedEvent, API_URL, events]);
 
   // Handle QR code scanning
   const handleQRScan = async () => {

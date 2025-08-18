@@ -3,7 +3,7 @@ import {
   CreateEventModal,
   CompanyRegistrationModal,
   ManualRegistrationModal,
-  TicketingModal,
+  TicketingModal, 
   AttendanceModal
 } from './modals';
 

@@ -133,12 +133,6 @@ const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
-  console.log('=== JWT DEBUG ===');
-  console.log('Full auth header:', authHeader);
-  console.log('Extracted token:', token);
-  console.log('Token length:', token ? token.length : 'No token');
-  console.log('================');
-
   if (!token) {
     return res.status(401).json({ message: 'Access token required' });
   }
@@ -146,7 +140,6 @@ const authenticateToken = (req, res, next) => {
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
       console.log('JWT verification failed:', err.message);
-      console.log('JWT error details:', err);
       return res.status(403).json({ message: 'Invalid or expired token', detail: err.message });
     }
     req.user = user;
@@ -2160,6 +2153,11 @@ app.post('/api/events', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'Event name and date are required' });
     }
 
+    // Convert empty strings to null for integer fields
+    const safeImageSize = image_size === '' || image_size === null || image_size === undefined ? null : parseInt(image_size);
+    const safeMaxAttendees = max_attendees === '' || max_attendees === null || max_attendees === undefined ? 100 : parseInt(max_attendees);
+    const safeTicketPrice = ticket_price === '' || ticket_price === null || ticket_price === undefined ? 0 : parseFloat(ticket_price);
+
     const newEvent = await pool.query(`
       INSERT INTO events (
         event_name, event_date, ticket_price, max_attendees, organizer_id, status,
@@ -2171,8 +2169,8 @@ app.post('/api/events', authenticateToken, async (req, res) => {
     `, [
       event_name,
       event_date,
-      ticket_price || 0,
-      max_attendees || 100,
+      safeTicketPrice,
+      safeMaxAttendees,
       organizerId,
       status,
       description || null,
@@ -2182,7 +2180,7 @@ app.post('/api/events', authenticateToken, async (req, res) => {
       image_url || null,
       image_filename || null,
       image_type || null,
-      image_size || null,
+      safeImageSize,
       image_mimetype || null
     ]);
 
@@ -2240,6 +2238,11 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
       image_mimetype
     } = req.body;
 
+    // Convert empty strings to null for integer fields
+    const safeImageSize = image_size === '' || image_size === null || image_size === undefined ? null : parseInt(image_size);
+    const safeMaxAttendees = max_attendees === '' || max_attendees === null || max_attendees === undefined ? null : parseInt(max_attendees);
+    const safeTicketPrice = ticket_price === '' || ticket_price === null || ticket_price === undefined ? null : parseFloat(ticket_price);
+
     const updatedEvent = await pool.query(`
       UPDATE events 
       SET event_name = COALESCE($1, event_name),
@@ -2262,8 +2265,8 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
     `, [
       event_name,
       event_date,
-      ticket_price,
-      max_attendees,
+      safeTicketPrice,
+      safeMaxAttendees,
       status,
       description,
       venue_name,
@@ -2272,7 +2275,7 @@ app.put('/api/events/:eventId', authenticateToken, async (req, res) => {
       image_url,
       image_filename,
       image_type,
-      image_size,
+      safeImageSize,
       image_mimetype,
       eventId,
       organizerId
