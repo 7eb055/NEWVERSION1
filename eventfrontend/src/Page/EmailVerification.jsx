@@ -3,7 +3,18 @@ import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
 import './css/EmailVerification.css';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+// Ensure API_BASE_URL always includes /api path
+const getApiBaseUrl = () => {
+  const viteApiUrl = import.meta.env.VITE_API_URL;
+  if (viteApiUrl) {
+    // If VITE_API_URL ends with /api, use it as is, otherwise append /api
+    return viteApiUrl.endsWith('/api') ? viteApiUrl : `${viteApiUrl}/api`;
+  }
+  // Fallback for local development
+  return 'http://localhost:5001/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();
