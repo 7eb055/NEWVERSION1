@@ -1439,22 +1439,57 @@ app.get('/api/my-registrations', authenticateToken, async (req, res) => {
   }
 });
 
+// Helper function to get or create organizer ID for a user
+async function getOrCreateOrganizerId(userId) {
+  try {
+    // First, try to get existing organizer
+    const organizerQuery = await pool.query(
+      'SELECT organizer_id FROM organizers WHERE user_id = $1',
+      [userId]
+    );
+    
+    if (organizerQuery.rows.length > 0) {
+      return { success: true, organizerId: organizerQuery.rows[0].organizer_id };
+    }
+    
+    // If no organizer record exists, create one
+    const userQuery = await pool.query(
+      'SELECT email FROM users WHERE user_id = $1 OR id = $1',
+      [userId]
+    );
+    
+    if (userQuery.rows.length === 0) {
+      return { success: false, error: 'User not found' };
+    }
+    
+    const userEmail = userQuery.rows[0].email;
+    
+    // Create basic organizer record
+    const newOrganizerQuery = await pool.query(
+      'INSERT INTO organizers (user_id, full_name, organizer_name) VALUES ($1, $2, $3) RETURNING organizer_id',
+      [userId, userEmail, userEmail]
+    );
+    
+    const organizerId = newOrganizerQuery.rows[0].organizer_id;
+    console.log(`Auto-created organizer record for user ${userId} with organizer_id ${organizerId}`);
+    
+    return { success: true, organizerId, created: true };
+  } catch (error) {
+    console.error('Error in getOrCreateOrganizerId:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 // Organizer Routes
 // GET organizer's events
 app.get('/api/events/my-events', authenticateToken, async (req, res) => {
   try {
-    // Get organizer_id from the user
-    const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
-      [req.user.user_id]
-    );
-
-    if (organizerQuery.rows.length === 0) {
-      return res.status(403).json({ message: 'User is not an organizer' });
+    const organizerResult = await getOrCreateOrganizerId(req.user.user_id);
+    
+    if (!organizerResult.success) {
+      return res.status(500).json({ message: organizerResult.error || 'Failed to get organizer information' });
     }
-
-    const organizerId = organizerQuery.rows[0].organizer_id;
-
+    
     // Get events for this organizer
     const eventsQuery = await pool.query(`
       SELECT e.event_id, e.event_name, e.event_date, 
@@ -1470,7 +1505,7 @@ app.get('/api/events/my-events', authenticateToken, async (req, res) => {
       WHERE e.organizer_id = $1
       GROUP BY e.event_id
       ORDER BY e.event_date DESC
-    `, [organizerId]);
+    `, [organizerResult.organizerId]);
 
     res.json(eventsQuery.rows);
   } catch (error) {
@@ -2120,17 +2155,13 @@ app.post('/api/attendees', authenticateToken, async (req, res) => {
 // POST create new event (organizer only)
 app.post('/api/events', authenticateToken, async (req, res) => {
   try {
-    // Get organizer_id from the user
-    const organizerQuery = await pool.query(
-      'SELECT organizer_id FROM organizers WHERE user_id = $1',
-      [req.user.user_id]
-    );
-
-    if (organizerQuery.rows.length === 0) {
-      return res.status(403).json({ message: 'User is not an organizer' });
+    const organizerResult = await getOrCreateOrganizerId(req.user.user_id);
+    
+    if (!organizerResult.success) {
+      return res.status(500).json({ message: organizerResult.error || 'Failed to get organizer information' });
     }
 
-    const organizerId = organizerQuery.rows[0].organizer_id;
+    const organizerId = organizerResult.organizerId;
 
     const {
       event_name,
