@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
+import { API_BASE_URL } from '../../config/api';
 import './css/CompanyRegistration.css';
 
 const CompanyRegistration = ({ onSubmit, onCancel, isLoading, editMode = false, initialData = null }) => {

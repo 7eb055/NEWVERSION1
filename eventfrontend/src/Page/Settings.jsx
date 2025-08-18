@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AuthTokenService from '../services/AuthTokenService';
 import apiService from '../services/ApiService';
 import Header from '../component/header';
@@ -38,9 +38,9 @@ const Settings = () => {
     setUserRole(role);
     
     fetchAllSettings();
-  }, []);
+  }, [fetchAllSettings]);
 
-  const fetchAllSettings = async () => {
+  const fetchAllSettings = useCallback(async () => {
     try {
       setIsLoading(true);
       setError('');
@@ -96,7 +96,7 @@ const Settings = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [userRole]);
 
   const handleNotificationChange = async (setting, value) => {
     try {
