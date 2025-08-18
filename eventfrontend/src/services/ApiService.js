@@ -3,10 +3,11 @@
 
 import axios from 'axios';
 import AuthTokenService from './AuthTokenService';
+import { API_BASE_URL } from '../config/api';
 
 class ApiService {
-  constructor(baseURL = 'http://localhost:5001') {
-    this.baseURL = baseURL;
+  constructor(baseURL = null) {
+    this.baseURL = baseURL || API_BASE_URL;
     this.axiosInstance = this.createAxiosInstance();
   }
 

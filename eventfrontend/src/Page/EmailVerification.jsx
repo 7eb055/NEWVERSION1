@@ -1,20 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import axios from 'axios';
+import { API_URL } from '../config/api';
 import './css/EmailVerification.css';
 
-// Ensure API_BASE_URL always includes /api path
-const getApiBaseUrl = () => {
-  const viteApiUrl = import.meta.env.VITE_API_URL;
-  if (viteApiUrl) {
-    // If VITE_API_URL ends with /api, use it as is, otherwise append /api
-    return viteApiUrl.endsWith('/api') ? viteApiUrl : `${viteApiUrl}/api`;
-  }
-  // Fallback for local development
-  return 'http://localhost:5001/api';
-};
-
-const API_BASE_URL = getApiBaseUrl();
+const API_BASE_URL = API_URL;
 
 const EmailVerification = () => {
   const [searchParams] = useSearchParams();

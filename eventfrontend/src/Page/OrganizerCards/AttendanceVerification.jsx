@@ -3,6 +3,7 @@ import axios from 'axios';
 import AuthTokenService from '../../services/AuthTokenService';
 import AttendeeListingService from '../../services/attendeeListingService';
 import { formatCurrency, toNumber } from '../../utils/formatters';
+import { API_BASE_URL } from '../../config/api';
 import './css/AttendanceVerification.css';
 
 const AttendanceVerification = ({ events = [], onCancel }) => {
@@ -31,7 +32,7 @@ const AttendanceVerification = ({ events = [], onCancel }) => {
     return Math.round((checkedIn / total) * 100);
   };
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+  const API_URL = API_BASE_URL;
 
   // Load attendees for the selected event using the new comprehensive attendee listing API
   const loadAttendees = useCallback(async () => {

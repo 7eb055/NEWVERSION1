@@ -1,8 +1,9 @@
 // Event Attendee Listing Service
 // Frontend service to interact with the attendee listing API
+import { API_URL } from '../config/api';
 
 class AttendeeListingService {
-  constructor(apiBaseUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5001'}/api`) {
+  constructor(apiBaseUrl = API_URL) {
     this.baseUrl = apiBaseUrl;
   }
 

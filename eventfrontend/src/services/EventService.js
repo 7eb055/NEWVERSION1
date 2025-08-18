@@ -1,5 +1,6 @@
 // Event Service - Handles all event-related API calls
 import ApiService from './ApiService';
+import { API_BASE_URL } from '../config/api';
 
 class EventService {
   constructor() {
@@ -7,7 +8,7 @@ class EventService {
     this.apiService = ApiService;
     
     // Set the API URL if needed
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    const apiUrl = API_BASE_URL;
     this.apiService.setBaseURL(apiUrl);
   }
 

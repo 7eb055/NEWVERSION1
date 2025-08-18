@@ -1,8 +1,9 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 class PaymentService {
   constructor() {
-    this.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+    this.baseURL = API_BASE_URL;
   }
 
   /**
