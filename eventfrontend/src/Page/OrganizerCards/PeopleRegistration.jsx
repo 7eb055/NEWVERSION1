@@ -152,129 +152,51 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
       return; // Stop if validation fails
     }
     
-    setIsLoading(true);
-    setSuccess('');
+    // Prepare data - ensure fields are properly formatted and all required fields are included
+    const attendeeData = {
+      full_name: formData.full_name.trim(),
+      email: formData.email.trim(),
+      phone: formData.phone.trim(),
+      date_of_birth: formData.date_of_birth || null,
+      gender: formData.gender || null,
+      interests: formData.interests || null,
+      emergency_contact_name: formData.emergency_contact_name || null,
+      emergency_contact_phone: formData.emergency_contact_phone || null,
+      dietary_restrictions: formData.dietary_restrictions || null,
+      accessibility_needs: formData.accessibility_needs || null,
+      bio: formData.bio || null,
+      social_media_links: JSON.stringify(formData.social_media_links || {}),
+      notification_preferences: JSON.stringify(formData.notification_preferences || {}),
+      company_id: formData.company_id || null,
+      profile_picture_url: formData.profile_picture_url || null
+    };
     
-    try {
-      const token = AuthTokenService.getToken();
-      
-      if (!token) {
-        setErrors({ general: 'Authentication token not found. Please log in.' });
-        setIsLoading(false);
-        return;
-      }
-
-      // Prepare data - ensure fields are properly formatted and all required fields are included
-      const attendeeData = {
-        full_name: formData.full_name.trim(),
-        email: formData.email.trim(),
-        phone: formData.phone.trim(),
-        date_of_birth: formData.date_of_birth || null,
-        gender: formData.gender || null,
-        interests: formData.interests || null,
-        emergency_contact_name: formData.emergency_contact_name || null,
-        emergency_contact_phone: formData.emergency_contact_phone || null,
-        dietary_restrictions: formData.dietary_restrictions || null,
-        accessibility_needs: formData.accessibility_needs || null,
-        bio: formData.bio || null,
-        social_media_links: JSON.stringify(formData.social_media_links || {}),
-        notification_preferences: JSON.stringify(formData.notification_preferences || {}),
-        company_id: formData.company_id || null,
-        profile_picture_url: formData.profile_picture_url || null
-      };
-      
-      let response;
-      
-      if (editMode && initialData?.attendee_id) {
-        // Update existing attendee
-        response = await axios.put(
-          `${API_BASE_URL}/api/attendees/${initialData.attendee_id}`,
-          attendeeData,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        setSuccess('Attendee updated successfully!');
-      } else {
-        // Create new attendee
-        response = await axios.post(
-          `${API_BASE_URL}/api/attendees`,
-          attendeeData,
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          }
-        );
-        
-        setSuccess('Attendee registered successfully!');
-      }
-      
-      // Call the parent component's onSubmit handler with the response data
-      if (onSubmit && typeof onSubmit === 'function') {
-        onSubmit(response.data);
-      }
-      
-      // If not in edit mode, reset the form
-      if (!editMode) {
-        setFormData({
-          full_name: '',
-          email: '',
-          phone: '',
-          date_of_birth: '',
-          gender: '',
-          interests: '',
-          emergency_contact_name: '',
-          emergency_contact_phone: '',
-          dietary_restrictions: '',
-          accessibility_needs: '',
-          bio: '',
-          social_media_links: {},
-          notification_preferences: {},
-          company_id: '',
-          profile_picture_url: ''
-        });
-      }
-    } catch (err) {
-      console.error('Error registering/updating attendee:', err);
-      let errorMessage = 'Failed to register/update attendee. Please try again.';
-      let fieldErrors = {};
-      
-      if (err.response) {
-        if (err.response.status === 400) {
-          if (err.response.data && err.response.data.message) {
-            const message = err.response.data.message.toLowerCase();
-            
-            // More specific field error handling
-            if (message.includes('email')) {
-              fieldErrors.email = err.response.data.message;
-            } else if (message.includes('full name') || message.includes('full_name')) {
-              fieldErrors.full_name = err.response.data.message;
-            } else if (message.includes('phone')) {
-              fieldErrors.phone = err.response.data.message;
-            } else {
-              errorMessage = err.response.data.message;
-            }
-          }
-        } else {
-          errorMessage = err.response.data?.message || 'An error occurred while processing your request';
-        }
-      }
-      
-      setErrors({
-        ...fieldErrors,
-        general: Object.keys(fieldErrors).length === 0 ? errorMessage : undefined
+    // Call the parent component's onSubmit handler with the form data
+    if (onSubmit && typeof onSubmit === 'function') {
+      onSubmit(attendeeData);
+    }
+    
+    // If not in edit mode, reset the form after successful submission
+    if (!editMode) {
+      setFormData({
+        full_name: '',
+        email: '',
+        phone: '',
+        date_of_birth: '',
+        gender: '',
+        interests: '',
+        emergency_contact_name: '',
+        emergency_contact_phone: '',
+        dietary_restrictions: '',
+        accessibility_needs: '',
+        bio: '',
+        social_media_links: {},
+        notification_preferences: {},
+        company_id: '',
+        profile_picture_url: ''
       });
-    } finally {
-      setIsLoading(false);
     }
   };
-
   return (
     <div className="people-registration-container">
       <div className="form-container">
