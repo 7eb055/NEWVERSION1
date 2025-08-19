@@ -5,7 +5,6 @@ import './css/PeopleRegistration.css';
 import { API_BASE_URL } from '../../config/api';
 
 const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, editMode = false, initialData = null }) => {
-  const [isLoading, setIsLoading] = useState(propIsLoading || false);
   const [companies, setCompanies] = useState([]);
   const [formData, setFormData] = useState({
     full_name: '',
@@ -25,7 +24,6 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
     profile_picture_url: ''
   });
   const [errors, setErrors] = useState({});
-  const [success, setSuccess] = useState('');
 
   // Fetch companies when component mounts
   useEffect(() => {
@@ -204,12 +202,6 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
           <i className="fas fa-users"></i>
           {editMode ? 'Edit Person' : 'Register Person'}
         </div>
-        
-        {success && (
-          <div className="success-message">
-            <i className="fas fa-check-circle"></i> {success}
-          </div>
-        )}
         
         {errors.general && (
           <div className="error-message">
@@ -515,16 +507,16 @@ const PeopleRegistration = ({ onSubmit, onCancel, isLoading: propIsLoading, edit
               type="button" 
               className="btn-secondary"
               onClick={onCancel}
-              disabled={isLoading}
+              disabled={propIsLoading}
             >
               Cancel
             </button>
             <button 
               type="submit" 
               className="btn-primary"
-              disabled={isLoading}
+              disabled={propIsLoading}
             >
-              {isLoading ? (
+              {propIsLoading ? (
                 <>
                   <i className="fas fa-spinner fa-spin"></i>
                   {editMode ? 'Updating...' : 'Registering...'}
