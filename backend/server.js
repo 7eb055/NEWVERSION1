@@ -13,7 +13,7 @@ const attendeeRoutes = require('./routes/attendee');
 // const ticketingRoutes = require('./routes/ticketing'); // Temporarily disabled - causes early DB connection
 const { router: settingsRoutes, setPool: setSettingsPool } = require('./routes/settings');
 const adminRoutes = require('./routes/admin');
-// const paymentRoutes = require('./routes/payments'); // Temporarily disabled - causes early DB connection
+const paymentRoutes = require('./routes/payments');
 
 // Import upload middleware
 const { upload, handleMulterError } = require('./middleware/upload');
@@ -5669,6 +5669,9 @@ app.use('/api/public/events', publicEventsRouter);
 
 // Mount attendee routes
 app.use('/api/attendee', attendeeRoutes);
+
+// Mount payment routes
+app.use('/api/payments', paymentRoutes);
 
 // Mount ticketing routes
 // app.use('/api', ticketingRoutes); // Temporarily disabled - causes early DB connection
