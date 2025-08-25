@@ -4,7 +4,6 @@ import "./css/Eventdetails.css";
 import Header from "../component/header";
 import Footer from "../component/footer";
 import EventCard from '../component/AttendeeCards/EventCard';
-import TicketPurchaseCard from '../component/AttendeeCards/TicketPurchaseCard';
 import FeedbackCard from '../component/AttendeeCards/FeedbackCard';
 import EventReviewsCard from '../component/AttendeeCards/EventReviewsCard';
 import ProfileCard from '../component/AttendeeCards/ProfileCard';
@@ -62,12 +61,8 @@ function Attendee() {
     confirmations: 0,
     system_notifications: 0
   });
-  const [selectedEvent, setSelectedEvent] = useState(null);
-  const [showTicketPurchase, setShowTicketPurchase] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackEventId, setFeedbackEventId] = useState(null);
-  const [ticketTypes, setTicketTypes] = useState([]);
-  const [loadingTickets, setLoadingTickets] = useState(false);
 
   // Helper function to get auth token
   const getAuthToken = useCallback(() => {
@@ -323,51 +318,6 @@ function Attendee() {
     // The useEffect will trigger a new fetchEvents call
   };
 
-  // Handle register for event click  
-  const handleRegisterClick = async (event) => {
-    setSelectedEvent(event);
-    setLoadingTickets(true);
-    
-    try {
-      // Fetch ticket types for the selected event
-      const response = await fetch(`${API_BASE_URL}/api/events/${event.event_id}/ticket-types/public`);
-      
-      if (response.ok) {
-        const data = await response.json();
-        setTicketTypes(data.ticketTypes || []);
-      } else {
-        console.error('Failed to fetch ticket types');
-        setTicketTypes([]);
-      }
-    } catch (error) {
-      console.error('Error fetching ticket types:', error);
-      setTicketTypes([]);
-    } finally {
-      setLoadingTickets(false);
-      setShowTicketPurchase(true);
-    }
-  };
-
-  // Handle purchase ticket submission
-  const handlePurchaseTicket = async () => {
-    try {
-      // The TicketPurchaseCard already handles the API call
-      // Just show success message and close the modal
-      alert('Ticket purchased successfully!');
-      setShowTicketPurchase(false);
-      
-      // Refresh tickets, notifications, and stats from the backend to get the latest data
-      await Promise.all([
-        fetchMyTickets(),
-        fetchNotifications(),
-        fetchNotificationStats()
-      ]);
-    } catch (error) {
-      console.error('Error handling ticket purchase:', error);
-      alert('An error occurred while processing your ticket purchase');
-    }
-  };
-
   // Handle view QR code
   const handleViewQRCode = (ticketId) => {
     const ticket = myTickets.find(t => t.id === ticketId);
@@ -595,7 +545,7 @@ function Attendee() {
         </div>
         
         {/* Conditional rendering based on active tab */}
-        {activeTab === 'events' && !showTicketPurchase && !showFeedback && (
+        {activeTab === 'events' && !showFeedback && (
           <div className="dashboard-section">
             <div className="section-header">
               <h2 className="section-title">Available Events</h2>
@@ -638,7 +588,6 @@ function Attendee() {
                   <EventCard 
                     key={event.event_id}
                     event={event}
-                    onRegister={() => handleRegisterClick(event)}
                     onViewDetails={() => navigate(`/event/${event.event_id}`)}
                   />
                 ))
@@ -672,16 +621,6 @@ function Attendee() {
               )}
             </div>
           </div>
-        )}
-        
-        {activeTab === 'events' && showTicketPurchase && (
-          <TicketPurchaseCard 
-            event={selectedEvent}
-            ticketTypes={ticketTypes}
-            loading={loadingTickets}
-            onPurchase={handlePurchaseTicket}
-            onCancel={() => setShowTicketPurchase(false)}
-          />
         )}
         
         {activeTab === 'events' && showFeedback && (

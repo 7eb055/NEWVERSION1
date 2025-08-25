@@ -2,7 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import './AttendeeCards.css';
 
-const EventCard = ({ event, onRegister }) => {
+const EventCard = ({ event }) => {
   const navigate = useNavigate();
   
   const formatDate = (dateString) => {
@@ -58,8 +58,8 @@ const EventCard = ({ event, onRegister }) => {
         <button className="btn-primary" onClick={viewEventDetails}>
           View Details
         </button>
-        <button className="btn-secondary" onClick={() => onRegister(event)}>
-          Register
+        <button className="btn-secondary" onClick={viewEventDetails}>
+          Register Now
         </button>
       </div>
     </div>

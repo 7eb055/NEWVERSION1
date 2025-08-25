@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './css/browseEvents.css';
 import EventService from '../services/EventService';
 import AuthTokenService from '../services/AuthTokenService';
 import { API_BASE_URL } from '../config/api';
 
 const BrowseEvents = () => {
+  const navigate = useNavigate();
   const [selectedDate, setSelectedDate] = useState(null);
   const [events, setEvents] = useState([]);
   const [filteredEvents, setFilteredEvents] = useState([]);
   const [eventDates, setEventDates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [registering, setRegistering] = useState({});
 
   // Default placeholder image for events
   const defaultEventImage = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
@@ -65,33 +66,17 @@ const BrowseEvents = () => {
     }
   };
 
-  const handleRegisterForEvent = async (eventId) => {
+  const handleViewEventDetails = (eventId) => {
     const isLoggedIn = AuthTokenService.isAuthenticated();
     
     if (!isLoggedIn) {
-      alert('Please log in to register for events');
+      alert('Please log in to view event details and register');
       // You could redirect to login page here
       return;
     }
 
-    try {
-      setRegistering(prev => ({ ...prev, [eventId]: true }));
-      
-      const response = await EventService.registerForEvent(eventId, 1);
-      
-      if (response.success) {
-        alert('Successfully registered for the event!');
-        // Refresh events to update registration count
-        fetchEvents();
-      } else {
-        alert(response.error || 'Failed to register for event');
-      }
-    } catch (err) {
-      console.error('Error registering for event:', err);
-      alert('Failed to register for event. Please try again.');
-    } finally {
-      setRegistering(prev => ({ ...prev, [eventId]: false }));
-    }
+    // Navigate to event details page where they can register
+    navigate(`/events/${eventId}`);
   };
 
   const formatEventDate = (dateString) => {
@@ -237,7 +222,6 @@ const BrowseEvents = () => {
             filteredEvents.map((event, index) => {
               const formattedDate = formatEventDate(event.event_date);
               const availableTickets = getAvailableTickets(event);
-              const isRegistering = registering[event.event_id];
               const isSoldOut = availableTickets <= 0;
               const isLowCapacity = availableTickets <= 10 && availableTickets > 0;
               
@@ -315,16 +299,11 @@ const BrowseEvents = () => {
                     {/* Action Buttons */}
                     <div className="event-actions-modern">
                       <button 
-                        className={`primary-action-btn ${isRegistering ? 'loading' : ''} ${isSoldOut ? 'disabled' : ''}`}
-                        onClick={() => handleRegisterForEvent(event.event_id)}
-                        disabled={isRegistering || isSoldOut}
+                        className={`primary-action-btn ${isSoldOut ? 'disabled' : ''}`}
+                        onClick={() => handleViewEventDetails(event.event_id)}
+                        disabled={isSoldOut}
                       >
-                        {isRegistering ? (
-                          <>
-                            <span className="btn-spinner"></span>
-                            Registering...
-                          </>
-                        ) : isSoldOut ? (
+                        {isSoldOut ? (
                           <>
                             <span className="btn-icon">❌</span>
                             Sold Out
@@ -339,9 +318,7 @@ const BrowseEvents = () => {
                       
                       <button 
                         className="secondary-action-btn"
-                        onClick={() => {
-                          console.log('View details for event:', event.event_id);
-                        }}
+                        onClick={() => handleViewEventDetails(event.event_id)}
                       >
                         <span className="btn-icon">📋</span>
                         Details

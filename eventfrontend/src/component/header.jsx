@@ -93,7 +93,7 @@ const Header = () => {
     
     const commonLinks = [
       { to: "/", icon: "fas fa-home", text: "Home" },
-      { to: "/eventslist", icon: "fas fa-calendar", text: "Events" }
+      //{ to: "/eventslist", icon: "fas fa-calendar", text: "Events" }
     ];
 
     const roleLinks = {
