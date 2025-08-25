@@ -47,30 +47,7 @@ const AdminDashboard = () => {
 
   const API_BASE = API_BASE_URL;
 
-  useEffect(() => {
-    fetchDashboardData();
-    }, [fetchDashboardData]);
-
-  useEffect(() => {
-    if (activeTab === 'users') fetchUsers();
-    }, [activeTab, userFilters, userPagination.page, fetchUsers]);
-
-  useEffect(() => {
-    if (activeTab === 'events') fetchEvents();
-    }, [activeTab, eventFilters, fetchEvents]);
-
-  useEffect(() => {
-    if (activeTab === 'logs') fetchLogs();
-    }, [activeTab, logFilters, fetchLogs]);
-
-  useEffect(() => {
-    if (activeTab === 'system') fetchSystemHealth();
-    }, [activeTab, fetchSystemHealth]);
-
-  useEffect(() => {
-    if (activeTab === 'reports') fetchReports();
-    }, [activeTab, reportPeriod, fetchReports]);
-
+  // Callback functions - defined before useEffect hooks to avoid hoisting issues
   const fetchDashboardData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -173,6 +150,31 @@ const AdminDashboard = () => {
       console.error(err);
     }
   }, [API_BASE, reportPeriod]);
+
+  // useEffect hooks - now defined after callback functions
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  useEffect(() => {
+    if (activeTab === 'users') fetchUsers();
+  }, [activeTab, userFilters, userPagination.page, fetchUsers]);
+
+  useEffect(() => {
+    if (activeTab === 'events') fetchEvents();
+  }, [activeTab, eventFilters, fetchEvents]);
+
+  useEffect(() => {
+    if (activeTab === 'logs') fetchLogs();
+  }, [activeTab, logFilters, fetchLogs]);
+
+  useEffect(() => {
+    if (activeTab === 'system') fetchSystemHealth();
+  }, [activeTab, fetchSystemHealth]);
+
+  useEffect(() => {
+    if (activeTab === 'reports') fetchReports();
+  }, [activeTab, reportPeriod, fetchReports]);
 
   const handleUserAction = async (action, userId, data = {}) => {
     try {
